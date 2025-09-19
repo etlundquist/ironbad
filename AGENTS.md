@@ -1,0 +1,3 @@
+- do not edit whitespace of existing lines if there are no surrounding non-whitespace suggestions
+- never make whitespace-only edit suggestions
+- never make comment-only edit suggestions
