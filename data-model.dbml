@@ -1,0 +1,163 @@
+// Enum Definitions //
+//////////////////////
+
+enum contract_status {
+  uploaded
+  parsed
+  analyzed
+  error
+}
+
+enum job_status {
+  queued
+  in_progress
+  completed
+  failed
+}
+
+enum section_type {
+  toc
+  preamble
+  body
+  signature
+  attachment
+}
+
+// User Configuration Entities //
+/////////////////////////////////
+
+// standard set of terms to map/extract from input contracts
+Table standard_terms {
+  id uuid [pk]
+  name string
+  description string
+  standard_text string
+  created_at timestamp
+  updated_at timestamp
+}
+
+// standard term-specific policy rules
+table standard_term_rules {
+  id uuid [pk]
+  standard_term_id uuid [ref: > standard_terms.id]
+  severity enum
+  title string
+  text string
+}
+
+// User-Uploaded Contract Entities //
+/////////////////////////////////////
+
+// user-uploaded contracts
+Table contracts {
+  id uuid [pk]
+  status contract_status
+  errors json
+  filename string
+  filetype enum
+  contents bytea
+  markdown string
+  meta json
+  created_at timestamp
+  updated_at timestamp
+}
+
+// parsed individual sections from input contracts
+Table contract_sections {
+  id uuid [pk]
+  contract_id uuid [ref: > contracts.id]
+  type enum
+  level integer
+  number string
+  name string
+  markdown string
+  embedding vector
+  beg_page int
+  end_page int
+  created_at timestamp
+  updated_at timestamp
+}
+
+// System-Generated Mapped Terms and Identified Issues //
+/////////////////////////////////////////////////////////
+
+// contract-specific standardized term text
+Table contract_terms {
+  id uuid [pk]
+  standard_term_id uuid [ref: > standard_terms.id]
+  contract_id uuid [ref: > contracts.id]
+  contract_sections uuid[] [ref: > contract_sections.id]
+  markdown string
+  created_at timestamp
+  updated_at timestamp
+}
+
+// mapping of contract-specific terms to relevant raw sections
+Table contract_term_sections {
+  id uuid [pk]
+  contract_term_id uuid [ref: > contract_terms.id]
+  contract_section_id uuid [ref: > contract_sections.id]
+}
+
+// identified contract-term issues wrt term-specific policy rules
+// NOTE: citations will be to term-specific policy rules
+Table contract_issues {
+  id uuid [pk]
+  standard_term_id uuid [ref: > standard_terms.id]
+  contract_id uuid [ref: > contracts.id]
+  issue_description string
+  relevant_text string
+  citations json
+  suggested_fix string
+  created_at timestamp
+  updated_at timestamp
+}
+
+// Chat-Based Contract Q&A Entities //
+//////////////////////////////////////
+
+// contract-specific chat threads
+Table chat_thread {
+  id uuid [pk]
+  contract_id uuid [ref: > contracts.id]
+  name string
+  archived boolean
+  created_at timestamp
+  updated_at timestamp
+}
+
+// contract-specific chat thread messages
+// NOTE: citations will be to the relevant contract section
+Table chat_message {
+  id uuid [pk]
+  chat_thread_id uuid [ref: > chat_thread.id]
+  parent_chat_message_id uuid [ref: - chat_message.id]
+  status enum
+  events json
+  role enum
+  content string
+  citations json
+  created_at timestamp
+  updated_at timestamp
+}
+
+// Background Jobs Entities //
+//////////////////////////////
+
+Table contract_ingestion_jobs {
+  id uuid [pk]
+  contract_id uuid [ref: > contracts.id]
+  status job_status
+  errors json
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table contract_analysis_jobs {
+  id uuid [pk]
+  contract_id uuid [ref: > contracts.id]
+  status job_status
+  errors json
+  created_at timestamp
+  updated_at timestamp
+}
