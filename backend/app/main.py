@@ -5,6 +5,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import create_tables
+from app.routers.index import router as index_router
+from app.routers.contracts import router as contracts_router
 
 
 logging.basicConfig(level=logging.INFO)
@@ -29,10 +31,5 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
-async def root():
-    return {"message": "hello world"}
-
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
+app.include_router(index_router)
+app.include_router(contracts_router)
