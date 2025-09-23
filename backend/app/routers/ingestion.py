@@ -30,6 +30,7 @@ async def ingest_contracts(contract_ids: List[UUID], db: AsyncSession = Depends(
     result = await db.execute(query)
     contracts = result.scalars().all()
     if len(contracts) != len(contract_ids):
+        logger.error("one or more requested contracts cannot be ingested", exc_info=True)
         raise HTTPException(status_code=400, detail="one or more requested contracts cannot be ingested")
 
     # create a new ingestion job for each ingestion contract

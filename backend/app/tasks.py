@@ -11,13 +11,13 @@ from taskiq_redis import RedisAsyncResultBackend, RedisStreamBroker
 from openai import AsyncOpenAI
 from openai.types import CreateEmbeddingResponse
 
-
 from app.ingestion import parse_contract
 from app.dbmodels import Contract as DBContract, ContractSection
 from app.models import ContractIngestionJob, ParsedContractSection
 from app.database import engine
 from app.utils import string_truncate, with_semaphore
 from app.enums import ContractStatus
+
 
 logger = logging.getLogger(__name__)
 encoding = tiktoken.encoding_for_model("gpt-4o")
@@ -48,7 +48,7 @@ async def get_section_embeddings(sections: list[ParsedContractSection]) -> list[
     return section_embeddings
 
 
-@broker.task
+@broker.task()
 async def ingest_contract(contract_ingestion_job: ContractIngestionJob) -> None:
     """parse/ingest a contract and update it's status"""
 
