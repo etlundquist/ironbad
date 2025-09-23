@@ -3,7 +3,7 @@ from typing import Optional
 from uuid import UUID
 from datetime import datetime
 
-from app.enums import ContractSectionType, JobStatus, ContractStatus, FileType
+from app.enums import ContractSectionType, JobStatus, ContractStatus, FileType, RuleSeverity
 
 
 class ConfiguredBaseModel(BaseModel):
@@ -21,7 +21,6 @@ class ParsedContractSection(ConfiguredBaseModel):
     embedding: Optional[list[float]] = None
     beg_page: Optional[int] = None
     end_page: Optional[int] = None
-
 
 class ParsedContract(ConfiguredBaseModel):
     filename: str
@@ -46,3 +45,44 @@ class ContractIngestionJob(ConfiguredBaseModel):
     errors: Optional[list[dict]] = None
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
+
+
+class StandardTerm(ConfiguredBaseModel):
+    id: UUID
+    name: str
+    display_name: str
+    description: str
+    standard_text: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+class StandardTermCreate(ConfiguredBaseModel):
+    name: str
+    display_name: str
+    description: str
+    standard_text: Optional[str] = None
+
+class StandardTermUpdate(ConfiguredBaseModel):
+    display_name: Optional[str] = None
+    description: Optional[str] = None
+    standard_text: Optional[str] = None
+
+
+class StandardTermRule(ConfiguredBaseModel):
+    id: UUID
+    standard_term_id: UUID
+    severity: RuleSeverity
+    title: str
+    text: str
+    created_at: datetime
+    updated_at: datetime
+
+class StandardTermRuleCreate(ConfiguredBaseModel):
+    severity: RuleSeverity
+    title: str
+    text: str
+
+class StandardTermRuleUpdate(ConfiguredBaseModel):
+    severity: Optional[RuleSeverity] = None
+    title: Optional[str] = None
+    text: Optional[str] = None

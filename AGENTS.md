@@ -1,3 +1,4 @@
 - do not edit whitespace of existing lines if there are no surrounding non-whitespace suggestions
 - never make whitespace-only edit suggestions
 - never make comment-only edit suggestions
+- try to fit edits on a single line when doing so would make the code more clear and the line width would be at most 120 characters

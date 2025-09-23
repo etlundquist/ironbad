@@ -21,3 +21,8 @@ class JobStatus(Enum):
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     FAILED = "failed"
+
+class RuleSeverity(Enum):
+    CRITICAL = "critical"
+    WARNING = "warning"
+    INFO = "info"

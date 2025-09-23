@@ -89,8 +89,6 @@ async def get_contracts(
         result = await db.execute(query)
         contracts = result.scalars().all()
         return [Contract.model_validate(contract) for contract in contracts]
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error("failed to fetch contracts", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
