@@ -4,9 +4,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import create_tables
+from app.database import create_extensions, create_tables
 from app.routers.index import router as index_router
 from app.routers.contracts import router as contracts_router
+from app.routers.ingestion import router as ingestion_router
+from app.tasks import broker
 
 
 logging.basicConfig(level=logging.INFO)
@@ -14,8 +16,11 @@ logging.basicConfig(level=logging.INFO)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await create_extensions()
     await create_tables()
+    await broker.startup()
     yield
+    await broker.shutdown()
 
 app = FastAPI(
     title="Ironbad Backend",
@@ -33,3 +38,4 @@ app.add_middleware(
 
 app.include_router(index_router)
 app.include_router(contracts_router)
+app.include_router(ingestion_router)

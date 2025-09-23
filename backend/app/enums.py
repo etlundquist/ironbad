@@ -2,20 +2,22 @@ from enum import Enum
 
 class ContractStatus(Enum):
     UPLOADED = "uploaded"
-    ANALYZING = "ingested"
-    COMPLETE = "analyzed"
+    INGESTING = "ingesting"
+    INGESTED = "ingested"
+    ANALYZING = "analyzing"
+    ANALYZED = "analyzed"
     ERROR = "error"
 
 class FileType(Enum):
     PDF = "application/pdf"
 
-class ContractType(Enum):
-    MSA = "Master Service Agreement"
-    SOW = "Statement of Work"
-    PO = "Purchase Order"
-
-class SectionType(Enum):
+class ContractSectionType(Enum):
     PREAMBLE = "preamble"
     BODY = "body"
-    ATTACHMENT = "attachment"
-    EXHIBIT = "exhibit"
+    APPENDIX = "appendix"
+
+class JobStatus(Enum):
+    QUEUED = "queued"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    FAILED = "failed"

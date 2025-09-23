@@ -6,6 +6,7 @@ from typing import AsyncGenerator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, AsyncEngine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import text
 
 from app.dbmodels import Base
 
@@ -24,6 +25,13 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             yield session
         finally:
             await session.close()
+
+
+async def create_extensions():
+    """add all necessary extensions to the database"""
+
+    async with engine.begin() as cnx:
+        await cnx.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
 
 
 async def create_tables():

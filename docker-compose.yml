@@ -33,9 +33,11 @@ services:
     depends_on:
       database:
         condition: service_healthy
+      redis:
+        condition: service_started
 
   database:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     container_name: ironbad-database
     environment:
       POSTGRES_DB: ironbad
@@ -51,5 +53,48 @@ services:
       timeout: 5s
       retries: 3
 
+  redis:
+    image: redis:7-alpine
+    container_name: ironbad-redis
+    ports:
+      - "6379:6379"
+    restart: always
+
+  redis-insight:
+    image: redis/redisinsight:latest
+    container_name: ironbad-redis-insight
+    ports:
+      - "5540:5540"
+    volumes:
+      - redis_insight_data:/db
+    environment:
+      - RI_APP_HOST=0.0.0.0
+      - RI_APP_PORT=5540
+      - RI_LOG_LEVEL=info
+      - RI_ACCEPT_TERMS_AND_CONDITIONS=true
+    restart: always
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5540"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  taskiq-worker:
+    image: ironbad-backend:latest
+    container_name: ironbad-taskiq-worker
+    command: uv run taskiq worker app.tasks:broker --fs-discover --reload --workers=2 --max-async-tasks=10 --max-prefetch=5
+    depends_on:
+      - redis
+      - database
+      - backend
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend/app:/src/app
+    restart: always
+
 volumes:
   postgres_data:
+  redis_insight_data:
