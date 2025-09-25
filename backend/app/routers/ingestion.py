@@ -26,7 +26,7 @@ async def ingest_contracts(contract_ids: List[UUID], db: AsyncSession = Depends(
     """parse the raw contract file into a markdown string and set of structured section objects"""
 
     # fetch the set of contracts to ingest and ensure all requested contracts may be ingested
-    query = select(DBContract).where(DBContract.id.in_(contract_ids), DBContract.status.in_([ContractStatus.UPLOADED, ContractStatus.INGESTED, ContractStatus.ANALYZED]))
+    query = select(DBContract).where(DBContract.id.in_(contract_ids), DBContract.status.in_([ContractStatus.UPLOADED, ContractStatus.INGESTED, ContractStatus.ANALYZED, ContractStatus.ERROR]))
     result = await db.execute(query)
     contracts = result.scalars().all()
     if len(contracts) != len(contract_ids):

@@ -23,6 +23,12 @@ enum section_type {
   attachment
 }
 
+enum rule_severity {
+  critical
+  warning
+  info
+}
+
 // User Configuration Entities //
 /////////////////////////////////
 
@@ -40,9 +46,11 @@ Table standard_terms {
 table standard_term_rules {
   id uuid [pk]
   standard_term_id uuid [ref: > standard_terms.id]
-  severity enum
+  severity rule_severity
   title string
   text string
+  created_at timestamp
+  updated_at timestamp
 }
 
 // User-Uploaded Contract Entities //
@@ -87,7 +95,8 @@ Table contract_terms {
   standard_term_id uuid [ref: > standard_terms.id]
   contract_id uuid [ref: > contracts.id]
   contract_sections uuid[] [ref: > contract_sections.id]
-  markdown string
+  raw_markdown string
+  summarized_markdown string
   created_at timestamp
   updated_at timestamp
 }

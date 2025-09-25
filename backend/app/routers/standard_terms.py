@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dbmodels import StandardTerm as DBStandardTerm
 from app.models import StandardTerm, StandardTermCreate, StandardTermUpdate
 from app.database import get_db
-
+from app.embeddings import get_text_embedding
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -26,6 +26,7 @@ async def create_standard_term(request: StandardTermCreate, db: AsyncSession = D
 
     try:
         standard_term = DBStandardTerm(**request.model_dump())
+        standard_term.embedding = await get_text_embedding(text=f"{standard_term.display_name}\n{standard_term.standard_text}")
         db.add(standard_term)
         await db.commit()
         await db.refresh(standard_term)
@@ -85,6 +86,8 @@ async def update_standard_term(term_id: UUID, request: StandardTermUpdate, db: A
         update_data = request.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(standard_term, field, value)
+        if ("display_name" in update_data) or ("standard_text" in update_data):
+            standard_term.embedding = await get_text_embedding(text=f"{standard_term.display_name}\n{standard_term.standard_text}")
         await db.commit()
         await db.refresh(standard_term)
         return StandardTerm.model_validate(standard_term)

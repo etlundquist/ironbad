@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import create_extensions, create_tables, load_sample_data
+from app.database import create_extensions, create_tables, add_generated_columns, load_sample_data
 from app.routers.index import router as index_router
 from app.routers.contracts import router as contracts_router
 from app.routers.ingestion import router as ingestion_router
@@ -20,6 +20,7 @@ logging.basicConfig(level=logging.INFO)
 async def lifespan(app: FastAPI):
     await create_extensions()
     await create_tables()
+    await add_generated_columns()
     await load_sample_data()
     await broker.startup()
     yield

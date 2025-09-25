@@ -10,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.dbmodels import Base, StandardTerm, StandardTermRule
 from app.enums import RuleSeverity
+from app.embeddings import get_term_embeddings
 
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,26 @@ async def create_tables():
         await cnx.run_sync(Base.metadata.create_all)
 
 
+async def add_generated_columns():
+    """add generated columns on the database"""
+
+    async with engine.begin() as cnx:
+
+        # add a generated text-search-vector column to the contract_sections table
+        await cnx.execute(text("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'contract_sections' AND column_name = 'tsv')
+            THEN EXECUTE '
+                ALTER TABLE contract_sections
+                ADD COLUMN tsv tsvector GENERATED ALWAYS AS (
+                    to_tsvector(''english'', coalesce(name, '''') || '' '' || coalesce(markdown, ''''))
+                ) STORED';
+            END IF;
+        END $$;
+        """))
+
+
 async def load_sample_data():
     """load default/sample data from YAML files into the database"""
 
@@ -57,6 +78,9 @@ async def load_sample_data():
         with open("app/sample_data/standard_terms.yml") as f:
             standard_terms_data = yaml.safe_load(f)["standard_terms"]
             standard_terms = [StandardTerm(**term) for term in standard_terms_data]
+            term_embeddings = await get_term_embeddings(terms=standard_terms)
+            for term, embedding in zip(standard_terms, term_embeddings):
+                term.embedding = embedding
             db.add_all(standard_terms)
             await db.commit()
             logger.info(f"seeded {len(standard_terms)} standard terms into the database from sample data")

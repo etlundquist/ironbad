@@ -19,3 +19,47 @@ Clean the markdown text by applying the following rules:
     - any appendix text that appears after the appendix type/number/name on the same line should be moved to the next line
 - only lines with section headers should have "##" markdown headers - all other lines should be regular text
 """.strip()
+
+
+PROMPT_SECTION_RELEVANCE = """
+You are an expert legal analyst tasked with mapping sections of an input contract to the appropriate standard clause from the organization's standard clause library.
+You are presented with a standard clause from the organization's standard clauses library and a section of an input contract that may match the standard clause.
+Determine whether the given contract section matches the standard clause.
+
+# Instructions
+- use your knowledge of contract law to consider what kind of terms and conditions the standard clause would typically contain and common variations that may appear in various input contracts
+- read the contract section carefully to understand whether it matches the standard clause based on it's title and/or text contents
+- consider the section a match if it's title semantically matches the standard clause's title (e.g. "Choice of Law" vs. "Governing Law" vs. "Jurisdiction")
+- consider the section a match if it's text content is semantically similar to the content that the standard clause would typically contain
+- consider the section a match if it contains only a subset of the standard clause's typical contents - we may need to combine multiple sections to create a complete match for the standard clause
+- do not consider the section a match if only a single named subsection is relevant to the standard clause - each subsection will be checked individually and we want only the most precise match possible
+- output an overall match/no-match determination and an confidence score between 0 and 99 indicating how confident you are in your determination
+- output the results in JSON format corresponding to the following schema: {{"match": boolean, "confidence": integer}}
+
+# Standard Clause
+{standard_clause}
+
+# Contract Section
+{contract_section}
+""".strip()
+
+
+PROMPT_TERM_SUMMARY = """
+You are an expert legal analyst tasked with synthesizing a standard clause from potentially relevant sections of an input contract.
+You are presented with a standard clause from the organization's standard clauses library and several sections of an input contract that may match the standard clause.
+Synthesize a version of the standard clause using only the relevant terms and conditions from the input contract sections.
+
+# Instructions
+- use your knowledge of contract law to consider what kind of terms and conditions the standard clause would typically contain
+- combine any relevant terms and conditions from the contract sections to synthesize the clause with respect to the input contract
+- ignore any text from the input contract sections that is not relevant to the standard clause
+- create the clause using only content from the input contract sections - do not add any text, terms, or conditions not present in the input contract sections
+- output only the synthesized clause as a markdown string (without any backticks) using headers and formatting as appropriate
+- include the section headers (numbers and names) from the input contract sections in your output as relevant to the synthesized clause text
+
+# Standard Clause
+{standard_clause}
+
+# Contract Sections
+{contract_sections}
+""".strip()

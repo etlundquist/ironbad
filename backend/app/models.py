@@ -52,7 +52,8 @@ class StandardTerm(ConfiguredBaseModel):
     name: str
     display_name: str
     description: str
-    standard_text: Optional[str] = None
+    standard_text: str
+    embedding: Optional[list[float]] = None
     created_at: datetime
     updated_at: datetime
 
@@ -60,7 +61,7 @@ class StandardTermCreate(ConfiguredBaseModel):
     name: str
     display_name: str
     description: str
-    standard_text: Optional[str] = None
+    standard_text: str
 
 class StandardTermUpdate(ConfiguredBaseModel):
     display_name: Optional[str] = None
@@ -86,3 +87,8 @@ class StandardTermRuleUpdate(ConfiguredBaseModel):
     severity: Optional[RuleSeverity] = None
     title: Optional[str] = None
     text: Optional[str] = None
+
+
+class SectionRelevanceEvaluation(ConfiguredBaseModel):
+    match: bool
+    confidence: int
