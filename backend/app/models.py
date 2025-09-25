@@ -89,6 +89,31 @@ class StandardTermRuleUpdate(ConfiguredBaseModel):
     text: Optional[str] = None
 
 
+class ContractSection(ConfiguredBaseModel):
+    id: UUID
+    contract_id: UUID
+    type: ContractSectionType
+    level: int
+    number: str
+    name: Optional[str] = None
+    markdown: str
+    beg_page: int
+    end_page: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class ContractTerm(ConfiguredBaseModel):
+    id: UUID
+    standard_term_id: UUID
+    contract_id: UUID
+    contract_sections: list[UUID]
+    raw_markdown: str
+    cleaned_markdown: str
+    created_at: datetime
+    updated_at: datetime
+
+
 class SectionRelevanceEvaluation(ConfiguredBaseModel):
     match: bool
     confidence: int

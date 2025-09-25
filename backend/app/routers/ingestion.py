@@ -21,7 +21,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.post("/contracts/ingest", tags=["contract_ingestion"])
+@router.post("/contracts/ingest", tags=["ingestion"])
 async def ingest_contracts(contract_ids: List[UUID], db: AsyncSession = Depends(get_db)) -> Response:
     """parse the raw contract file into a markdown string and set of structured section objects"""
 
@@ -46,30 +46,4 @@ async def ingest_contracts(contract_ids: List[UUID], db: AsyncSession = Depends(
     # commit the contract status changes and return a response to the client if the jobs were queued successfully
     await db.commit()
     return Response(status_code=202)
-
-
-
-
-
-
-
-
-# @router.get("/compliance-evaluation/{compliance_id}", response_model=ComplianceEvaluationSchema, tags=["compliance_evaluations"])
-# async def get_compliance_evaluation_by_id(
-#     compliance_id: UUID,
-#     db: AsyncSession = Depends(get_db)):
-#     """get a specifc compliance evaluation from the database by ID"""
-
-#     try:
-#         query = select(ComplianceEvaluationModel).where(ComplianceEvaluationModel.id == compliance_id)
-#         result = await db.execute(query)
-#         model = result.scalars().one_or_none()
-
-#         if not model:
-#             raise HTTPException(status_code=404, detail="Compliance evaluation not found")
-
-#         return ComplianceEvaluationSchema.model_validate(model)
-#     except Exception as e:
-#         logger.error("failed to fetch compliance evaluation", exc_info=True)
-#         raise HTTPException(status_code=500, detail=str(e))
 

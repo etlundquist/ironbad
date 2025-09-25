@@ -10,6 +10,8 @@ from app.routers.contracts import router as contracts_router
 from app.routers.ingestion import router as ingestion_router
 from app.routers.standard_terms import router as standard_terms_router
 from app.routers.standard_term_rules import router as standard_term_rules_router
+from app.routers.contract_terms import router as contract_terms_router
+from app.routers.contract_sections import router as contract_sections_router
 from app.tasks import broker
 
 
@@ -45,3 +47,5 @@ app.include_router(contracts_router)
 app.include_router(ingestion_router)
 app.include_router(standard_terms_router)
 app.include_router(standard_term_rules_router)
+app.include_router(contract_terms_router)
+app.include_router(contract_sections_router)
