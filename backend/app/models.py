@@ -1,119 +1,91 @@
-from pydantic import BaseModel, Field
-from typing import Optional
-from uuid import UUID
-from datetime import datetime
+import uuid
 
-from app.enums import ContractSectionType, JobStatus, ContractStatus, FileType, RuleSeverity
+from sqlalchemy import Column, String, Integer, DateTime, Enum, JSON, ForeignKey, ARRAY
+from sqlalchemy.sql import func
+from sqlalchemy.dialects.postgresql import UUID, BYTEA
+from sqlalchemy.orm import DeclarativeBase, relationship
 
+from app.enums import ContractStatus, FileType, ContractSectionType, RuleSeverity
+from app.constants import EMBEDDING_VECTOR_DIMENSION
 
-class ConfiguredBaseModel(BaseModel):
-    class Config:
-        from_attributes = True
-        arbitrary_types_allowed = True
+from pgvector.sqlalchemy import Vector
 
-
-class ParsedContractSection(ConfiguredBaseModel):
-    type: ContractSectionType
-    level: int
-    number: str
-    name: Optional[str] = None
-    markdown: str
-    embedding: Optional[list[float]] = None
-    beg_page: Optional[int] = None
-    end_page: Optional[int] = None
-
-class ParsedContract(ConfiguredBaseModel):
-    filename: str
-    markdown: str
-    sections: list[ParsedContractSection]
+class Base(DeclarativeBase):
+    pass
 
 
-class Contract(ConfiguredBaseModel):
-    id: UUID
-    status: ContractStatus
-    filename: str
-    filetype: FileType
-    meta: Optional[dict] = None
-    errors: Optional[list[dict]] = None
-    created_at: datetime
-    updated_at: datetime
+class StandardClause(Base):
+    __tablename__ = "standard_clauses"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String, nullable=False, unique=True)
+    display_name = Column(String, nullable=False)
+    description = Column(String, nullable=False)
+    standard_text = Column(String, nullable=False)
+    embedding = Column(Vector(dim=EMBEDDING_VECTOR_DIMENSION), nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    rules = relationship("StandardClauseRule", back_populates="standard_clause")
 
 
-class ContractIngestionJob(ConfiguredBaseModel):
-    contract_id: UUID
-    status: JobStatus
-    errors: Optional[list[dict]] = None
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+class StandardClauseRule(Base):
+    __tablename__ = "standard_clause_rules"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    standard_clause_id = Column(UUID(as_uuid=True), ForeignKey(column="standard_clauses.id", ondelete="CASCADE"), nullable=False)
+    severity = Column(Enum(RuleSeverity), nullable=False)
+    title = Column(String, nullable=False)
+    text = Column(String, nullable=False)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    standard_clause = relationship("StandardClause", back_populates="rules")
 
 
-class StandardTerm(ConfiguredBaseModel):
-    id: UUID
-    name: str
-    display_name: str
-    description: str
-    standard_text: str
-    embedding: Optional[list[float]] = None
-    created_at: datetime
-    updated_at: datetime
+class Contract(Base):
+    __tablename__ = "contracts"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    status = Column(Enum(ContractStatus), nullable=False)
+    filename = Column(String, nullable=False, unique=True)
+    filetype = Column(Enum(FileType), nullable=False)
+    contents = Column(BYTEA, nullable=False)
+    markdown = Column(String, nullable=True)
+    meta = Column(JSON, nullable=True)
+    errors = Column(JSON, nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
-class StandardTermCreate(ConfiguredBaseModel):
-    name: str
-    display_name: str
-    description: str
-    standard_text: str
-
-class StandardTermUpdate(ConfiguredBaseModel):
-    display_name: Optional[str] = None
-    description: Optional[str] = None
-    standard_text: Optional[str] = None
+    sections = relationship("ContractSection", back_populates="contract")
+    clauses = relationship("ContractClause", back_populates="contract")
 
 
-class StandardTermRule(ConfiguredBaseModel):
-    id: UUID
-    standard_term_id: UUID
-    severity: RuleSeverity
-    title: str
-    text: str
-    created_at: datetime
-    updated_at: datetime
+class ContractSection(Base):
+    __tablename__ = "contract_sections"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    contract_id = Column(UUID(as_uuid=True), ForeignKey(column="contracts.id", ondelete="CASCADE"), nullable=False)
+    type = Column(Enum(ContractSectionType), nullable=False)
+    level = Column(Integer, nullable=False)
+    number = Column(String, nullable=False)
+    name = Column(String, nullable=True)
+    markdown = Column(String, nullable=False)
+    embedding = Column(Vector(dim=EMBEDDING_VECTOR_DIMENSION), nullable=True)
+    beg_page = Column(Integer, nullable=False)
+    end_page = Column(Integer, nullable=False)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
-class StandardTermRuleCreate(ConfiguredBaseModel):
-    severity: RuleSeverity
-    title: str
-    text: str
-
-class StandardTermRuleUpdate(ConfiguredBaseModel):
-    severity: Optional[RuleSeverity] = None
-    title: Optional[str] = None
-    text: Optional[str] = None
+    contract = relationship("Contract", back_populates="sections")
 
 
-class ContractSection(ConfiguredBaseModel):
-    id: UUID
-    contract_id: UUID
-    type: ContractSectionType
-    level: int
-    number: str
-    name: Optional[str] = None
-    markdown: str
-    beg_page: int
-    end_page: int
-    created_at: datetime
-    updated_at: datetime
+class ContractClause(Base):
+    __tablename__ = "contract_clauses"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    standard_clause_id = Column(UUID(as_uuid=True), ForeignKey(column="standard_clauses.id", ondelete="CASCADE"), nullable=False)
+    contract_id = Column(UUID(as_uuid=True), ForeignKey(column="contracts.id", ondelete="CASCADE"), nullable=False)
+    contract_sections = Column(ARRAY(UUID(as_uuid=True)), nullable=False)
+    raw_markdown = Column(String, nullable=False)
+    cleaned_markdown = Column(String, nullable=False)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
-
-class ContractTerm(ConfiguredBaseModel):
-    id: UUID
-    standard_term_id: UUID
-    contract_id: UUID
-    contract_sections: list[UUID]
-    raw_markdown: str
-    cleaned_markdown: str
-    created_at: datetime
-    updated_at: datetime
-
-
-class SectionRelevanceEvaluation(ConfiguredBaseModel):
-    match: bool
-    confidence: int
+    standard_clause = relationship("StandardClause")
+    contract = relationship("Contract", back_populates="clauses")

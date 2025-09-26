@@ -1,12 +1,13 @@
 from enum import Enum
 
 class ContractStatus(Enum):
-    UPLOADED = "uploaded"
-    INGESTING = "ingesting"
-    INGESTED = "ingested"
-    ANALYZING = "analyzing"
-    ANALYZED = "analyzed"
-    ERROR = "error"
+    UPLOADED = "Uploaded"
+    PROCESSING = "Processing"
+    READY_FOR_REVIEW = "Ready for Review"
+    UNDER_REVIEW = "Under Review"
+    APPROVED = "Approved"
+    REJECTED = "Rejected"
+
 
 class FileType(Enum):
     PDF = "application/pdf"

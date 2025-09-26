@@ -2,18 +2,28 @@ import os
 import re
 import logging
 import asyncio
-import dotenv
+
+from uuid import UUID
 
 from docling.document_converter import DocumentConverter
+from openai import AsyncOpenAI
+from openai.types.responses import Response, ParsedResponse
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import ParsedContract, ParsedContractSection
+from app.models import Contract, StandardClause, ContractSection, ContractClause
+from app.schemas import ContractMetadata, ParsedContract, ParsedContractSection, SectionRelevanceEvaluation
 from app.enums import ContractSectionType
+from app.prompts import PROMPT_METADATA_EXTRACTION, PROMPT_SECTION_RELEVANCE, PROMPT_CLAUSE_SUMMARY
+from app.embeddings import get_section_embeddings
 
-dotenv.load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
+###################################
+# PDF/DOCX TO MARKDOWN CONVERSION #
+###################################
 
 def clean_contract_markdown(contract_markdown: str) -> str:
     """perform a series of clean-up steps on the raw converted markdown text"""
@@ -52,6 +62,9 @@ async def parse_contract_markdown(path: str) -> str:
     contract_markdown = clean_contract_markdown(contract_markdown)
     return contract_markdown
 
+#################################
+# STRUCTURED SECTION EXTRACTION #
+#################################
 
 def split_contract_lines(contract_markdown: str) -> list[str]:
     """split the cleaned contract markdown text into individual lines for further processing"""
@@ -163,7 +176,19 @@ def combine_leaf_sections(leaf_sections: list[ParsedContractSection], target_lev
     return merged_sections
 
 
-def parse_contract_sections(contract_markdown: str) -> list[ParsedContractSection]:
+async def add_section_embeddings(sections: list[ParsedContractSection]) -> list[ParsedContractSection]:
+    """add embedding vectors to the structured contract sections"""
+
+    # generate vector embeddings for all named sections (valid section names are typically less than 10 words)
+    named_sections = [section for section in sections if 1 <= len(section.name.split()) <= 10]
+    named_section_embeddings = await get_section_embeddings(sections=named_sections)
+    for section, embedding in zip(named_sections, named_section_embeddings):
+        if embedding:
+            section.embedding = embedding
+    return sections
+
+
+async def parse_contract_sections(contract_markdown: str) -> list[ParsedContractSection]:
     """parse the contract markdown text into structured section objects at multiple levels of granularity"""
 
     # parse the contract into lowest-level atomic (leaf) sections
@@ -176,8 +201,124 @@ def parse_contract_sections(contract_markdown: str) -> list[ParsedContractSectio
 
     # flatten the list of combined sections into a single list of sections at all levels of granularity
     flattened_sections = [section for level_sections in combined_sections for section in level_sections]
-    return flattened_sections
 
+    # add embedding vectors to the structured contract sections
+    embedded_sections = await add_section_embeddings(sections=flattened_sections)
+
+    # return the parsed and embedded structured contract sections
+    return embedded_sections
+
+
+# ##############################
+# CONTRACT METADATA EXTRACTION #
+################################
+
+async def extract_contract_metadata(contract_markdown: str) -> ContractMetadata:
+    """extract structured contract-level metadata from the parsed markdown text"""
+
+    openai = AsyncOpenAI()
+    response: ParsedResponse = await openai.responses.parse(
+        model="gpt-4.1-mini",
+        input=PROMPT_METADATA_EXTRACTION.format(contract_markdown=contract_markdown),
+        text_format=ContractMetadata,
+        temperature=0.0,
+        timeout=60
+    )
+    result: ContractMetadata = response.output_parsed
+    logger.info(f"extracted contract metadata: {result.model_dump()}")
+    return result
+
+##############################
+# STANDARD CLAUSE EXTRACTION #
+##############################
+
+async def get_clause_section_candidates(db: AsyncSession, clause: StandardClause, contract_id: UUID, k: int = 10) -> list[ContractSection]:
+    """get the best-matching contract sections using embedding similarity"""
+
+    if clause.embedding is None:
+        return []
+
+    statement = (
+        select(ContractSection)
+        .where(ContractSection.contract_id == contract_id)
+        .where(ContractSection.embedding.is_not(None))
+        .order_by(ContractSection.embedding.cosine_distance(clause.embedding))
+        .limit(k)
+    )
+
+    result = await db.execute(statement)
+    return result.scalars().all()
+
+
+async def evaluate_clause_section_relevance(clause: StandardClause, section: ContractSection) -> SectionRelevanceEvaluation:
+    """evaluate the relevance of a single contract section wrt a standard clause"""
+
+    openai = AsyncOpenAI()
+    standard_clause_text = f"Name: {clause.display_name}\nDescription: {clause.description}"
+    input_section_text = section.markdown
+
+    response: ParsedResponse = await openai.responses.parse(
+        model="gpt-4.1-mini",
+        input=PROMPT_SECTION_RELEVANCE.format(standard_clause=standard_clause_text, contract_section=input_section_text),
+        text_format=SectionRelevanceEvaluation,
+        temperature=0.0,
+        timeout=60
+    )
+    result: SectionRelevanceEvaluation= response.output_parsed
+
+    logger.info(f"relevance evaluation: clause={clause.name} section={section.number} {section.name} result={result.model_dump()}")
+    return result
+
+
+async def evaluate_clause_section_candidates(clause: StandardClause, sections: list[ContractSection]) -> list[ContractSection]:
+    """determine which of the candidate sections are relevant to the standard clause using LLM classification"""
+
+    evaluation_results = await asyncio.gather(*[evaluate_clause_section_relevance(clause, section) for section in sections])
+    matching_sections = [section for section, result in zip(sections, evaluation_results) if result.match]
+
+    logger.info(f"{len(matching_sections)} matching sections identified for clause={clause.name}")
+    return matching_sections
+
+
+async def extract_contract_clause(db: AsyncSession, contract: Contract, clause: StandardClause) -> ContractClause:
+    """assemble a contract-specific standard clause based on the relevant contract sections"""
+
+    # identify the subset of relevant sections for the clause using embedding similarity -> LLM classification
+    candidate_sections = await get_clause_section_candidates(db=db, clause=clause, contract_id=contract.id)
+    matching_sections = await evaluate_clause_section_candidates(clause=clause, sections=candidate_sections)
+    if not matching_sections:
+        logger.warning(f"no matching input sections found for clause={clause.name} - skipping contract-specific clause extraction")
+        return None
+
+    # extract the clause raw text: appended relevant sections ordered by section number
+    raw_markdown = "\n".join([section.markdown for section in sorted(matching_sections, key=lambda x: x.number)])
+
+    # extract the clause cleaned text: LLM-synthesized summary from the raw text
+    openai = AsyncOpenAI()
+    response: Response = await openai.responses.create(
+        model="gpt-4.1-mini",
+        input=PROMPT_CLAUSE_SUMMARY.format(
+            standard_clause=f"Name: {clause.display_name}\nDescription: {clause.description}",
+            contract_sections=raw_markdown
+        ),
+        temperature=0.0,
+        timeout=60
+    )
+    cleaned_markdown = response.output_text
+
+    # create the contract clause object and return
+    contract_clause = ContractClause(
+        standard_clause_id=clause.id,
+        contract_id=contract.id,
+        contract_sections=[section.id for section in matching_sections],
+        raw_markdown=raw_markdown,
+        cleaned_markdown=cleaned_markdown
+    )
+    return contract_clause
+
+###################################
+# HIGHER-LEVEL WORKFLOW FUNCTIONS #
+###################################
 
 async def parse_contract(path: str) -> ParsedContract:
     """parse a PDF/DOCX contract into a markdown string and list of structured section objects"""
@@ -186,14 +327,40 @@ async def parse_contract(path: str) -> ParsedContract:
     contract_markdown = await parse_contract_markdown(path)
 
     logger.info("parsing contract sections as structured objects...")
-    contract_sections = parse_contract_sections(contract_markdown)
+    contract_sections = await parse_contract_sections(contract_markdown)
 
-    contract = ParsedContract(filename=os.path.basename(path), markdown=contract_markdown, sections=contract_sections)
+    logger.info("extracting contract metadata...")
+    contract_metadata = await extract_contract_metadata(contract_markdown)
+
+    contract = ParsedContract(
+        filename=os.path.basename(path),
+        markdown=contract_markdown,
+        metadata=contract_metadata,
+        sections=contract_sections
+    )
     return contract
 
 
+async def extract_clauses(db: AsyncSession, contract: Contract, standard_clauses: list[StandardClause]) -> list[ContractClause]:
+    """extract all standard clauses from the input contract"""
+
+    contract_clauses: list[ContractClause] = []
+    for clause in standard_clauses:
+        logger.info(f"*** extracting standard clause: {clause.name} ***")
+        contract_clause = await extract_contract_clause(db, contract, clause)
+        if contract_clause:
+            contract_clauses.append(contract_clause)
+    return contract_clauses
+
+##############################################################
+# EXECUTABLE ENTRYPOINT TO RUN WORKFLOW AS STANDALONE SCRIPT #
+##############################################################
+
 async def main():
     """run the contract parsing workflow as an executable script"""
+
+    import dotenv
+    dotenv.load_dotenv()
 
     import argparse
     parser = argparse.ArgumentParser()
@@ -201,9 +368,12 @@ async def main():
     args = parser.parse_args()
 
     parsed_contract = await parse_contract(args.contract_path)
-    output_prefix = os.path.splitext(os.path.split(args.contract_path)[1])[0]
+    for section in parsed_contract.sections:
+        section.embedding = None
 
     output_folder = "../sample_output"
+    output_prefix = os.path.splitext(os.path.split(args.contract_path)[1])[0]
+
     os.makedirs(output_folder, exist_ok=True)
     with open(f"{output_folder}/{output_prefix}.md", "w") as f:
         f.write(parsed_contract.markdown)
@@ -212,6 +382,5 @@ async def main():
 
 
 if __name__ == "__main__":
-    # python -m app.ingestion --contract_path="../sample_input/contract.pdf"
+    # uv run -m app.workflows.ingestion --contract_path="../sample_contracts/contract.pdf"
     asyncio.run(main())
-

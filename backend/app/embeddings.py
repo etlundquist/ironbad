@@ -5,7 +5,7 @@ import logging
 from openai import AsyncOpenAI
 from openai.types import CreateEmbeddingResponse
 
-from app.models import ParsedContractSection, StandardTerm
+from app.schemas import ParsedContractSection, StandardClause
 from app.utils import string_truncate, with_semaphore
 
 
@@ -23,22 +23,22 @@ async def get_text_embedding(text: str) -> list[float]:
     return response.data[0].embedding
 
 
-async def get_term_embeddings(terms: list[StandardTerm]) -> list[list[float]]:
-    """get vector embeddings for a list of standard terms"""
+async def get_clause_embeddings(clauses: list[StandardClause]) -> list[list[float]]:
+    """get vector embeddings for a list of standard clauses"""
 
     openai = AsyncOpenAI()
-    term_texts = [string_truncate(f"{term.display_name}\n{term.standard_text}", max_tokens=8192, tokenizer=encoding) for term in terms]
-    term_tasks = [with_semaphore(openai.embeddings.create(input=text, model="text-embedding-3-small"), openai_semaphore) for text in term_texts]
-    term_responses: list[CreateEmbeddingResponse|Exception] = await asyncio.gather(*term_tasks, return_exceptions=True)
-    term_embeddings: list[list[float]] = [response.data[0].embedding if isinstance(response, CreateEmbeddingResponse) else None for response in term_responses]
-    return term_embeddings
+    clause_texts = [string_truncate(f"{clause.display_name}\n{clause.standard_text}", max_tokens=8192, tokenizer=encoding) for clause in clauses]
+    clause_tasks = [with_semaphore(openai.embeddings.create(input=text, model="text-embedding-3-small"), openai_semaphore) for text in clause_texts]
+    clause_responses: list[CreateEmbeddingResponse|Exception] = await asyncio.gather(*clause_tasks, return_exceptions=True)
+    clause_embeddings: list[list[float]] = [response.data[0].embedding if isinstance(response, CreateEmbeddingResponse) else None for response in clause_responses]
+    return clause_embeddings
 
 
 async def get_section_embeddings(sections: list[ParsedContractSection]) -> list[list[float]]:
     """get vector embeddings for a list of contract sections"""
 
     openai = AsyncOpenAI()
-    section_texts = [string_truncate(f"{section.name}\n{section.markdown}", max_tokens=8192, tokenizer=encoding) for section in sections]
+    section_texts = [string_truncate(section.markdown, max_tokens=8192, tokenizer=encoding) for section in sections]
     section_tasks = [with_semaphore(openai.embeddings.create(input=text, model="text-embedding-3-small"), openai_semaphore) for text in section_texts]
     section_responses: list[CreateEmbeddingResponse|Exception] = await asyncio.gather(*section_tasks, return_exceptions=True)
     section_embeddings: list[list[float]] = [response.data[0].embedding if isinstance(response, CreateEmbeddingResponse) else None for response in section_responses]

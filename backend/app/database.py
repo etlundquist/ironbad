@@ -8,9 +8,9 @@ from sqlalchemy import text, select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, AsyncEngine
 from sqlalchemy.orm import sessionmaker
 
-from app.dbmodels import Base, StandardTerm, StandardTermRule
+from app.models import Base, StandardClause, StandardClauseRule
 from app.enums import RuleSeverity
-from app.embeddings import get_term_embeddings
+from app.embeddings import get_clause_embeddings
 
 
 logger = logging.getLogger(__name__)
@@ -68,43 +68,43 @@ async def load_sample_data():
 
     async with AsyncSession(engine) as db:
 
-        query = select(StandardTerm)
+        query = select(StandardClause)
         result = await db.execute(query)
-        current_standard_terms = result.scalars().all()
-        if current_standard_terms:
-            logger.info(f"found {len(current_standard_terms)} standard terms in the database - ignoring sample data")
+        current_standard_clauses = result.scalars().all()
+        if current_standard_clauses:
+            logger.info(f"found {len(current_standard_clauses)} standard clauses in the database - ignoring sample data")
             return
 
-        with open("app/sample_data/standard_terms.yml") as f:
-            standard_terms_data = yaml.safe_load(f)["standard_terms"]
-            standard_terms = [StandardTerm(**term) for term in standard_terms_data]
-            term_embeddings = await get_term_embeddings(terms=standard_terms)
-            for term, embedding in zip(standard_terms, term_embeddings):
-                term.embedding = embedding
-            db.add_all(standard_terms)
+        with open("app/sample_data/standard_clauses.yml") as f:
+            standard_clauses_data = yaml.safe_load(f)["standard_clauses"]
+            standard_clauses = [StandardClause(**clause) for clause in standard_clauses_data]
+            clause_embeddings = await get_clause_embeddings(clauses=standard_clauses)
+            for clause, embedding in zip(standard_clauses, clause_embeddings):
+                clause.embedding = embedding
+            db.add_all(standard_clauses)
             await db.commit()
-            logger.info(f"seeded {len(standard_terms)} standard terms into the database from sample data")
-            for term in standard_terms:
-                await db.refresh(term)
-            term_id_mapping = {term.name: term.id for term in standard_terms}
+            logger.info(f"seeded {len(standard_clauses)} standard clauses into the database from sample data")
+            for clause in standard_clauses:
+                await db.refresh(clause)
+            clause_id_mapping = {clause.name: clause.id for clause in standard_clauses}
 
-        with open("app/sample_data/standard_term_rules.yml") as f:
-            standard_term_rulesets = yaml.safe_load(f)["standard_term_rules"]
-            for ruleset in standard_term_rulesets:
-                term_name = ruleset["standard_term_name"]
-                term_id = term_id_mapping.get(term_name)
-                if term_id:
-                    ruleset["standard_term_id"] = term_id
+        with open("app/sample_data/standard_clause_rules.yml") as f:
+            standard_clause_rulesets = yaml.safe_load(f)["standard_clause_rules"]
+            for ruleset in standard_clause_rulesets:
+                clause_name = ruleset["standard_clause_name"]
+                clause_id = clause_id_mapping.get(clause_name)
+                if clause_id:
+                    ruleset["standard_clause_id"] = clause_id
                 else:
-                    logger.warning(f"standard term '{term_name}' not found in `standard_terms` - skipping term-specific rules")
+                    logger.warning(f"standard clause '{clause_name}' not found in `standard_clauses` - skipping clause-specific rules")
 
-            standard_term_rules = [
-                StandardTermRule(standard_term_id=ruleset["standard_term_id"], severity=RuleSeverity(rule["severity"]), title=rule["title"], text=rule["text"])
-                for ruleset in standard_term_rulesets for rule in ruleset["rules"] if ruleset["standard_term_id"]
+            standard_clause_rules = [
+                StandardClauseRule(standard_clause_id=ruleset["standard_clause_id"], severity=RuleSeverity(rule["severity"]), title=rule["title"], text=rule["text"])
+                for ruleset in standard_clause_rulesets for rule in ruleset["rules"] if ruleset.get("standard_clause_id")
             ]
-            db.add_all(standard_term_rules)
+            db.add_all(standard_clause_rules)
             await db.commit()
-            logger.info(f"seeded {len(standard_term_rules)} rules from {len(standard_term_rulesets)} rulesets into the database from sample data")
+            logger.info(f"seeded {len(standard_clause_rules)} rules from {len(standard_clause_rulesets)} rulesets into the database from sample data")
 
 
 async def test_connection():

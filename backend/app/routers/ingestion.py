@@ -10,8 +10,8 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dbmodels import Contract as DBContract
-from app.models import ContractIngestionJob
+from app.models import Contract as DBContract
+from app.schemas import ContractIngestionJob
 from app.enums import ContractStatus, JobStatus
 from app.database import get_db
 from app.tasks import ingest_contract
@@ -25,18 +25,18 @@ logger = logging.getLogger(__name__)
 async def ingest_contracts(contract_ids: List[UUID], db: AsyncSession = Depends(get_db)) -> Response:
     """parse the raw contract file into a markdown string and set of structured section objects"""
 
-    # fetch the set of contracts to ingest and ensure all requested contracts may be ingested
-    query = select(DBContract).where(DBContract.id.in_(contract_ids), DBContract.status.in_([ContractStatus.UPLOADED, ContractStatus.INGESTED, ContractStatus.ANALYZED, ContractStatus.ERROR]))
+    # fetch the set of contracts to ingest and ensure none of them are currently being ingested
+    query = select(DBContract).where(DBContract.id.in_(contract_ids), DBContract.status.not_in([ContractStatus.PROCESSING]))
     result = await db.execute(query)
     contracts = result.scalars().all()
     if len(contracts) != len(contract_ids):
         logger.error("one or more requested contracts cannot be ingested", exc_info=True)
         raise HTTPException(status_code=400, detail="one or more requested contracts cannot be ingested")
 
-    # create a new ingestion job for each ingestion contract
+    # update contract status to processing to prevent duplicate runs and queue each contract for ingestion
     for contract in contracts:
         try:
-            contract.status = ContractStatus.INGESTING
+            contract.status = ContractStatus.PROCESSING
             ingestion_job = ContractIngestionJob(contract_id=contract.id, status=JobStatus.QUEUED)
             await ingest_contract.kiq(ingestion_job)
         except Exception:

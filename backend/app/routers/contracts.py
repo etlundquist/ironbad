@@ -11,8 +11,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dbmodels import Contract as DBContract
-from app.models import Contract
+from app.models import Contract as DBContract
+from app.schemas import Contract
 
 from app.database import get_db
 from app.enums import ContractStatus, FileType
@@ -29,9 +29,9 @@ async def upload_contract(file: UploadFile = File(...), db: AsyncSession = Depen
     """create a new contract record storing the file contents in binary format"""
 
     try:
+
         contents = await file.read()
         filetype = FileType(file.content_type)
-
         if file.size > MAX_UPLOAD_FILE_SIZE:
             raise HTTPException(status_code=413, detail="upload file size exceeds the limit (10MB)")
 

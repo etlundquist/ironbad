@@ -32,8 +32,8 @@ enum rule_severity {
 // User Configuration Entities //
 /////////////////////////////////
 
-// standard set of terms to map/extract from input contracts
-Table standard_terms {
+// standard set of clauses to map/extract from input contracts
+Table standard_clauses {
   id uuid [pk]
   name string
   description string
@@ -42,10 +42,10 @@ Table standard_terms {
   updated_at timestamp
 }
 
-// standard term-specific policy rules
-table standard_term_rules {
+// standard clause-specific policy rules
+table standard_clause_rules {
   id uuid [pk]
-  standard_term_id uuid [ref: > standard_terms.id]
+  standard_clause_id uuid [ref: > standard_clauses.id]
   severity rule_severity
   title string
   text string
@@ -86,13 +86,13 @@ Table contract_sections {
   updated_at timestamp
 }
 
-// System-Generated Mapped Terms and Identified Issues //
+// System-Generated Mapped Clauses and Identified Issues //
 /////////////////////////////////////////////////////////
 
-// contract-specific standardized term text
-Table contract_terms {
+// contract-specific standardized clause text
+Table contract_clauses {
   id uuid [pk]
-  standard_term_id uuid [ref: > standard_terms.id]
+  standard_clause_id uuid [ref: > standard_clauses.id]
   contract_id uuid [ref: > contracts.id]
   contract_sections uuid[] [ref: > contract_sections.id]
   raw_markdown string
@@ -101,18 +101,18 @@ Table contract_terms {
   updated_at timestamp
 }
 
-// mapping of contract-specific terms to relevant raw sections
-Table contract_term_sections {
+// mapping of contract-specific clauses to relevant raw sections
+Table contract_clause_sections {
   id uuid [pk]
-  contract_term_id uuid [ref: > contract_terms.id]
+  contract_clause_id uuid [ref: > contract_clauses.id]
   contract_section_id uuid [ref: > contract_sections.id]
 }
 
-// identified contract-term issues wrt term-specific policy rules
-// NOTE: citations will be to term-specific policy rules
+// identified contract-clause issues wrt clause-specific policy rules
+// NOTE: citations will be to clause-specific policy rules
 Table contract_issues {
   id uuid [pk]
-  standard_term_id uuid [ref: > standard_terms.id]
+  standard_clause_id uuid [ref: > standard_clauses.id]
   contract_id uuid [ref: > contracts.id]
   issue_description string
   relevant_text string

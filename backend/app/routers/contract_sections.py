@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dbmodels import Contract as DBContract, ContractSection as DBContractSection
-from app.models import ContractSection
+from app.models import Contract as DBContract, ContractSection as DBContractSection
+from app.schemas import ContractSection
 from app.enums import ContractSectionType
 from app.database import get_db
 

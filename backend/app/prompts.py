@@ -21,6 +21,46 @@ Clean the markdown text by applying the following rules:
 """.strip()
 
 
+PROMPT_METADATA_EXTRACTION = """
+You are an expert legal analyst tasked with extracting structured metadata from a contract text.
+Extract the following metadata attributes from the contract text provided below as a valid JSON object.
+
+# Metadata Attributes
+- document_type: the document type, one of: ["Master Agreement", "Statement of Work", "Purchase Order", "Other"]
+- document_title: the document title, e.g. "Master Services Agreement", "Software License Agreement", etc.
+- customer_name: the company name of the "Customer" party in the contract (i.e. the customer, buyer, or client company named in the contract)
+- supplier_name: the company name of the "Supplier" party in the contract (i.e. the supplier, vendor, or service provider company named in the contract)
+- effective_date: the effective date or execution date of the contract in YYYY-MM-DD format if available
+- initial_term: the term, end date, or duration of the contract's initial period if available in a single sentence
+
+# Extraction Guidelines
+- valid `document_type` values are as follow:
+    - "Master Agreement": an overall services or licensing contract that sets the high-level terms and conditions governing the relationship between the two parties
+    - "Statement of Work": a detailed contract that defines the scope, deliverables, timelines, and pricing for a specific project under a master agreement
+    - "Purchase Order": a short-form contract authorizing a specific purchase or license of goods or services, usually referencing a master agreement
+    - "Other": additional addendums (e.g. confidentiality, non-disclosure, etc.) or non-contract documents (no legal terms or conditions)
+- the `document_title` will typically be the title or first line of the contract document if available
+- the `customer_name` and `supplier_name` are usually identified in the contract preamble - do not include legal entity suffixes such as "Inc.", "LLC", "Corp", etc.
+- the `effective_date` is usually either mentioned explicitly at the beginning of the contract or on the signature page
+- the `initial_term` can be specified as fixed end date or an initial duration in months or years - concisely extract the initial term if present in a single sentence
+- if you cannot determine the correct value for an attribute then omit it from your response - do not make up information or respond that the information is not available
+- format your response as a valid JSON object conforming to the Example Response provided below
+
+# Example Response
+{{
+    "document_type": "Master Agreement",
+    "document_title": "Master Services Agreement",
+    "customer_name": "PepsiCo",
+    "supplier_name": “Okta”,
+    "effective_date": "2023-12-01",
+    "initial_term": "the agreement shall begin on the Effective Date and continue for two years"
+}}
+
+Contract Text:
+{contract_markdown}
+""".strip()
+
+
 PROMPT_SECTION_RELEVANCE = """
 You are an expert legal analyst tasked with mapping sections of an input contract to the appropriate standard clause from the organization's standard clause library.
 You are presented with a standard clause from the organization's standard clauses library and a section of an input contract that may match the standard clause.
@@ -44,7 +84,7 @@ Determine whether the given contract section matches the standard clause.
 """.strip()
 
 
-PROMPT_TERM_SUMMARY = """
+PROMPT_CLAUSE_SUMMARY = """
 You are an expert legal analyst tasked with synthesizing a standard clause from potentially relevant sections of an input contract.
 You are presented with a standard clause from the organization's standard clauses library and several sections of an input contract that may match the standard clause.
 Synthesize a version of the standard clause using only the relevant terms and conditions from the input contract sections.
