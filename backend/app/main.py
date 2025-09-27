@@ -8,6 +8,7 @@ from app.database import create_extensions, create_tables, add_generated_columns
 from app.routers.index import router as index_router
 from app.routers.contracts import router as contracts_router
 from app.routers.ingestion import router as ingestion_router
+from app.routers.analysis import router as analysis_router
 from app.routers.standard_clauses import router as standard_clauses_router
 from app.routers.standard_clause_rules import router as standard_clause_rules_router
 from app.routers.contract_clauses import router as contract_clauses_router
@@ -45,6 +46,7 @@ app.add_middleware(
 app.include_router(index_router)
 app.include_router(contracts_router)
 app.include_router(ingestion_router)
+app.include_router(analysis_router)
 app.include_router(standard_clauses_router)
 app.include_router(standard_clause_rules_router)
 app.include_router(contract_clauses_router)

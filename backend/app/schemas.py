@@ -3,7 +3,7 @@ from typing import Literal, Optional
 from uuid import UUID
 from datetime import datetime
 
-from app.enums import ContractSectionType, JobStatus, ContractStatus, FileType, RuleSeverity
+from app.enums import ContractSectionType, JobStatus, ContractStatus, FileType, RuleSeverity, IssueStatus, IssueResolution
 
 
 class ConfiguredBaseModel(BaseModel):
@@ -49,6 +49,14 @@ class Contract(ConfiguredBaseModel):
 
 
 class ContractIngestionJob(ConfiguredBaseModel):
+    contract_id: UUID
+    status: JobStatus
+    errors: Optional[list[dict]] = None
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+
+class ContractAnalysisJob(ConfiguredBaseModel):
     contract_id: UUID
     status: JobStatus
     errors: Optional[list[dict]] = None
@@ -126,3 +134,36 @@ class ContractClause(ConfiguredBaseModel):
 class SectionRelevanceEvaluation(ConfiguredBaseModel):
     match: bool
     confidence: int
+
+
+class ClauseRuleEvaluation(ConfiguredBaseModel):
+    violation: bool
+    explanation: Optional[str] = None
+    citations: Optional[list[str]] = None
+
+
+class EvaluatedClauseRule(ConfiguredBaseModel):
+    standard_clause_rule_id: UUID
+    violation: bool
+    explanation: Optional[str] = None
+    citations: Optional[list[str]] = None
+
+
+class ContractIssueCitation(ConfiguredBaseModel):
+    section_id: str
+    section_number: str
+    section_name: Optional[str] = None
+    beg_page: Optional[int] = None
+    end_page: Optional[int] = None
+
+class ContractIssue(ConfiguredBaseModel):
+    id: UUID
+    standard_clause_id: UUID
+    standard_clause_rule_id: UUID
+    contract_id: UUID
+    explanation: str
+    status: IssueStatus
+    citations: list[ContractIssueCitation]
+    resolution: Optional[IssueResolution] = None
+    suggested_text: Optional[str] = None
+    resolved_text: Optional[str] = None

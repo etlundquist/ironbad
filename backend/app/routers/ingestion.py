@@ -1,6 +1,3 @@
-
-
-
 import logging
 
 from uuid import UUID

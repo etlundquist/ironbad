@@ -8,10 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from taskiq_redis import RedisAsyncResultBackend, RedisStreamBroker
 
 from app.workflows.ingestion import parse_contract, extract_clauses
-from app.models import Contract as DBContract, ContractSection, ContractClause, StandardClause
-from app.schemas import ContractIngestionJob
-from app.database import engine
+from app.workflows.analysis import extract_issues
+from app.models import Contract as DBContract, ContractSection, ContractClause, StandardClause, ContractIssue
+from app.schemas import ContractIngestionJob, ContractAnalysisJob
 from app.enums import ContractStatus
+from app.database import engine
 
 
 logger = logging.getLogger(__name__)
@@ -100,4 +101,47 @@ async def ingest_contract(job: ContractIngestionJob) -> None:
             contract.errors = [{"step": "ingestion", "message": str(e)}]
             contract.markdown = None
             contract.meta = None
+            await db.commit()
+
+
+@broker.task()
+async def analyze_contract(job: ContractAnalysisJob) -> None:
+    """identify issues with a contract and update it's status"""
+
+    async with AsyncSession(engine) as db:
+
+        # get the contract record from the database
+        query = select(DBContract).where(DBContract.id == job.contract_id)
+        result = await db.execute(query)
+        contract = result.scalar_one()
+
+        # get the up-to-date set of standard clauses to evaluate
+        query = select(StandardClause)
+        result = await db.execute(query)
+        standard_clauses = result.scalars().all()
+
+        # log the start time for issue identification
+        logger.info(f"*** analyzing contract: {contract.filename} ({contract.id}) ***")
+        beg_time = datetime.now()
+
+        try:
+
+            # extract all issues with the contract with respect to the standard clauses
+            contract_issues = await extract_issues(db, contract, standard_clauses)
+            db.add_all(contract_issues)
+
+            # if issue identification was successful then progress the contract to the next state and commit all changes to the database
+            duration = datetime.now() - beg_time
+            contract.status = ContractStatus.UNDER_REVIEW
+            logger.info(f"*** contract analysis ({contract.id}: {contract.filename}) successful! ({duration}) ***")
+            await db.commit()
+
+        except Exception as e:
+
+            # if issue identification failed then leave the contract in the current state and discard all extracted issues
+            logger.error(f"*** contract analysis ({contract.id}: {contract.filename}) failed! discarding extracted issues ***", exc_info=True)
+            await db.execute(delete(ContractIssue).where(ContractIssue.contract_id == contract.id))
+
+            # record the error and discard any extracted issues
+            contract.errors = [{"step": "analysis", "message": str(e)}]
             await db.commit()

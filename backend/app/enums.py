@@ -27,3 +27,13 @@ class RuleSeverity(Enum):
     CRITICAL = "critical"
     WARNING = "warning"
     INFO = "info"
+
+
+class IssueStatus(Enum):
+    OPEN = "open"
+    RESOLVED = "resolved"
+
+class IssueResolution(Enum):
+    IGNORE = "ignore"
+    MANUAL_EDIT = "manual_edit"
+    SUGGESTED_EDIT = "suggested_edit"

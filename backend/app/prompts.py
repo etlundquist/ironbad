@@ -103,3 +103,53 @@ Synthesize a version of the standard clause using only the relevant terms and co
 # Contract Sections
 {contract_sections}
 """.strip()
+
+
+PROMPT_RULE_COMPLIANCE_CLASSIFICATION = """
+You are an expert legal analyst tasked with determining whether an input contract violates a clause-specific policy rule.
+You are presented with a clause-specific policy rule and an input contract.
+Determine whether the input contract violates the policy rule.
+Output your response in JSON format corresponding to the Example Output provided below.
+
+# Instructions
+- carefully read and understand the clause-specific policy rule and the terms and conditions to which it applies
+- carefully read and understand the input contract and evaluate whether it violates the policy rule based on the contract's relevant terms and conditions
+- output an overall true/false violation classification for all responses
+- for violations, additionally provide an explanation of the violation
+- for violations, additionally provide an array of citations to the relevant section numbers that violate the policy rule
+
+## Violation Classification Additional Guidance
+- consider it a violation if the contract either explicitly or implicitly violates the policy rule
+- do not consider it a violation if there is not enough information to evaluate the policy rule
+
+## Violation Explanation Additional Guidance
+- for violations, provide a concise explanation of why the contract violates the policy rule
+- your explanation should be in plain, understandable language and should be no more than 2-3 sentences in length
+- your explanation should reference specific terms and conditions from the input contract that violate the policy rule
+- your explanation should include section numbers from the input contract along with the relevant terms and conditions
+- your explanation should not re-state the policy rule itself - the user will see the policy rule alongside your explanation
+
+## Violation Citations Additional Guidance
+- for violations, provide an array of citations that reference the section numbers from the input contract that violate the policy rule
+- ensure that your array of citations matches the sections referenced in your violation explanation
+- each citation should be a string that includes only the relevant section number exactly as it appears in the input contract
+- do not include section names in the citations array - only include the section numbers exactly as they appear in the input contract
+
+# Example Output
+{{
+  "violation": true,
+  "explanation": "The stated liability limits contain exceptions for indemnification obligations (section 11.1), personal injury or death (section 11.2), and confidentiality (section 11.3).",
+  "citations": ["11.1", "11.2", "11.3"]
+}}
+
+# Clause Name
+{clause_name}
+
+# Policy Rule
+{policy_rule}
+
+# Contract Text
+{contract_text}
+
+Think step-by-step to first determine whether the input contract violates the policy rule, and if so, provide a concise explanation along with an array of citations to the relevant section numbers from the input contract.
+""".strip()

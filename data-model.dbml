@@ -29,6 +29,17 @@ enum rule_severity {
   info
 }
 
+enum issue_status {
+  open
+  resolved
+}
+
+enum issue_resolution {
+  ignore
+  manual_edit
+  suggested_edit
+}
+
 // User Configuration Entities //
 /////////////////////////////////
 
@@ -109,15 +120,18 @@ Table contract_clause_sections {
 }
 
 // identified contract-clause issues wrt clause-specific policy rules
-// NOTE: citations will be to clause-specific policy rules
 Table contract_issues {
   id uuid [pk]
   standard_clause_id uuid [ref: > standard_clauses.id]
+  standard_clause_rule_id uuid [ref: > standard_clause_rules.id]
   contract_id uuid [ref: > contracts.id]
-  issue_description string
-  relevant_text string
+  description string
   citations json
-  suggested_fix string
+  status issue_status
+  resolution issue_resolution
+  original_text string
+  suggested_text string
+  resolved_text string
   created_at timestamp
   updated_at timestamp
 }

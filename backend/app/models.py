@@ -5,7 +5,7 @@ from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import UUID, BYTEA
 from sqlalchemy.orm import DeclarativeBase, relationship
 
-from app.enums import ContractStatus, FileType, ContractSectionType, RuleSeverity
+from app.enums import ContractStatus, FileType, ContractSectionType, RuleSeverity, IssueStatus, IssueResolution
 from app.constants import EMBEDDING_VECTOR_DIMENSION
 
 from pgvector.sqlalchemy import Vector
@@ -89,3 +89,23 @@ class ContractClause(Base):
 
     standard_clause = relationship("StandardClause")
     contract = relationship("Contract", back_populates="clauses")
+
+
+class ContractIssue(Base):
+    __tablename__ = "contract_issues"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    standard_clause_id = Column(UUID(as_uuid=True), ForeignKey(column="standard_clauses.id", ondelete="CASCADE"), nullable=False)
+    standard_clause_rule_id = Column(UUID(as_uuid=True), ForeignKey(column="standard_clause_rules.id", ondelete="CASCADE"), nullable=False)
+    contract_id = Column(UUID(as_uuid=True), ForeignKey(column="contracts.id", ondelete="CASCADE"), nullable=False)
+    explanation = Column(String, nullable=False)
+    citations = Column(JSON, nullable=False)
+    status = Column(Enum(IssueStatus), nullable=False)
+    resolution = Column(Enum(IssueResolution), nullable=True)
+    suggested_text = Column(String, nullable=True)
+    resolved_text = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    standard_clause = relationship("StandardClause")
+    standard_clause_rule = relationship("StandardClauseRule")
+    contract = relationship("Contract")
