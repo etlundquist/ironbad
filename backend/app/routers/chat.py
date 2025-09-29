@@ -1,24 +1,28 @@
 import re
 import logging
 
+from typing import AsyncGenerator
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
-from openai import AsyncOpenAI
-# from sse_starlette import EventSourceResponse
+
+from openai import AsyncOpenAI, AsyncStream
+from openai.types.responses import ResponseStreamEvent, ResponseInProgressEvent, ResponseCompletedEvent, ResponseFailedEvent, ResponseTextDeltaEvent
+
+from sse_starlette import EventSourceResponse, ServerSentEvent
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.schemas import ChatMessageCreate, ChatMessage, ChatMessageResponse, ContractSectionCitation
+from app.schemas import ChatMessageCreate, ChatMessage, ChatMessageEvent, ChatMessageStatusUpdate, ChatMessageTokenDelta, ContractSectionCitation
 from app.models import Contract as DBContract, ChatThread as DBChatThread, ChatMessage as DBChatMessage, ContractSection as DBContractSection
 
-from app.database import get_db
+from app.database import SessionLocal, get_db
 from app.enums import ChatMessageRole, ChatMessageStatus, ContractSectionType, ContractStatus
 from app.prompts import PROMPT_STANDALONE_SEARCH_PHRASE, PROMPT_CONTRACT_CHAT
 from app.embeddings import get_text_embedding
 from app.utils import count_tokens
+from app.constants import CHAT_ENDPOINT_DESCRIPTION
 
 
 router = APIRouter()
@@ -97,12 +101,98 @@ async def extract_response_citations(db: AsyncSession, contract_id: UUID, respon
             )
             response_citations.append(response_citation)
         else:
-            logger.warning(f"cited section number {section_number} not found in the contract's parsed sections")
+            logger.warning(f"cited section number: [{section_number}] not found in the contract's parsed sections")
     return response_citations
 
 
-@router.post("/chat", response_model=ChatMessageResponse, tags=["chat"])
-async def send_chat_message(request: ChatMessageCreate, db: AsyncSession = Depends(get_db)) -> ChatMessageResponse:
+async def stream_chat_response(
+    contract_id: UUID,
+    chat_thread_id: UUID,
+    user_message_id: UUID,
+    assistant_message_id: UUID,
+    response_stream: AsyncStream[ResponseStreamEvent]
+) -> AsyncGenerator[ServerSentEvent, None]:
+    """generator function to stream the chat response as server-sent events and update the database accordingly"""
+
+    # send the fully-resolved user message as the first event in the response stream
+    async with SessionLocal() as db:
+        db: AsyncSession
+        user_message = await db.get(DBChatMessage, user_message_id)
+        user_message_event = ChatMessageEvent(event="user_message", data=ChatMessage.model_validate(user_message))
+    yield ServerSentEvent(event=user_message_event.event, data=user_message_event.data.model_dump_json())
+
+    # iterate over the response stream making database updates and sending events to the client
+    async for event in response_stream:
+        event: ResponseStreamEvent
+        if isinstance(event, ResponseInProgressEvent):
+            # send an event indicating the response is in progress
+            status_update_event = ChatMessageEvent(
+                event="message_status_update",
+                data=ChatMessageStatusUpdate(
+                    chat_thread_id=chat_thread_id,
+                    chat_message_id=assistant_message_id,
+                    status=ChatMessageStatus.IN_PROGRESS
+                )
+            )
+            yield ServerSentEvent(event=status_update_event.event, data=status_update_event.data.model_dump_json())
+        elif isinstance(event, ResponseTextDeltaEvent):
+            # send an event with the next token of the response content
+            token_delta_event = ChatMessageEvent(
+                event="message_token_delta",
+                data=ChatMessageTokenDelta(
+                    chat_thread_id=chat_thread_id,
+                    chat_message_id=assistant_message_id,
+                    delta=event.delta
+                )
+            )
+            yield ServerSentEvent(event=token_delta_event.event, data=token_delta_event.data.model_dump_json())
+        elif isinstance(event, ResponseCompletedEvent):
+            # send an event indicating the response is complete
+            status_update_event = ChatMessageEvent(
+                event="message_status_update",
+                data=ChatMessageStatusUpdate(
+                    chat_thread_id=chat_thread_id,
+                    chat_message_id=assistant_message_id,
+                    status=ChatMessageStatus.COMPLETED
+                )
+            )
+            yield ServerSentEvent(event=status_update_event.event, data=status_update_event.data.model_dump_json())
+            # resolve the citations, update the complete assistant message in the database, and send the full complete assistant message
+            async with SessionLocal() as db:
+                db: AsyncSession
+                assistant_message = await db.get(DBChatMessage, assistant_message_id)
+                response_citations = await extract_response_citations(db, contract_id, event.response.output_text)
+                assistant_message.status = ChatMessageStatus.COMPLETED
+                assistant_message.content = event.response.output_text
+                assistant_message.citations = [citation.model_dump() for citation in response_citations]
+                assistant_message_event = ChatMessageEvent(event="assistant_message", data=ChatMessage.model_validate(assistant_message))
+                await db.commit()
+            yield ServerSentEvent(event=assistant_message_event.event, data=assistant_message_event.data.model_dump_json())
+        elif isinstance(event, ResponseFailedEvent):
+            # send an event indicating the response failed, update the message in the database, and send the full failed assistant message
+            logger.info(f"response failed event: {event.response.error}")
+            status_update_event = ChatMessageEvent(
+                event="message_status_update",
+                data=ChatMessageStatusUpdate(
+                    chat_thread_id=chat_thread_id,
+                    chat_message_id=assistant_message_id,
+                    status=ChatMessageStatus.FAILED
+                )
+            )
+            yield ServerSentEvent(event=status_update_event.event, data=status_update_event.data.model_dump_json())
+            # update the failed assistant message in the database and send the full failed assistant message
+            async with SessionLocal() as db:
+                db: AsyncSession
+                assistant_message = await db.get(DBChatMessage, assistant_message_id)
+                assistant_message.status = ChatMessageStatus.FAILED
+                assistant_message.content = "There was an error generating the response. Please try again."
+                assistant_message_event = ChatMessageEvent(event="assistant_message", data=ChatMessage.model_validate(assistant_message))
+                await db.commit()
+            yield ServerSentEvent(event=assistant_message_event.event, data=assistant_message_event.data.model_dump_json())
+
+
+@router.post("/chat", tags=["chat"], description=CHAT_ENDPOINT_DESCRIPTION)
+async def send_chat_message(request: ChatMessageCreate, db: AsyncSession = Depends(get_db)) -> EventSourceResponse:
     """send a new chat message and get the response as a stream of server-sent events"""
 
     # create a new OpenAI client to handle the request
@@ -129,7 +219,7 @@ async def send_chat_message(request: ChatMessageCreate, db: AsyncSession = Depen
         db.add(chat_thread)
         await db.flush()
 
-    # create a chat message record in the database for the new user message
+    # create a chat message record in the database for the user message
     user_message = DBChatMessage(
         chat_thread_id=chat_thread.id,
         status=ChatMessageStatus.COMPLETED,
@@ -157,41 +247,40 @@ async def send_chat_message(request: ChatMessageCreate, db: AsyncSession = Depen
     search_phrase = search_phrase.output_text
     # logger.info(f"generated standalone search phrase: {search_phrase}")
 
-    # fetch the most relevant contract sections based on the standalone search phrase
+    # fetch the most relevant contract sections based on the standalone search phrase and resolve the system prompt
     contract_sections = await get_relevant_sections(db, request.contract_id, search_phrase)
-
-    # build the system prompt injecting the retrieved sections as dynamic context
     system_prompt = PROMPT_CONTRACT_CHAT.format(contract_sections=contract_sections)
     # logger.info(f"resolved system prompt: {system_prompt}")
 
-    # generate a response using the resolved system prompt and conversation history
-    response = await openai.responses.create(
-        model="gpt-4.1-mini",
-        instructions=system_prompt,
-        input=conversation_history,
-        temperature=0.0,
-        timeout=60
-    )
-
-    # parse the raw response content to extract the section-specific inline citations
-    response_citations = await extract_response_citations(db, request.contract_id, response.output_text)
-
-    # add the assistant response message to the database with the extracted citations
+    # create a chat message record in the database for the assistant message
     assistant_message = DBChatMessage(
         chat_thread_id=chat_thread.id,
         parent_chat_message_id=user_message.id,
-        status=ChatMessageStatus.COMPLETED,
+        status=ChatMessageStatus.PENDING,
         role=ChatMessageRole.ASSISTANT,
-        content=response.output_text,
-        citations=[citation.model_dump() for citation in response_citations]
+        content="",
     )
     db.add(assistant_message)
     await db.flush()
 
-    # return the fully resolved [user, assistant] message for FE display and commit changes for this turn
-    response = ChatMessageResponse(
-        user_message=ChatMessage.model_validate(user_message),
-        assistant_message=ChatMessage.model_validate(assistant_message)
+    # process the streaming response to yield server-sent events back to the client and update the assistant message in the database
+    response_stream = await openai.responses.create(
+        model="gpt-4.1-mini",
+        instructions=system_prompt,
+        input=conversation_history,
+        temperature=0.0,
+        timeout=60,
+        stream=True
     )
+    streaming_chat_response = stream_chat_response(
+        contract_id=request.contract_id,
+        chat_thread_id=chat_thread.id,
+        user_message_id=user_message.id,
+        assistant_message_id=assistant_message.id,
+        response_stream=response_stream
+    )
+
+    # commit the initial messages to the database and return the streaming generator object
+    # NOTE: the streaming generator yields events outside the lifecycle of the request handler so we need a separate database session
     await db.commit()
-    return response
+    return EventSourceResponse(streaming_chat_response)

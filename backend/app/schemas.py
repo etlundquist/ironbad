@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Literal, Optional
+from typing import Literal, Optional, Union
 from uuid import UUID
 from datetime import datetime
 
@@ -185,6 +185,18 @@ class ChatMessage(ConfiguredBaseModel):
     created_at: datetime
     updated_at: datetime
 
-class ChatMessageResponse(ConfiguredBaseModel):
-    user_message: ChatMessage
-    assistant_message: ChatMessage
+
+
+class ChatMessageStatusUpdate(ConfiguredBaseModel):
+    chat_thread_id: UUID
+    chat_message_id: UUID
+    status: ChatMessageStatus
+
+class ChatMessageTokenDelta(ConfiguredBaseModel):
+    chat_message_id: UUID
+    delta: str
+
+class ChatMessageEvent(ConfiguredBaseModel):
+    event: Literal["user_message", "assistant_message", "message_status_update", "message_token_delta"]
+    data: Union[ChatMessage, ChatMessageStatusUpdate, ChatMessageTokenDelta]
+
