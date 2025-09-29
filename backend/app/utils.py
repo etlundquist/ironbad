@@ -42,3 +42,11 @@ def string_truncate(string: str, max_tokens: int = 100_000, tokenizer: Optional[
         return tokenizer.decode(tokens[:max_tokens])
     else:
         return string
+
+
+def count_tokens(string: str, tokenizer: Optional[Encoding] = None) -> int:
+    """count the number of tokens in the input string"""
+
+    if not tokenizer:
+        tokenizer = tiktoken.get_encoding("cl100k_base")
+    return len(tokenizer.encode(string))
