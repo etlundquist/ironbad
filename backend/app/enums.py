@@ -37,3 +37,15 @@ class IssueResolution(Enum):
     IGNORE = "ignore"
     MANUAL_EDIT = "manual_edit"
     SUGGESTED_EDIT = "suggested_edit"
+
+
+class ChatMessageStatus(Enum):
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+class ChatMessageRole(Enum):
+    SYSTEM = "system"
+    USER = "user"
+    ASSISTANT = "assistant"

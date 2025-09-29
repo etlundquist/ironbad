@@ -3,7 +3,7 @@ from typing import Literal, Optional
 from uuid import UUID
 from datetime import datetime
 
-from app.enums import ContractSectionType, JobStatus, ContractStatus, FileType, RuleSeverity, IssueStatus, IssueResolution
+from app.enums import ChatMessageRole, ChatMessageStatus, ContractSectionType, JobStatus, ContractStatus, FileType, RuleSeverity, IssueStatus, IssueResolution
 
 
 class ConfiguredBaseModel(BaseModel):
@@ -149,7 +149,7 @@ class EvaluatedClauseRule(ConfiguredBaseModel):
     citations: Optional[list[str]] = None
 
 
-class ContractIssueCitation(ConfiguredBaseModel):
+class ContractSectionCitation(ConfiguredBaseModel):
     section_id: str
     section_number: str
     section_name: Optional[str] = None
@@ -163,7 +163,28 @@ class ContractIssue(ConfiguredBaseModel):
     contract_id: UUID
     explanation: str
     status: IssueStatus
-    citations: list[ContractIssueCitation]
+    citations: list[ContractSectionCitation]
     resolution: Optional[IssueResolution] = None
     suggested_text: Optional[str] = None
     resolved_text: Optional[str] = None
+
+
+class ChatMessageCreate(ConfiguredBaseModel):
+    contract_id: UUID
+    chat_thread_id: Optional[UUID] = None
+    content: str
+
+class ChatMessage(ConfiguredBaseModel):
+    id: UUID
+    chat_thread_id: UUID
+    parent_chat_message_id: Optional[UUID] = None
+    status: ChatMessageStatus
+    role: ChatMessageRole
+    content: str
+    citations: Optional[list[ContractSectionCitation]] = None
+    created_at: datetime
+    updated_at: datetime
+
+class ChatMessageResponse(ConfiguredBaseModel):
+    user_message: ChatMessage
+    assistant_message: ChatMessage

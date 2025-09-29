@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Contract, StandardClause, StandardClauseRule, ContractSection, ContractClause, ContractIssue
-from app.schemas import ClauseRuleEvaluation, EvaluatedClauseRule, ContractIssueCitation
+from app.schemas import ClauseRuleEvaluation, EvaluatedClauseRule, ContractSectionCitation
 from app.enums import IssueStatus
 from app.prompts import PROMPT_RULE_COMPLIANCE_CLASSIFICATION
 
@@ -40,7 +40,7 @@ async def evaluate_clause_rule(contract_clause: ContractClause, standard_clause:
     return result
 
 
-async def extract_violation_citations(db: AsyncSession, contract_id: UUID, violation: EvaluatedClauseRule) -> list[ContractIssueCitation]:
+async def extract_violation_citations(db: AsyncSession, contract_id: UUID, violation: EvaluatedClauseRule) -> list[ContractSectionCitation]:
     """extract citations from a rule evaluation into structured citation objects referencing specific contract sections"""
 
     # if there are no citations then return an empty list for this violation
@@ -58,10 +58,10 @@ async def extract_violation_citations(db: AsyncSession, contract_id: UUID, viola
     contract_sections = result.scalars().all()
     contract_section_numbers = {section.number: section for section in contract_sections}
 
-    citations: list[ContractIssueCitation] = []
+    citations: list[ContractSectionCitation] = []
     for text_citation in text_citations:
         if contract_section := contract_section_numbers.get(text_citation):
-            citation = ContractIssueCitation(
+            citation = ContractSectionCitation(
                 section_id=str(contract_section.id),
                 section_number=contract_section.number,
                 section_name=contract_section.name,

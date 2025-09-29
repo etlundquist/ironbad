@@ -20,5 +20,6 @@ dependencies = [
     "pgvector>=0.4.1",
     "taskiq[reload]>=0.11.18",
     "taskiq-redis>=1.1.0",
+    "sse-starlette>=3.0.2",
 ]
 requires-python = ">=3.11"

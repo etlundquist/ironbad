@@ -40,6 +40,18 @@ enum issue_resolution {
   suggested_edit
 }
 
+enum chat_message_status {
+  pending
+  in_progress
+  completed
+  failed
+}
+
+enum chat_message_role {
+  user
+  assistant
+}
+
 // User Configuration Entities //
 /////////////////////////////////
 
@@ -156,7 +168,6 @@ Table chat_message {
   chat_thread_id uuid [ref: > chat_thread.id]
   parent_chat_message_id uuid [ref: - chat_message.id]
   status enum
-  events json
   role enum
   content string
   citations json
