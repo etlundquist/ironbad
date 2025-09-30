@@ -10,6 +10,7 @@ class ContractStatus(Enum):
 
 class FileType(Enum):
     PDF = "application/pdf"
+    DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 class ContractSectionType(Enum):
     PREAMBLE = "preamble"

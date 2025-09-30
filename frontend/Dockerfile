@@ -1,13 +1,17 @@
 FROM node:18-alpine
 WORKDIR /app
 
-# install dependencies
+# copy package files first for better caching
 COPY package*.json ./
-RUN npm install
 
-# copy source code and build the application
+# install all dependencies including types in one step
+RUN npm install && npm install --save-dev @types/react @types/react-dom @types/node
+
+# copy source code
 COPY . .
-RUN npm run build
+
+# set environment variable for backend URL
+ENV NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
 
 # expose port and start the application in development mode
 EXPOSE 3000

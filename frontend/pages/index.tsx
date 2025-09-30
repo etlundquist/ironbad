@@ -1,4 +1,5 @@
 import { NextPage } from 'next'
+import Link from 'next/link'
 
 const Home: NextPage = () => {
   return (
@@ -6,6 +7,11 @@ const Home: NextPage = () => {
       <main>
         <h1>Ironbad - Contract Lifecycle Management</h1>
         <p>Welcome to your CLM application!</p>
+        <div className="action-buttons">
+          <Link href="/upload" className="primary-button">
+            Upload Contracts
+          </Link>
+        </div>
       </main>
     </div>
   )

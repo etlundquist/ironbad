@@ -29,9 +29,24 @@ async def upload_contract(file: UploadFile = File(...), db: AsyncSession = Depen
     """create a new contract record storing the file contents in binary format"""
 
     try:
-
         contents = await file.read()
-        filetype = FileType(file.content_type)
+        content_type = file.content_type
+        filename = file.filename or ""
+
+        # handle cases where content type is not properly detected
+        if content_type == "application/octet-stream" or not content_type:
+            if filename.lower().endswith('.pdf'):
+                filetype = FileType.PDF
+            elif filename.lower().endswith('.docx'):
+                filetype = FileType.DOCX
+            else:
+                raise HTTPException(status_code=400, detail="unsupported file type - only PDF and DOCX files are allowed")
+        else:
+            try:
+                filetype = FileType(content_type)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="unsupported file type - only PDF and DOCX files are allowed")
+
         if file.size > MAX_UPLOAD_FILE_SIZE:
             raise HTTPException(status_code=413, detail="upload file size exceeds the limit (10MB)")
 
