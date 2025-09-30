@@ -774,11 +774,55 @@ main {
 }
 
 .pdf-viewer-container {
-  flex: 1;
   background-color: #ffffff;
   border-right: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
+  min-width: 0; /* Allow shrinking */
+}
+
+/* Resizable Splitter */
+.resizable-splitter {
+  width: 8px;
+  background-color: #e2e8f0;
+  cursor: col-resize;
+  position: relative;
+  flex-shrink: 0;
+  transition: background-color 0.2s ease;
+}
+
+.resizable-splitter:hover {
+  background-color: #cbd5e0;
+}
+
+.resizable-splitter:active {
+  background-color: #a0aec0;
+}
+
+.resizable-splitter::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 100%;
+  background-color: #a0aec0;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.resizable-splitter:hover::before {
+  opacity: 1;
+}
+
+.contract-detail-sidebar {
+  background-color: #f8fafc;
+  border-left: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0; /* Allow shrinking */
 }
 
 .pdf-viewer {
@@ -1859,11 +1903,17 @@ main {
 
   .pdf-viewer-container {
     height: 400px;
+    width: 100% !important;
     border-right: none;
     border-bottom: 1px solid #e2e8f0;
   }
 
+  .resizable-splitter {
+    display: none;
+  }
+
   .contract-detail-sidebar {
+    width: 100% !important;
     height: 400px;
   }
 }

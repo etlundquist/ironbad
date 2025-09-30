@@ -181,6 +181,11 @@ const ContractDetailPage: NextPage = () => {
   const chatAbortControllerRef = useRef<AbortController | null>(null)
   const chatEndRef = useRef<HTMLDivElement | null>(null)
 
+  // Resizable splitter state
+  const [leftPanelWidth, setLeftPanelWidth] = useState(60) // percentage
+  const [isDragging, setIsDragging] = useState(false)
+  const splitterRef = useRef<HTMLDivElement | null>(null)
+
   const sortMessagesByTime = (messages: ChatMessage[]) => {
     return [...messages].sort((a, b) => {
       const ta = new Date(a.created_at).getTime()
@@ -191,6 +196,52 @@ const ContractDetailPage: NextPage = () => {
       return a.id.localeCompare(b.id)
     })
   }
+
+  // Splitter drag handlers
+  const handleSplitterMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleSplitterMouseMove = (e: MouseEvent) => {
+    if (!isDragging) return
+
+    const container = document.querySelector('.contract-detail-content') as HTMLElement
+    if (!container) return
+
+    const containerRect = container.getBoundingClientRect()
+    const newLeftWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100
+
+    // Constrain between 20% and 80%
+    const constrainedWidth = Math.max(20, Math.min(80, newLeftWidth))
+    setLeftPanelWidth(constrainedWidth)
+  }
+
+  const handleSplitterMouseUp = () => {
+    setIsDragging(false)
+  }
+
+  // Add global mouse event listeners when dragging
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleSplitterMouseMove)
+      document.addEventListener('mouseup', handleSplitterMouseUp)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    } else {
+      document.removeEventListener('mousemove', handleSplitterMouseMove)
+      document.removeEventListener('mouseup', handleSplitterMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleSplitterMouseMove)
+      document.removeEventListener('mouseup', handleSplitterMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [isDragging])
 
   useEffect(() => {
     setIsClient(true)
@@ -1205,7 +1256,10 @@ const ContractDetailPage: NextPage = () => {
       {/* Main Content */}
       <div className="contract-detail-content">
         {/* Left Side - PDF Viewer */}
-        <div className="pdf-viewer-container">
+        <div
+          className="pdf-viewer-container"
+          style={{ width: `${leftPanelWidth}%` }}
+        >
           <div className="pdf-viewer">
             {contract.filetype === 'application/pdf' && pdfUrl ? (
               <div className="pdf-document-container">
@@ -1350,8 +1404,18 @@ const ContractDetailPage: NextPage = () => {
           </div>
         </div>
 
+        {/* Resizable Splitter */}
+        <div
+          ref={splitterRef}
+          className="resizable-splitter"
+          onMouseDown={handleSplitterMouseDown}
+        />
+
         {/* Right Side - Tabbed Content */}
-        <div className="contract-detail-sidebar">
+        <div
+          className="contract-detail-sidebar"
+          style={{ width: `${100 - leftPanelWidth}%` }}
+        >
           <div className="tabs-container">
             <div className="tabs-header">
               <button
