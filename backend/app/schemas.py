@@ -70,7 +70,7 @@ class StandardClause(ConfiguredBaseModel):
     display_name: str
     description: str
     standard_text: str
-    embedding: Optional[list[float]] = None
+    embedding: Optional[list[float]] = Field(default=None, exclude=True)
     created_at: datetime
     updated_at: datetime
 
@@ -123,6 +123,7 @@ class ContractSection(ConfiguredBaseModel):
 class ContractClause(ConfiguredBaseModel):
     id: UUID
     standard_clause_id: UUID
+    standard_clause: Optional[StandardClause] = None
     contract_id: UUID
     contract_sections: list[UUID]
     raw_markdown: str
@@ -160,6 +161,8 @@ class ContractIssue(ConfiguredBaseModel):
     id: UUID
     standard_clause_id: UUID
     standard_clause_rule_id: UUID
+    standard_clause: Optional[StandardClause] = None
+    standard_clause_rule: Optional[StandardClauseRule] = None
     contract_id: UUID
     explanation: str
     citations: Optional[list[ContractSectionCitation]] = None
@@ -170,6 +173,9 @@ class ContractIssue(ConfiguredBaseModel):
     active_suggested_revision: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+
+class ContractIssueUserRevision(ConfiguredBaseModel):
+    user_suggested_revision: str
 
 
 class ChatMessageCreate(ConfiguredBaseModel):

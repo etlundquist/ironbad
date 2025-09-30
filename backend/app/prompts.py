@@ -201,3 +201,35 @@ The initial term of the contract is 12 months, after which the contract will aut
 # Contract Sections
 {contract_sections}
 """.strip()
+
+
+PROMPT_CONTRACT_ISSUE_REVISION = """
+You are an expert legal analyst tasked with generating a suggested revision to fix a contract issue.
+You are presented with a contract clause which contains one or more terms and conditions which violate a clause-specific policy rule.
+You are also presented with an issue description which explains why the contract clause violates the policy rule.
+You are also presented with the full set of clause-specific policy rules and the standard approved language for the clause.
+Generate a suggested revision to the contract clause which will fix the issue without violating any other policy rules.
+
+# Instructions
+- read the issue description carefully to understand which terms and conditions in the contract clause violate the provided policy rule
+- read the full set of policy rules and the standard approved language to understand how to suggest a revision which will fix the identified issue without violating any other policy rules
+- generate a suggested revision which will fix the identified issue by modifying, adding, and/or removing relevant terms and conditions from the contract clause
+- your revision must be consistent with the full set of policy rules but not add, modify, or remove any terms or conditions which are not relevant to the identified issue
+- your revision should replace the smallest possible section, sub-section, paragraph, or sentence of the contract clause necessary to fix the identified issue
+- output your revision in markdown format (without any backticks) using headers, lists, tables, and other markdown formatting as appropriate to match the format of the original contract clause
+
+# Clause Name
+{clause_name}
+
+# Contract Clause Text
+{contract_clause}
+
+# Issue Description
+{issue_description}
+
+# Policy Rules
+{policy_rules}
+
+# Standard Approved Language
+{standard_approved_language}
+""".strip()

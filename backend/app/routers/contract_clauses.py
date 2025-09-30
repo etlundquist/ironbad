@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models import Contract as DBContract, ContractClause as DBContractClause
 from app.schemas import ContractClause
@@ -26,7 +27,7 @@ async def get_contract_clauses(contract_id: UUID, db: AsyncSession = Depends(get
             raise HTTPException(status_code=404, detail="contract not found")
 
         # fetch all contract clauses for this contract
-        query = select(DBContractClause).where(DBContractClause.contract_id == contract_id)
+        query = select(DBContractClause).where(DBContractClause.contract_id == contract_id).options(selectinload(DBContractClause.standard_clause))
         result = await db.execute(query)
         contract_clauses = result.scalars().all()
         return [ContractClause.model_validate(clause) for clause in contract_clauses]
@@ -62,13 +63,12 @@ async def get_contract_clause(
             query = select(DBContractClause).where(
                 DBContractClause.contract_id == contract_id,
                 DBContractClause.standard_clause_id == standard_clause_id
-            )
+            ).options(selectinload(DBContractClause.standard_clause))
         else:
             query = select(DBContractClause).where(
                 DBContractClause.contract_id == contract_id,
                 DBContractClause.id == contract_clause_id
-            )
-
+            ).options(selectinload(DBContractClause.standard_clause))
         result = await db.execute(query)
         contract_clause = result.scalar_one_or_none()
         if not contract_clause:
