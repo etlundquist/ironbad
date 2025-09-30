@@ -181,6 +181,17 @@ const ContractDetailPage: NextPage = () => {
   const chatAbortControllerRef = useRef<AbortController | null>(null)
   const chatEndRef = useRef<HTMLDivElement | null>(null)
 
+  const sortMessagesByTime = (messages: ChatMessage[]) => {
+    return [...messages].sort((a, b) => {
+      const ta = new Date(a.created_at).getTime()
+      const tb = new Date(b.created_at).getTime()
+      if (ta !== tb) return ta - tb
+      // Stable tie-breaker: user before assistant
+      if (a.role !== b.role) return a.role === 'user' ? -1 : 1
+      return a.id.localeCompare(b.id)
+    })
+  }
+
   useEffect(() => {
     setIsClient(true)
     if (typeof tab === 'string' && ['metadata','clauses','issues','chat'].includes(tab)) {
@@ -770,7 +781,7 @@ const ContractDetailPage: NextPage = () => {
         const msgsResp = await fetch(`${backendUrl}/contracts/${id}/chat/threads/${thread.id}/messages`)
         if (msgsResp.ok) {
           const msgs: ChatMessage[] = await msgsResp.json()
-          setChatMessages(msgs)
+          setChatMessages(sortMessagesByTime(msgs))
         } else {
           setChatMessages([])
         }
@@ -815,31 +826,27 @@ const ContractDetailPage: NextPage = () => {
       const userMsg: ChatMessage = data.user_message
       const assistantMsg: ChatMessage = data.assistant_message
       setCurrentChatThread({ id: threadId, contract_id: contract!.id, archived: false, created_at: userMsg.created_at, updated_at: userMsg.updated_at })
-      setChatMessages((prev) => {
-        const hasUser = prev.some((m) => m.id === userMsg.id)
-        const hasAssistant = prev.some((m) => m.id === assistantMsg.id)
-        return [
-          ...prev,
-          ...(hasUser ? [] : [userMsg]),
-          ...(hasAssistant ? [] : [assistantMsg])
-        ]
-      })
+      setChatMessages((prev) => sortMessagesByTime([
+        ...prev,
+        ...(prev.some((m) => m.id === userMsg.id) ? [] : [userMsg]),
+        ...(prev.some((m) => m.id === assistantMsg.id) ? [] : [assistantMsg])
+      ]))
       return
     }
     if (eventName === 'user_message') {
       const msg: ChatMessage = data
       setCurrentChatThread((prev) => prev || { id: msg.chat_thread_id, contract_id: contract!.id, archived: false, created_at: msg.created_at, updated_at: msg.updated_at })
       // Append user message; init already provided proper ordering
-      setChatMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]))
+      setChatMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : sortMessagesByTime([...prev, msg])))
     } else if (eventName === 'message_status_update') {
       const update: ChatMessageStatusUpdate = data
-      setChatMessages((prev) => prev.map((m) => (m.id === update.chat_message_id ? { ...m, status: update.status } : m)))
+      setChatMessages((prev) => sortMessagesByTime(prev.map((m) => (m.id === update.chat_message_id ? { ...m, status: update.status } : m))))
     } else if (eventName === 'message_token_delta') {
       const delta: ChatMessageTokenDelta = data
-      setChatMessages((prev) => prev.map((m) => (m.id === delta.chat_message_id ? { ...m, content: (m.content || '') + delta.delta, status: m.status === 'pending' ? 'in_progress' : m.status } : m)))
+      setChatMessages((prev) => sortMessagesByTime(prev.map((m) => (m.id === delta.chat_message_id ? { ...m, content: (m.content || '') + delta.delta, status: m.status === 'pending' ? 'in_progress' : m.status } : m))))
     } else if (eventName === 'assistant_message') {
       const fullMsg: ChatMessage = data
-      setChatMessages((prev) => prev.map((m) => (m.id === fullMsg.id ? fullMsg : m)))
+      setChatMessages((prev) => sortMessagesByTime(prev.map((m) => (m.id === fullMsg.id ? fullMsg : m))))
     }
   }
 
