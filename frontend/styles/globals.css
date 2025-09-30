@@ -1,3 +1,7 @@
+/* React PDF styles */
+@import 'react-pdf/dist/Page/AnnotationLayer.css';
+@import 'react-pdf/dist/Page/TextLayer.css';
+
 html,
 body {
   padding: 0;
@@ -37,6 +41,9 @@ main {
 
 .action-buttons {
   margin-top: 2rem;
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
 }
 
 .primary-button {
@@ -54,6 +61,25 @@ main {
   background-color: #2563eb;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.secondary-button {
+  background-color: #ffffff;
+  color: #374151;
+  padding: 0.75rem 2rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-block;
+  transition: all 0.2s ease;
+}
+
+.secondary-button:hover {
+  background-color: #f9fafb;
+  border-color: #9ca3af;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* Upload Page Styles */
@@ -79,7 +105,35 @@ main {
 .upload-header p {
   font-size: 1.125rem;
   color: #64748b;
-  margin: 0;
+  margin: 0 0 1.5rem 0;
+}
+
+.header-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.view-contracts-link {
+  background-color: #ffffff;
+  color: #374151;
+  padding: 0.5rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-weight: 500;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+  font-size: 0.875rem;
+}
+
+.view-contracts-link:hover {
+  background-color: #f9fafb;
+  border-color: #9ca3af;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .upload-zone {
@@ -259,4 +313,858 @@ main {
 
 .ingest-button:active:not(:disabled) {
   transform: translateY(0);
+}
+
+/* Contracts Dashboard Styles */
+.contracts-container {
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.contracts-header {
+  margin-bottom: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.contracts-header h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 0.5rem 0;
+}
+
+.contracts-header p {
+  font-size: 1.125rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.upload-contracts-link {
+  background-color: #3b82f6;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.upload-contracts-link:hover {
+  background-color: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.contracts-table-container {
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.contracts-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.contracts-table thead {
+  background-color: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.contracts-table th {
+  padding: 1rem 1.5rem;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.contracts-table td {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.contracts-table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+.contracts-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.file-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.file-icon {
+  flex-shrink: 0;
+}
+
+.file-icon.pdf {
+  color: #dc2626;
+}
+
+.file-icon.docx {
+  color: #2563eb;
+}
+
+.file-icon.unknown {
+  color: #6b7280;
+}
+
+.filename {
+  font-weight: 500;
+  color: #1e293b;
+  word-break: break-all;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.status-uploaded {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.status-processing {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.status-ready {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.status-review {
+  background-color: #fce7f3;
+  color: #be185d;
+}
+
+.status-completed {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.status-default {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.contract-date {
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.contract-actions {
+  text-align: right;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.action-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.875rem;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.action-button.primary {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.action-button.primary:hover {
+  background-color: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+.action-button.secondary {
+  background-color: #ffffff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.action-button.secondary:hover:not(:disabled) {
+  background-color: #f9fafb;
+  border-color: #9ca3af;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.action-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1.5rem;
+}
+
+.empty-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.empty-content svg {
+  color: #d1d5db;
+}
+
+.empty-content h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #374151;
+  margin: 0;
+}
+
+.empty-content p {
+  color: #6b7280;
+  margin: 0;
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 3rem;
+}
+
+.spinner.large {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e2e8f0;
+  border-top: 3px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 3rem;
+  text-align: center;
+}
+
+.error-state p {
+  color: #dc2626;
+  margin: 0;
+}
+
+.retry-button {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.retry-button:hover {
+  background-color: #2563eb;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .contracts-header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .contracts-header .header-actions {
+    justify-content: center;
+  }
+
+  .upload-header .header-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .contracts-table th,
+  .contracts-table td {
+    padding: 0.75rem 1rem;
+  }
+
+  .contracts-table th {
+    font-size: 0.75rem;
+  }
+}
+
+/* Contract Detail Page Styles */
+.contract-detail-container {
+  min-height: 100vh;
+  background-color: #f8fafc;
+}
+
+.contract-detail-header {
+  background-color: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 1.5rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.back-link {
+  color: #6b7280;
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: color 0.2s ease;
+}
+
+.back-link:hover {
+  color: #374151;
+}
+
+.contract-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.contract-title h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+  word-break: break-all;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+}
+
+.cta-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.cta-button.primary {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.cta-button.primary:hover:not(:disabled) {
+  background-color: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.cta-button.secondary {
+  background-color: #ffffff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.cta-button.secondary:hover {
+  background-color: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.cta-button.processing {
+  background-color: #f3f4f6;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+.cta-button.completed {
+  background-color: #d1fae5;
+  color: #065f46;
+  cursor: default;
+}
+
+.cta-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.contract-detail-content {
+  display: flex;
+  height: calc(100vh - 120px);
+  min-height: 600px;
+}
+
+.pdf-viewer-container {
+  flex: 1;
+  background-color: #ffffff;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pdf-viewer {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pdf-document-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.pdf-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background-color: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.pdf-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pdf-zoom-display {
+  font-weight: 500;
+  color: #374151;
+  font-size: 0.875rem;
+  min-width: 50px;
+  text-align: center;
+}
+
+.pdf-search-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+  max-width: 500px;
+  min-width: 0;
+}
+
+.search-input-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.search-input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  background-color: #ffffff;
+  transition: border-color 0.2s ease;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.search-button {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.search-button:hover:not(:disabled) {
+  background-color: #2563eb;
+}
+
+.search-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.clear-search-button {
+  background-color: #6b7280;
+  color: white;
+  border: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.clear-search-button:hover {
+  background-color: #4b5563;
+}
+
+.search-results {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.search-results-info {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.search-nav-button {
+  background-color: #ffffff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-nav-button:hover {
+  background-color: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.pdf-scroll-page {
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Search highlighting styles - inline approach */
+.pdf-search-highlight {
+  background-color: rgba(254, 243, 199, 0.6) !important;
+  border: 1px solid rgba(245, 158, 11, 0.8) !important;
+  border-radius: 2px !important;
+  padding: 0 1px !important;
+  margin: 0 !important;
+  box-shadow: 0 1px 2px rgba(245, 158, 11, 0.3) !important;
+  display: inline !important;
+}
+
+.pdf-search-highlight.current {
+  background-color: rgba(251, 191, 36, 0.7) !important;
+  border-color: rgba(217, 119, 6, 0.9) !important;
+  box-shadow: 0 2px 4px rgba(217, 119, 6, 0.4) !important;
+  animation: searchPulse 1s ease-in-out !important;
+}
+
+@keyframes searchPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.pdf-control-button {
+  background-color: #ffffff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.875rem;
+}
+
+.pdf-control-button:hover:not(:disabled) {
+  background-color: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.pdf-control-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pdf-page-info {
+  font-weight: 500;
+  color: #374151;
+  font-size: 0.875rem;
+}
+
+.pdf-page-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 1rem;
+  overflow: auto;
+  background-color: #f8fafc;
+}
+
+.pdf-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  gap: 1rem;
+}
+
+.pdf-loading p {
+  color: #6b7280;
+  margin: 0;
+}
+
+.pdf-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 1rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.file-icon-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  background-color: #f3f4f6;
+  border-radius: 12px;
+}
+
+.file-icon-container .file-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.pdf-placeholder p {
+  color: #6b7280;
+  margin: 0;
+  font-size: 1rem;
+}
+
+.download-link {
+  background-color: #3b82f6;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.download-link:hover {
+  background-color: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.tabs-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.tabs-header {
+  display: flex;
+  background-color: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.tab-button {
+  flex: 1;
+  padding: 1rem 1.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  color: #6b7280;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+  font-size: 0.875rem;
+}
+
+.tab-button:hover {
+  color: #374151;
+  background-color: #ffffff;
+}
+
+.tab-button.active {
+  color: #3b82f6;
+  border-bottom-color: #3b82f6;
+  background-color: #ffffff;
+}
+
+.tab-content {
+  flex: 1;
+  padding: 1.5rem;
+  background-color: #ffffff;
+  overflow-y: auto;
+}
+
+.tab-panel h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 1rem 0;
+}
+
+.tab-panel p {
+  color: #6b7280;
+  margin: 0;
+}
+
+/* Responsive Design for Contract Detail */
+@media (max-width: 1024px) {
+  .contract-detail-content {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .pdf-viewer-container {
+    height: 400px;
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .contract-detail-sidebar {
+    height: 400px;
+  }
+}
+
+@media (max-width: 768px) {
+  .contract-detail-header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .header-right {
+    justify-content: center;
+  }
+
+  .tabs-header {
+    flex-wrap: wrap;
+  }
+
+  .tab-button {
+    flex: 1 1 50%;
+    font-size: 0.75rem;
+    padding: 0.75rem 0.5rem;
+  }
+
+  .pdf-controls {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .pdf-zoom-controls {
+    justify-content: center;
+  }
+
+  .pdf-search-controls {
+    max-width: none;
+  }
+
+  .search-input-container {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .search-results {
+    justify-content: center;
+  }
+
+  .pdf-control-button {
+    font-size: 0.75rem;
+    padding: 0.375rem 0.75rem;
+  }
+
+  .pdf-page-container {
+    padding: 0.5rem;
+  }
 }

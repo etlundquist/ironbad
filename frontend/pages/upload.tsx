@@ -1,5 +1,6 @@
 import { NextPage } from 'next'
 import React, { useState, useCallback, useRef } from 'react'
+import Link from 'next/link'
 
 interface UploadedContract {
   id: string
@@ -147,6 +148,11 @@ const UploadPage: NextPage = () => {
       <div className="upload-header">
         <h1>Upload Contracts</h1>
         <p>Upload PDF or DOCX contracts to begin the analysis process</p>
+        <div className="header-actions">
+          <Link href="/contracts" className="view-contracts-link">
+            View All Contracts →
+          </Link>
+        </div>
       </div>
 
       <div

@@ -11,6 +11,9 @@ const Home: NextPage = () => {
           <Link href="/upload" className="primary-button">
             Upload Contracts
           </Link>
+          <Link href="/contracts" className="secondary-button">
+            View Contracts
+          </Link>
         </div>
       </main>
     </div>
