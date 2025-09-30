@@ -212,7 +212,14 @@ class ChatMessageTokenDelta(ConfiguredBaseModel):
     chat_message_id: UUID
     delta: str
 
+
+class ChatInitEventData(ConfiguredBaseModel):
+    chat_thread_id: UUID
+    user_message: ChatMessage
+    assistant_message: ChatMessage
+
+
 class ChatMessageEvent(ConfiguredBaseModel):
-    event: Literal["user_message", "assistant_message", "message_status_update", "message_token_delta"]
-    data: Union[ChatMessage, ChatMessageStatusUpdate, ChatMessageTokenDelta]
+    event: Literal["init", "user_message", "assistant_message", "message_status_update", "message_token_delta"]
+    data: Union[ChatMessage, ChatMessageStatusUpdate, ChatMessageTokenDelta, ChatInitEventData]
 

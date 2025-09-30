@@ -10,10 +10,10 @@ from sse_starlette import EventSourceResponse, ServerSentEvent
 from openai import AsyncOpenAI, AsyncStream
 from openai.types.responses import ResponseStreamEvent, ResponseInProgressEvent, ResponseCompletedEvent, ResponseFailedEvent, ResponseTextDeltaEvent
 
-from sqlalchemy import select
+from sqlalchemy import select, not_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.schemas import ChatMessageCreate, ChatMessage, ChatMessageEvent, ChatMessageStatusUpdate, ChatMessageTokenDelta, ContractSectionCitation, ChatThread
+from app.schemas import ChatInitEventData, ChatMessageCreate, ChatMessage, ChatMessageEvent, ChatMessageStatusUpdate, ChatMessageTokenDelta, ContractSectionCitation, ChatThread
 from app.models import Contract, ContractSection, ContractChatThread, ContractChatMessage
 from app.enums import ChatMessageRole, ChatMessageStatus, ContractSectionType, ContractStatus
 
@@ -112,12 +112,20 @@ async def stream_chat_response(
 ) -> AsyncGenerator[ServerSentEvent, None]:
     """generator function to stream the chat response as server-sent events and update the database accordingly"""
 
-    # send the fully-resolved user message as the first event in the response stream
+    # send an initialization event with thread id, full user message, and pending assistant message
     async with SessionLocal() as db:
         db: AsyncSession
         user_message = await db.get(ContractChatMessage, user_message_id)
-        user_message_event = ChatMessageEvent(event="user_message", data=ChatMessage.model_validate(user_message))
-    yield ServerSentEvent(event=user_message_event.event, data=user_message_event.data.model_dump_json())
+        assistant_message = await db.get(ContractChatMessage, assistant_message_id)
+        init_event = ChatMessageEvent(
+            event="init",
+            data=ChatInitEventData(
+                chat_thread_id=chat_thread_id,
+                user_message=ChatMessage.model_validate(user_message),
+                assistant_message=ChatMessage.model_validate(assistant_message)
+            )
+        )
+    yield ServerSentEvent(event=init_event.event, data=init_event.data.model_dump_json())
 
     # iterate over the response stream making database updates and sending events to the client
     async for event in response_stream:
@@ -296,6 +304,25 @@ async def get_chat_threads(contract_id: UUID, db: AsyncSession = Depends(get_db)
     return [ChatThread.model_validate(thread) for thread in chat_threads]
 
 
+@router.get("/contracts/{contract_id}/chat/threads/current", tags=["contract_chat"])
+async def get_current_thread(contract_id: UUID, db: AsyncSession = Depends(get_db)) -> ChatThread:
+    """get the most recent active chat thread for a given contract"""
+
+    query = (
+        select(ContractChatThread)
+        .where(ContractChatThread.contract_id == contract_id, not_(ContractChatThread.archived))
+        .order_by(ContractChatThread.created_at.desc())
+        .limit(1)
+    )
+
+    result = await db.execute(query)
+    current_thread = result.scalar_one_or_none()
+    if not current_thread:
+        raise HTTPException(status_code=404, detail=f"no active chat thread found for contract_id={contract_id}")
+    else:
+        return ChatThread.model_validate(current_thread)
+
+
 @router.get("/contracts/{contract_id}/chat/threads/{thread_id}", tags=["contract_chat"])
 async def get_chat_thread(contract_id: UUID, thread_id: UUID, db: AsyncSession = Depends(get_db)) -> ChatThread:
     """get a single chat thread for a given contract by ID"""
@@ -305,6 +332,22 @@ async def get_chat_thread(contract_id: UUID, thread_id: UUID, db: AsyncSession =
     chat_thread = result.scalar_one_or_none()
     if not chat_thread:
         raise HTTPException(status_code=404, detail=f"chat_thread_id={thread_id} not found")
+    return ChatThread.model_validate(chat_thread)
+
+
+@router.put("/contracts/{contract_id}/chat/threads/{thread_id}", tags=["contract_chat"])
+async def archive_chat_thread(contract_id: UUID, thread_id: UUID, db: AsyncSession = Depends(get_db)) -> ChatThread:
+    """archive a chat thread for a given contract by ID"""
+
+    query = select(ContractChatThread).where(ContractChatThread.contract_id == contract_id, ContractChatThread.id == thread_id)
+    result = await db.execute(query)
+    chat_thread = result.scalar_one_or_none()
+    if not chat_thread:
+        raise HTTPException(status_code=404, detail=f"chat_thread_id={thread_id} not found")
+
+    chat_thread.archived = True
+    await db.commit()
+    await db.refresh(chat_thread)
     return ChatThread.model_validate(chat_thread)
 
 

@@ -1,5 +1,5 @@
 import { NextPage } from 'next'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
@@ -88,6 +88,41 @@ interface ContractSectionCitation {
   end_page?: number
 }
 
+// Chat types matching backend schemas
+type ChatMessageStatus = 'pending' | 'in_progress' | 'completed' | 'failed'
+type ChatMessageRole = 'system' | 'user' | 'assistant'
+
+interface ChatThread {
+  id: string
+  contract_id: string
+  archived: boolean
+  created_at: string
+  updated_at: string
+}
+
+interface ChatMessage {
+  id: string
+  chat_thread_id: string
+  parent_chat_message_id?: string | null
+  status: ChatMessageStatus
+  role: ChatMessageRole
+  content: string
+  citations?: ContractSectionCitation[]
+  created_at: string
+  updated_at: string
+}
+
+interface ChatMessageStatusUpdate {
+  chat_thread_id: string
+  chat_message_id: string
+  status: ChatMessageStatus
+}
+
+interface ChatMessageTokenDelta {
+  chat_message_id: string
+  delta: string
+}
+
 const ContractDetailPage: NextPage = () => {
   const router = useRouter()
   const { id, tab } = router.query
@@ -137,6 +172,15 @@ const ContractDetailPage: NextPage = () => {
   const [expandedIssueClause, setExpandedIssueClause] = useState<string | null>(null)
   const [hoveredIssueId, setHoveredIssueId] = useState<string | null>(null)
 
+  // Chat state
+  const [currentChatThread, setCurrentChatThread] = useState<ChatThread | null>(null)
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [isChatLoading, setIsChatLoading] = useState(false)
+  const [isSendingMessage, setIsSendingMessage] = useState(false)
+  const [chatInput, setChatInput] = useState('')
+  const chatAbortControllerRef = useRef<AbortController | null>(null)
+  const chatEndRef = useRef<HTMLDivElement | null>(null)
+
   useEffect(() => {
     setIsClient(true)
     if (typeof tab === 'string' && ['metadata','clauses','issues','chat'].includes(tab)) {
@@ -160,6 +204,28 @@ const ContractDetailPage: NextPage = () => {
       fetchIssuesData()
     }
   }, [activeTab, id, contractIssues.length])
+
+  // Fetch chat current thread and messages when chat tab becomes active
+  useEffect(() => {
+    const initializeChat = async () => {
+      if (!id || activeTab !== 'chat') return
+      await fetchCurrentChatThreadAndMessages()
+    }
+    initializeChat()
+    // Cleanup on tab switch: abort any in-flight stream
+    return () => {
+      if (activeTab !== 'chat' && chatAbortControllerRef.current) {
+        chatAbortControllerRef.current.abort()
+        chatAbortControllerRef.current = null
+      }
+    }
+  }, [activeTab, id])
+
+  useEffect(() => {
+    if (activeTab === 'chat' && chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [activeTab, chatMessages.length])
 
   // Set up PDF.js worker on client side; pin worker to the exact API version
   useEffect(() => {
@@ -688,6 +754,306 @@ const ContractDetailPage: NextPage = () => {
       default:
         return null
     }
+  }
+
+  // Chat helpers
+  const fetchCurrentChatThreadAndMessages = async () => {
+    if (!id) return
+    try {
+      setIsChatLoading(true)
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
+      // Try to get current active thread
+      const threadResp = await fetch(`${backendUrl}/contracts/${id}/chat/threads/current`)
+      if (threadResp.ok) {
+        const thread: ChatThread = await threadResp.json()
+        setCurrentChatThread(thread)
+        const msgsResp = await fetch(`${backendUrl}/contracts/${id}/chat/threads/${thread.id}/messages`)
+        if (msgsResp.ok) {
+          const msgs: ChatMessage[] = await msgsResp.json()
+          setChatMessages(msgs)
+        } else {
+          setChatMessages([])
+        }
+      } else {
+        setCurrentChatThread(null)
+        setChatMessages([])
+      }
+    } catch (e) {
+      setCurrentChatThread(null)
+      setChatMessages([])
+    } finally {
+      setIsChatLoading(false)
+    }
+  }
+
+  const archiveCurrentChatThread = async () => {
+    if (!id || !currentChatThread) return
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
+    await fetch(`${backendUrl}/contracts/${id}/chat/threads/${currentChatThread.id}`, { method: 'PUT' })
+  }
+
+  const handleNewChat = async () => {
+    // Abort any ongoing stream
+    if (chatAbortControllerRef.current) {
+      chatAbortControllerRef.current.abort()
+      chatAbortControllerRef.current = null
+    }
+    // Archive existing thread if present
+    try {
+      await archiveCurrentChatThread()
+    } catch (_) {}
+    // Clear FE state; next send will create a thread server-side
+    setCurrentChatThread(null)
+    setChatMessages([])
+  }
+
+  // No placeholder messages; initialization handled by backend 'init' event
+
+  const handleSSEEvent = (eventName: string, data: any) => {
+    if (eventName === 'init') {
+      const threadId: string = data.chat_thread_id
+      const userMsg: ChatMessage = data.user_message
+      const assistantMsg: ChatMessage = data.assistant_message
+      setCurrentChatThread({ id: threadId, contract_id: contract!.id, archived: false, created_at: userMsg.created_at, updated_at: userMsg.updated_at })
+      setChatMessages((prev) => {
+        const hasUser = prev.some((m) => m.id === userMsg.id)
+        const hasAssistant = prev.some((m) => m.id === assistantMsg.id)
+        return [
+          ...prev,
+          ...(hasUser ? [] : [userMsg]),
+          ...(hasAssistant ? [] : [assistantMsg])
+        ]
+      })
+      return
+    }
+    if (eventName === 'user_message') {
+      const msg: ChatMessage = data
+      setCurrentChatThread((prev) => prev || { id: msg.chat_thread_id, contract_id: contract!.id, archived: false, created_at: msg.created_at, updated_at: msg.updated_at })
+      // Append user message; init already provided proper ordering
+      setChatMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]))
+    } else if (eventName === 'message_status_update') {
+      const update: ChatMessageStatusUpdate = data
+      setChatMessages((prev) => prev.map((m) => (m.id === update.chat_message_id ? { ...m, status: update.status } : m)))
+    } else if (eventName === 'message_token_delta') {
+      const delta: ChatMessageTokenDelta = data
+      setChatMessages((prev) => prev.map((m) => (m.id === delta.chat_message_id ? { ...m, content: (m.content || '') + delta.delta, status: m.status === 'pending' ? 'in_progress' : m.status } : m)))
+    } else if (eventName === 'assistant_message') {
+      const fullMsg: ChatMessage = data
+      setChatMessages((prev) => prev.map((m) => (m.id === fullMsg.id ? fullMsg : m)))
+    }
+  }
+
+  const parseAndHandleSSEStream = async (response: Response) => {
+    const reader = response.body?.getReader()
+    if (!reader) {
+      console.error('No reader available from response')
+      return
+    }
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read()
+
+        if (done) {
+          // Process any remaining buffer
+          if (buffer.trim()) {
+            let sepIndex
+            while ((sepIndex = buffer.indexOf('\n\n')) !== -1) {
+              const rawEvent = buffer.slice(0, sepIndex)
+              buffer = buffer.slice(sepIndex + 2)
+              const lines = rawEvent.split('\n')
+              let eventName = ''
+              let dataStr = ''
+              for (const line of lines) {
+                if (line.startsWith('event:')) eventName = line.slice(6).trim()
+                if (line.startsWith('data:')) dataStr += line.slice(5).trim()
+              }
+              if (eventName && dataStr) {
+                try {
+                  const parsed = JSON.parse(dataStr)
+                  handleSSEEvent(eventName, parsed)
+                } catch (e) {
+                  console.error('Error parsing SSE data:', e)
+                }
+              }
+            }
+          }
+          break
+        }
+
+        if (!value || value.length === 0) continue
+
+        let chunk = decoder.decode(value, { stream: true })
+        // Normalize CRLF to LF to ensure separator detection
+        chunk = chunk.replace(/\r\n/g, '\n')
+        buffer += chunk
+
+        let sepIndex
+        while ((sepIndex = buffer.indexOf('\n\n')) !== -1) {
+          const rawEvent = buffer.slice(0, sepIndex)
+          buffer = buffer.slice(sepIndex + 2)
+          const lines = rawEvent.split('\n')
+          let eventName = ''
+          let dataStr = ''
+          for (const line of lines) {
+            if (line.startsWith('event:')) eventName = line.slice(6).trim()
+            if (line.startsWith('data:')) dataStr += line.slice(5).trim()
+          }
+          if (eventName && dataStr) {
+            try {
+              const parsed = JSON.parse(dataStr)
+              handleSSEEvent(eventName, parsed)
+            } catch (e) {
+              console.error('Error parsing SSE data:', e)
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error in SSE stream parsing:', error)
+      throw error
+    }
+  }
+
+  const sendChatMessage = async () => {
+    if (!contract || !chatInput.trim() || isSendingMessage) return
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
+    const url = `${backendUrl}/contracts/${contract.id}/chat/messages`
+    const controller = new AbortController()
+    chatAbortControllerRef.current = controller
+    setIsSendingMessage(true)
+
+    const userMessageContent = chatInput.trim()
+    setChatInput('')
+
+    try {
+      const payload: any = { content: userMessageContent }
+      if (currentChatThread?.id) payload.chat_thread_id = currentChatThread.id
+
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      })
+
+      if (!resp.ok) {
+        alert('Failed to send message')
+        return
+      }
+
+      if (!resp.body) {
+        alert('Failed to send message - no response body')
+        return
+      }
+
+      // Stream updates will replace placeholders in real-time
+      await parseAndHandleSSEStream(resp)
+    } catch (e) {
+      if ((e as any)?.name !== 'AbortError') {
+        alert('Chat request failed')
+      }
+    } finally {
+      setIsSendingMessage(false)
+      if (chatAbortControllerRef.current === controller) chatAbortControllerRef.current = null
+    }
+  }
+
+  const renderAssistantContent = (content: string, citations?: ContractSectionCitation[]) => {
+    if (!content) return <span>{content}</span>
+
+    // Component to render markdown with clickable citations
+    const MarkdownWithCitations: React.FC<{ children: string }> = ({ children }) => {
+      const contentRef = useRef<HTMLDivElement>(null)
+
+      useEffect(() => {
+        if (!contentRef.current || !citations) return
+
+        // Find all text nodes and replace citation patterns with buttons
+        const walker = document.createTreeWalker(
+          contentRef.current,
+          NodeFilter.SHOW_TEXT,
+          null
+        )
+
+        type Replacement = { text?: string; citation?: ContractSectionCitation; sectionNum?: string }
+        const nodesToReplace: Array<{ node: Text; replacements: Replacement[] }> = []
+
+        let node: Text | null
+        while ((node = walker.nextNode() as Text | null)) {
+          if (!node.textContent) continue
+          const text = node.textContent
+          // Match one or more section numbers separated by commas inside a single bracket
+          const regex = /\[([0-9]+(?:\.[0-9]+)*(?:\s*,\s*[0-9]+(?:\.[0-9]+)*)*)\]/g
+          let match: RegExpExecArray | null
+          let lastIndex = 0
+          const replacements: Replacement[] = []
+          let hasCitations = false
+
+          while ((match = regex.exec(text)) !== null) {
+            hasCitations = true
+            if (match.index > lastIndex) {
+              replacements.push({ text: text.slice(lastIndex, match.index) })
+            }
+            const group = match[1]
+            const sectionNums = group.split(',').map(s => s.trim()).filter(Boolean)
+            if (sectionNums.length > 0) {
+              sectionNums.forEach((sectionNum) => {
+                const citation = citations.find((c) => c.section_number === sectionNum)
+                if (citation && (citation.beg_page !== undefined && citation.beg_page !== null)) {
+                  replacements.push({ citation, sectionNum })
+                } else {
+                  // Fallback to plain text for unknown section numbers
+                  replacements.push({ text: `[${sectionNum}]` })
+                }
+              })
+            } else {
+              // Fallback to original text if parsing somehow fails
+              replacements.push({ text: match[0] })
+            }
+            lastIndex = regex.lastIndex
+          }
+
+          if (hasCitations) {
+            if (lastIndex < text.length) {
+              replacements.push({ text: text.slice(lastIndex) })
+            }
+            nodesToReplace.push({ node, replacements })
+          }
+        }
+
+        // Replace text nodes with spans containing buttons
+        nodesToReplace.forEach(({ node, replacements }) => {
+          const span = document.createElement('span')
+          replacements.forEach((replacement) => {
+            if (replacement.text !== undefined) {
+              span.appendChild(document.createTextNode(replacement.text))
+            } else if (replacement.citation && replacement.sectionNum) {
+              const button = document.createElement('button')
+              button.type = 'button'
+              button.className = 'section-number link inline'
+              button.textContent = `[${replacement.sectionNum}]`
+              button.title = replacement.citation.section_name || `Section ${replacement.sectionNum}`
+              button.onclick = () => navigateToPage(replacement.citation!.beg_page || 1)
+              span.appendChild(button)
+            }
+          })
+          node.parentNode?.replaceChild(span, node)
+        })
+      }, [children, citations])
+
+      return (
+        <div ref={contentRef}>
+          <ReactMarkdown>{children}</ReactMarkdown>
+        </div>
+      )
+    }
+
+    return <MarkdownWithCitations>{content}</MarkdownWithCitations>
   }
 
   // Expose functions to parent component for future RHS integration
@@ -1304,11 +1670,78 @@ const ContractDetailPage: NextPage = () => {
                   <div className="tab-header">
                     <h3>Contract Chat</h3>
                     <div className="tab-header-actions">
+                      <button className="cta-button secondary" onClick={handleNewChat} disabled={isSendingMessage}>
+                        {isSendingMessage ? 'New Chat' : 'New Chat'}
+                      </button>
                       {getIngestCTA()}
                     </div>
                   </div>
 
-                  <p>Contract chat will be displayed here.</p>
+                  <div className="chat-container">
+                    {isChatLoading ? (
+                      <div className="issues-loading">
+                        <div className="spinner large"></div>
+                        <p>Loading chat...</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="chat-messages">
+                          {chatMessages.length === 0 && (
+                            <div className="empty-state">
+                              <p>No messages yet. Start a new conversation below.</p>
+                            </div>
+                          )}
+                          {chatMessages.map((msg) => (
+                            <div key={msg.id} className={`chat-message ${msg.role}`}>
+                              <div className="chat-message-meta">
+                                <span className="role">{msg.role === 'user' ? 'You' : 'Assistant'}</span>
+                                <span className={`status ${msg.status.replace('_', '-')}`}>{msg.status.replace('_', ' ')}</span>
+                              </div>
+                              <div className="chat-message-content">
+                                {msg.role === 'assistant' ? (
+                                  <div className="assistant-content">{renderAssistantContent(msg.content, msg.citations)}</div>
+                                ) : (
+                                  <div className="user-content">{msg.content}</div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                          <div ref={chatEndRef} />
+                        </div>
+
+                        <div className="chat-input-container">
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder={contract.status === 'Uploaded' ? 'Ingest the contract before chatting' : 'Type your message and press Enter...'}
+                            value={chatInput}
+                            onChange={(e) => setChatInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault()
+                                sendChatMessage()
+                              }
+                            }}
+                            disabled={isSendingMessage || contract.status === 'Uploaded' || contract.status === 'Processing'}
+                          />
+                          <button
+                            className="cta-button primary"
+                            onClick={sendChatMessage}
+                            disabled={isSendingMessage || !chatInput.trim() || contract.status === 'Uploaded' || contract.status === 'Processing'}
+                          >
+                            {isSendingMessage ? (
+                              <>
+                                <div className="spinner small"></div>
+                                Sending...
+                              </>
+                            ) : (
+                              'Send'
+                            )}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
