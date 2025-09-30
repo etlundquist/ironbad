@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import ReactMarkdown from 'react-markdown'
 
 // Dynamically import react-pdf to avoid SSR issues
 const Document = dynamic(() => import('react-pdf').then(mod => mod.Document), { ssr: false })
@@ -15,13 +16,81 @@ interface Contract {
   status: string
   filename: string
   filetype: string
+  meta?: ContractMetadata
   created_at: string
   updated_at: string
 }
 
+interface ContractMetadata {
+  document_type: "Master Agreement" | "Statement of Work" | "Purchase Order" | "Other"
+  document_title?: string
+  customer_name?: string
+  supplier_name?: string
+  effective_date?: string
+  initial_term?: string
+}
+
+interface StandardClause {
+  id: string
+  name: string
+  display_name: string
+  description: string
+  standard_text: string
+  created_at: string
+  updated_at: string
+}
+
+interface ContractClause {
+  id: string
+  standard_clause_id: string
+  standard_clause?: StandardClause
+  contract_id: string
+  contract_sections: string[]
+  raw_markdown: string
+  cleaned_markdown: string
+  created_at: string
+  updated_at: string
+}
+
+interface StandardClauseRule {
+  id: string
+  standard_clause_id: string
+  severity: "Low" | "Medium" | "High" | "Critical"
+  title: string
+  text: string
+  created_at: string
+  updated_at: string
+}
+
+interface ContractIssue {
+  id: string
+  standard_clause_id: string
+  standard_clause_rule_id: string
+  standard_clause?: StandardClause
+  standard_clause_rule?: StandardClauseRule
+  contract_id: string
+  explanation: string
+  citations?: ContractSectionCitation[]
+  status: "Open" | "Resolved"
+  resolution?: "Ignored" | "Revised"
+  ai_suggested_revision?: string
+  user_suggested_revision?: string
+  active_suggested_revision?: string
+  created_at: string
+  updated_at: string
+}
+
+interface ContractSectionCitation {
+  section_id: string
+  section_number: string
+  section_name?: string
+  beg_page?: number
+  end_page?: number
+}
+
 const ContractDetailPage: NextPage = () => {
   const router = useRouter()
-  const { id } = router.query
+  const { id, tab } = router.query
   const [contract, setContract] = useState<Contract | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -43,12 +112,54 @@ const ContractDetailPage: NextPage = () => {
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0)
   const [isSearching, setIsSearching] = useState(false)
 
+  // Metadata form state
+  const [metadata, setMetadata] = useState<ContractMetadata>({
+    document_type: "Master Agreement",
+    document_title: "",
+    customer_name: "",
+    supplier_name: "",
+    effective_date: "",
+    initial_term: ""
+  })
+  const [originalMetadata, setOriginalMetadata] = useState<ContractMetadata | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [hasChanges, setHasChanges] = useState(false)
+
+  // Clauses data state
+  const [standardClauses, setStandardClauses] = useState<StandardClause[]>([])
+  const [contractClauses, setContractClauses] = useState<ContractClause[]>([])
+  const [clausesLoading, setClausesLoading] = useState(false)
+  const [expandedClause, setExpandedClause] = useState<string | null>(null)
+
+  // Issues data state
+  const [contractIssues, setContractIssues] = useState<ContractIssue[]>([])
+  const [issuesLoading, setIssuesLoading] = useState(false)
+  const [expandedIssueClause, setExpandedIssueClause] = useState<string | null>(null)
+  const [hoveredIssueId, setHoveredIssueId] = useState<string | null>(null)
+
   useEffect(() => {
     setIsClient(true)
+    if (typeof tab === 'string' && ['metadata','clauses','issues','chat'].includes(tab)) {
+      setActiveTab(tab)
+    }
     if (id) {
       fetchContract()
     }
-  }, [id])
+  }, [id, tab])
+
+  // Fetch clauses data when clauses tab is active
+  useEffect(() => {
+    if (activeTab === 'clauses' && id && standardClauses.length === 0) {
+      fetchClausesData()
+    }
+  }, [activeTab, id, standardClauses.length])
+
+  // Fetch issues data when issues tab is active
+  useEffect(() => {
+    if (activeTab === 'issues' && id && contractIssues.length === 0) {
+      fetchIssuesData()
+    }
+  }, [activeTab, id, contractIssues.length])
 
   // Set up PDF.js worker on client side; pin worker to the exact API version
   useEffect(() => {
@@ -82,6 +193,24 @@ const ContractDetailPage: NextPage = () => {
       const data = await response.json()
       setContract(data)
 
+      // Initialize metadata form
+      if (data.meta) {
+        setMetadata(data.meta)
+        setOriginalMetadata(data.meta)
+      } else {
+        // Set default values if no metadata exists
+        const defaultMetadata: ContractMetadata = {
+          document_type: "Master Agreement",
+          document_title: "",
+          customer_name: "",
+          supplier_name: "",
+          effective_date: "",
+          initial_term: ""
+        }
+        setMetadata(defaultMetadata)
+        setOriginalMetadata(defaultMetadata)
+      }
+
       // Set up PDF URL for react-pdf
       if (data.filetype === 'application/pdf') {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
@@ -91,6 +220,59 @@ const ContractDetailPage: NextPage = () => {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchClausesData = async () => {
+    if (!id) return
+
+    try {
+      setClausesLoading(true)
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
+
+      // Fetch both standard clauses and contract clauses in parallel
+      const [standardClausesResponse, contractClausesResponse] = await Promise.all([
+        fetch(`${backendUrl}/standard_clauses`),
+        fetch(`${backendUrl}/contracts/${id}/clauses`)
+      ])
+
+      if (standardClausesResponse.ok && contractClausesResponse.ok) {
+        const [standardClausesData, contractClausesData] = await Promise.all([
+          standardClausesResponse.json(),
+          contractClausesResponse.json()
+        ])
+
+        setStandardClauses(standardClausesData)
+        setContractClauses(contractClausesData)
+      } else {
+        console.error('Failed to fetch clauses data')
+      }
+    } catch (err) {
+      console.error('Error fetching clauses data:', err)
+    } finally {
+      setClausesLoading(false)
+    }
+  }
+
+  const fetchIssuesData = async () => {
+    if (!id) return
+
+    try {
+      setIssuesLoading(true)
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
+
+      const response = await fetch(`${backendUrl}/contracts/${id}/issues`)
+
+      if (response.ok) {
+        const issuesData = await response.json()
+        setContractIssues(issuesData)
+      } else {
+        console.error('Failed to fetch issues data')
+      }
+    } catch (err) {
+      console.error('Error fetching issues data:', err)
+    } finally {
+      setIssuesLoading(false)
     }
   }
 
@@ -323,6 +505,191 @@ const ContractDetailPage: NextPage = () => {
     setZoomLevel(newZoom)
   }
 
+  // Metadata form functions
+  const handleMetadataChange = (field: keyof ContractMetadata, value: string) => {
+    const newMetadata = { ...metadata, [field]: value }
+    setMetadata(newMetadata)
+
+    // Check if there are changes
+    const hasChanges = originalMetadata ?
+      JSON.stringify(newMetadata) !== JSON.stringify(originalMetadata) :
+      Object.values(newMetadata).some(val => val !== "")
+    setHasChanges(hasChanges)
+  }
+
+  const handleSaveMetadata = async () => {
+    if (!contract) return
+
+    setIsSaving(true)
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
+      const response = await fetch(`${backendUrl}/contracts/${contract.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(metadata)
+      })
+
+      if (response.ok) {
+        const updatedContract = await response.json()
+        setContract(updatedContract)
+        setOriginalMetadata(metadata)
+        setHasChanges(false)
+        alert('Metadata saved successfully!')
+      } else {
+        const error = await response.text()
+        alert(`Failed to save metadata: ${error}`)
+      }
+    } catch (error) {
+      alert(`Network error: ${error}`)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Helper functions for clauses display
+  const getContractClauseForStandardClause = (standardClauseId: string): ContractClause | undefined => {
+    return contractClauses.find(cc => cc.standard_clause_id === standardClauseId)
+  }
+
+  const toggleClauseExpansion = (clauseId: string) => {
+    setExpandedClause(expandedClause === clauseId ? null : clauseId)
+  }
+
+  // Helper functions for issues display
+  const getIssuesByStandardClause = () => {
+    const grouped: { [key: string]: ContractIssue[] } = {}
+
+    contractIssues.forEach(issue => {
+      if (issue.standard_clause) {
+        const clauseId = issue.standard_clause.id
+        if (!grouped[clauseId]) {
+          grouped[clauseId] = []
+        }
+        grouped[clauseId].push(issue)
+      }
+    })
+
+    return grouped
+  }
+
+  const toggleIssueClauseExpansion = (clauseId: string) => {
+    setExpandedIssueClause(expandedIssueClause === clauseId ? null : clauseId)
+  }
+
+  const getSeverityLevel = (severity: string): 'info' | 'warning' | 'critical' => {
+    const s = (severity || '').toLowerCase()
+    if (s === 'critical') return 'critical'
+    if (s === 'high' || s === 'medium' || s === 'warning') return 'warning'
+    return 'info'
+  }
+
+  const getSeverityIcon = (severity: string) => {
+    switch (severity) {
+      case 'Critical':
+        return (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="severity-icon critical">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        )
+      case 'High':
+        return (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="severity-icon high">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          </svg>
+        )
+      case 'Medium':
+        return (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="severity-icon medium">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+          </svg>
+        )
+      case 'Low':
+        return (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="severity-icon low">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+          </svg>
+        )
+      default:
+        return (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="severity-icon default">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+          </svg>
+        )
+    }
+  }
+
+  // CTA helper functions for each tab
+  const getIngestCTA = () => {
+    if (!contract) return null
+
+    switch (contract.status) {
+      case 'Uploaded':
+        return (
+          <button className="cta-button primary" onClick={handleIngestContract} disabled={isAnalyzing}>
+            {isAnalyzing ? (
+              <>
+                <div className="spinner small"></div>
+                Ingesting...
+              </>
+            ) : (
+              'Ingest Contract'
+            )}
+          </button>
+        )
+      case 'Processing':
+        return (
+          <div className="cta-banner processing">
+            <div className="spinner small"></div>
+            Contract is currently being ingested
+          </div>
+        )
+      default:
+        return null
+    }
+  }
+
+  const getAnalyzeCTA = () => {
+    if (!contract) return null
+
+    switch (contract.status) {
+      case 'Ready for Review':
+        return (
+          <button className="cta-button primary" onClick={handleAnalyzeIssues} disabled={isAnalyzing}>
+            {isAnalyzing ? (
+              <>
+                <div className="spinner small"></div>
+                Analyzing...
+              </>
+            ) : (
+              'Analyze Contract'
+            )}
+          </button>
+        )
+      case 'Under Review':
+        return (
+          <button className="cta-button secondary" onClick={() => {/* TODO: Implement complete review */}}>
+            Complete Review
+          </button>
+        )
+      case 'Uploaded':
+      case 'Processing':
+        return (
+          <div className="cta-banner info">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 16v-4"/>
+              <path d="M12 8h.01"/>
+            </svg>
+            Contracts must be ingested prior to review
+          </div>
+        )
+      default:
+        return null
+    }
+  }
+
   // Expose functions to parent component for future RHS integration
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -333,6 +700,35 @@ const ContractDetailPage: NextPage = () => {
       }
     }
   }, [])
+
+  const handleIngestContract = async () => {
+    if (!contract) return
+
+    setIsAnalyzing(true)
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
+      const response = await fetch(`${backendUrl}/contracts/ingest`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify([contract.id])
+      })
+
+      if (response.ok) {
+        // Refresh contract to get updated status
+        await fetchContract()
+        alert('Contract ingestion started successfully!')
+      } else {
+        const error = await response.text()
+        alert(`Failed to start ingestion: ${error}`)
+      }
+    } catch (error) {
+      alert(`Network error: ${error}`)
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
 
   const handleAnalyzeIssues = async () => {
     if (!contract) return
@@ -363,55 +759,6 @@ const ContractDetailPage: NextPage = () => {
     }
   }
 
-  const getCTAContent = () => {
-    if (!contract) return null
-
-    switch (contract.status) {
-      case 'Uploaded':
-        return (
-          <button className="cta-button primary" onClick={() => {/* TODO: Implement parse contract */}}>
-            Parse Contract
-          </button>
-        )
-      case 'Processing':
-        return (
-          <div className="cta-button processing">
-            <div className="spinner small"></div>
-            Contract Processing
-          </div>
-        )
-      case 'Ready for Review':
-        return (
-          <button className="cta-button primary" onClick={handleAnalyzeIssues} disabled={isAnalyzing}>
-            {isAnalyzing ? (
-              <>
-                <div className="spinner small"></div>
-                Analyzing...
-              </>
-            ) : (
-              'Analyze Issues'
-            )}
-          </button>
-        )
-      case 'Under Review':
-        return (
-          <button className="cta-button secondary" onClick={() => {/* TODO: Implement complete review */}}>
-            Complete Review
-          </button>
-        )
-      case 'Review Completed':
-        return (
-          <div className="cta-button completed">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="20,6 9,17 4,12"/>
-            </svg>
-            Review Completed
-          </div>
-        )
-      default:
-        return null
-    }
-  }
 
   const getFileIcon = (filetype: string) => {
     if (filetype === 'application/pdf') {
@@ -479,9 +826,6 @@ const ContractDetailPage: NextPage = () => {
             {getFileIcon(contract.filetype)}
             <h1>{contract.filename}</h1>
           </div>
-        </div>
-        <div className="header-right">
-          {getCTAContent()}
         </div>
       </div>
 
@@ -665,25 +1009,305 @@ const ContractDetailPage: NextPage = () => {
             <div className="tab-content">
               {activeTab === 'metadata' && (
                 <div className="tab-panel">
-                  <h3>Contract Metadata</h3>
-                  <p>Metadata content will be displayed here.</p>
+                  <div className="tab-header">
+                    <h3>Contract Metadata</h3>
+                    <div className="tab-header-actions">
+                      {hasChanges && (
+                        <button
+                          onClick={handleSaveMetadata}
+                          disabled={isSaving}
+                          className="save-button"
+                        >
+                          {isSaving ? (
+                            <>
+                              <div className="spinner small"></div>
+                              Saving...
+                            </>
+                          ) : (
+                            'Save Changes'
+                          )}
+                        </button>
+                      )}
+                      {getIngestCTA()}
+                    </div>
+                  </div>
+
+                  <div className="metadata-form">
+                    <div className="form-group">
+                      <label htmlFor="document_type">Document Type</label>
+                      <select
+                        id="document_type"
+                        value={metadata.document_type}
+                        onChange={(e) => handleMetadataChange('document_type', e.target.value)}
+                        className="form-select"
+                      >
+                        <option value="Master Agreement">Master Agreement</option>
+                        <option value="Statement of Work">Statement of Work</option>
+                        <option value="Purchase Order">Purchase Order</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="document_title">Document Title</label>
+                      <input
+                        type="text"
+                        id="document_title"
+                        value={metadata.document_title || ''}
+                        onChange={(e) => handleMetadataChange('document_title', e.target.value)}
+                        className="form-input"
+                        placeholder="Enter document title"
+                      />
+                    </div>
+
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label htmlFor="customer_name">Customer Name</label>
+                        <input
+                          type="text"
+                          id="customer_name"
+                          value={metadata.customer_name || ''}
+                          onChange={(e) => handleMetadataChange('customer_name', e.target.value)}
+                          className="form-input"
+                          placeholder="Enter customer name"
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="supplier_name">Supplier Name</label>
+                        <input
+                          type="text"
+                          id="supplier_name"
+                          value={metadata.supplier_name || ''}
+                          onChange={(e) => handleMetadataChange('supplier_name', e.target.value)}
+                          className="form-input"
+                          placeholder="Enter supplier name"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label htmlFor="effective_date">Effective Date</label>
+                        <input
+                          type="date"
+                          id="effective_date"
+                          value={metadata.effective_date || ''}
+                          onChange={(e) => handleMetadataChange('effective_date', e.target.value)}
+                          className="form-input"
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="initial_term">Initial Term</label>
+                        <input
+                          type="text"
+                          id="initial_term"
+                          value={metadata.initial_term || ''}
+                          onChange={(e) => handleMetadataChange('initial_term', e.target.value)}
+                          className="form-input"
+                          placeholder="e.g., 12 months, 2 years"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
               {activeTab === 'clauses' && (
                 <div className="tab-panel">
-                  <h3>Extracted Clauses</h3>
-                  <p>Extracted clauses will be displayed here.</p>
+                  <div className="tab-header">
+                    <h3>Extracted Clauses</h3>
+                    <div className="tab-header-actions">
+                      {getIngestCTA()}
+                    </div>
+                  </div>
+
+                  {clausesLoading ? (
+                    <div className="clauses-loading">
+                      <div className="spinner large"></div>
+                      <p>Loading clauses...</p>
+                    </div>
+                  ) : (
+                    <div className="clauses-list">
+                      {standardClauses.map((standardClause) => {
+                        const contractClause = getContractClauseForStandardClause(standardClause.id)
+                        const isFound = !!contractClause
+                        const isExpanded = expandedClause === standardClause.id
+
+                        return (
+                          <div key={standardClause.id} className={`clause-item ${isFound ? 'found' : 'missing'}`}>
+                            <div className="clause-header" onClick={() => isFound && toggleClauseExpansion(standardClause.id)}>
+                              <div className="clause-status">
+                                {isFound ? (
+                                  <div className="status-icon found">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                      <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
+                                    </svg>
+                                  </div>
+                                ) : (
+                                  <div className="status-icon missing">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                      <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+                                    </svg>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="clause-name">
+                                {standardClause.display_name}
+                              </div>
+                              {isFound && (
+                                <div className="clause-expand">
+                                  <svg
+                                    width="12"
+                                    height="12"
+                                    viewBox="0 0 12 12"
+                                    fill="currentColor"
+                                    className={`expand-icon ${isExpanded ? 'expanded' : ''}`}
+                                  >
+                                    <path d="M6 8L2 4h8l-4 4z"/>
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
+
+                            {isFound && isExpanded && contractClause && (
+                              <div className="clause-content">
+                                <div className="clause-markdown">
+                                  <ReactMarkdown>{contractClause.cleaned_markdown}</ReactMarkdown>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
               {activeTab === 'issues' && (
                 <div className="tab-panel">
-                  <h3>Identified Issues</h3>
-                  <p>Identified issues will be displayed here.</p>
+                  <div className="tab-header">
+                    <h3>Identified Issues</h3>
+                    <div className="tab-header-actions">
+                      {getAnalyzeCTA()}
+                    </div>
+                  </div>
+
+                  {issuesLoading ? (
+                    <div className="issues-loading">
+                      <div className="spinner large"></div>
+                      <p>Loading issues...</p>
+                    </div>
+                  ) : (
+                    <div className="issues-list">
+                      {Object.entries(getIssuesByStandardClause()).map(([clauseId, issues]) => {
+                        const standardClause = issues[0]?.standard_clause
+                        if (!standardClause) return null
+
+                        const isExpanded = expandedIssueClause === clauseId
+
+                        return (
+                          <div key={clauseId} className="issue-clause-item">
+                            <div className="issue-clause-header" onClick={() => toggleIssueClauseExpansion(clauseId)}>
+                              <div className="issue-clause-info">
+                                <div className="issue-clause-name">
+                                  {standardClause.display_name}
+                                </div>
+                                <div className="issue-count">
+                                  {issues.length} issue{issues.length !== 1 ? 's' : ''}
+                                </div>
+                              </div>
+                              <div className="issue-clause-expand">
+                                <svg
+                                  width="12"
+                                  height="12"
+                                  viewBox="0 0 12 12"
+                                  fill="currentColor"
+                                  className={`expand-icon ${isExpanded ? 'expanded' : ''}`}
+                                >
+                                  <path d="M6 8L2 4h8l-4 4z"/>
+                                </svg>
+                              </div>
+                            </div>
+
+                            {isExpanded && (
+                              <div className="issue-clause-content">
+                                {issues.map((issue) => (
+                                  <div key={issue.id} className={`issue-item severity-${getSeverityLevel(issue.standard_clause_rule?.severity || '')}`}>
+                                    <div className="issue-header">
+                                      <div className="issue-rule">
+                                        <div
+                                          className={`issue-info-tooltip severity-${getSeverityLevel(issue.standard_clause_rule?.severity || '')}`}
+                                          onMouseEnter={() => setHoveredIssueId(issue.id)}
+                                          onMouseLeave={() => setHoveredIssueId(null)}
+                                        >
+                                          <span className="info-badge">i</span>
+                                          {hoveredIssueId === issue.id && (
+                                            <div className="custom-tooltip">
+                                              <div className="tooltip-content">
+                                                {issue.explanation}
+                                              </div>
+                                              <div className="tooltip-arrow"></div>
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div className="issue-title">
+                                          {issue.standard_clause_rule?.title || 'Unknown Issue'}
+                                        </div>
+                                      </div>
+                                      <div className="issue-sections">
+                                        {issue.citations && issue.citations.length > 0 ? (
+                                          <div className="section-numbers">
+                                            {issue.citations.map((citation, index) => (
+                                              <button
+                                                key={index}
+                                                type="button"
+                                                className="section-number link"
+                                                onClick={() => navigateToPage((citation.beg_page || 1))}
+                                                title={citation.section_name || `Section ${citation.section_number}`}
+                                              >
+                                                {citation.section_number}
+                                              </button>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <span className="no-sections">No sections</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+
+                      {Object.keys(getIssuesByStandardClause()).length === 0 && (
+                        <div className="no-issues">
+                          <div className="no-issues-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M9 12l2 2 4-4"/>
+                              <circle cx="12" cy="12" r="10"/>
+                            </svg>
+                          </div>
+                          <h4>No Issues Found</h4>
+                          <p>This contract appears to be compliant with all standard clause rules.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
               {activeTab === 'chat' && (
                 <div className="tab-panel">
-                  <h3>Contract Chat</h3>
+                  <div className="tab-header">
+                    <h3>Contract Chat</h3>
+                    <div className="tab-header-actions">
+                      {getIngestCTA()}
+                    </div>
+                  </div>
+
                   <p>Contract chat will be displayed here.</p>
                 </div>
               )}

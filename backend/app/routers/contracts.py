@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Contract as DBContract
-from app.schemas import Contract
+from app.schemas import Contract, ContractMetadata
 
 from app.database import get_db
 from app.enums import ContractStatus, FileType
@@ -31,7 +31,7 @@ async def upload_contract(file: UploadFile = File(...), db: AsyncSession = Depen
     try:
         contents = await file.read()
         content_type = file.content_type
-        filename = file.filename or ""
+        filename = file.filename
 
         # handle cases where content type is not properly detected
         if content_type == "application/octet-stream" or not content_type:

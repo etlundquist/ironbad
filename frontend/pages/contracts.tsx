@@ -209,26 +209,11 @@ const ContractsPage: NextPage = () => {
                     {formatDate(contract.updated_at)}
                   </td>
                   <td className="contract-actions">
-                    <div className="action-buttons">
-                      <Link href={`/contracts/${contract.id}`} className="action-button primary">
-                        Open Contract
-                      </Link>
-                      {contract.status !== 'Processing' && (
-                        <button
-                          className="action-button secondary"
-                          onClick={() => handleAnalyzeContract(contract.id)}
-                          disabled={analyzingContract === contract.id}
-                        >
-                          {analyzingContract === contract.id ? (
-                            <>
-                              <div className="spinner small"></div>
-                              Analyzing...
-                            </>
-                          ) : (
-                            'Analyze Issues'
-                          )}
-                        </button>
-                      )}
+                    <div className="actions-group" role="group" aria-label="Contract actions">
+                      <Link href={`/contracts/${contract.id}?tab=metadata`} className="action-link">Metadata</Link>
+                      <Link href={`/contracts/${contract.id}?tab=clauses`} className="action-link">Clauses</Link>
+                      <Link href={`/contracts/${contract.id}?tab=issues`} className="action-link">Issues</Link>
+                      <Link href={`/contracts/${contract.id}?tab=chat`} className="action-link">Chat</Link>
                     </div>
                   </td>
                 </tr>
