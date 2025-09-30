@@ -1,28 +1,26 @@
 import re
 import logging
 
-from typing import AsyncGenerator
 from uuid import UUID
+from typing import AsyncGenerator
 
 from fastapi import APIRouter, Depends, HTTPException
+from sse_starlette import EventSourceResponse, ServerSentEvent
 
 from openai import AsyncOpenAI, AsyncStream
 from openai.types.responses import ResponseStreamEvent, ResponseInProgressEvent, ResponseCompletedEvent, ResponseFailedEvent, ResponseTextDeltaEvent
 
-from sse_starlette import EventSourceResponse, ServerSentEvent
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.schemas import ChatMessageCreate, ChatMessage, ChatMessageEvent, ChatMessageStatusUpdate, ChatMessageTokenDelta, ContractSectionCitation
-from app.models import Contract as DBContract, ChatThread as DBChatThread, ChatMessage as DBChatMessage, ContractSection as DBContractSection
+from app.schemas import ChatMessageCreate, ChatMessage, ChatMessageEvent, ChatMessageStatusUpdate, ChatMessageTokenDelta, ContractSectionCitation, ChatThread
+from app.models import Contract, ContractSection, ContractChatThread, ContractChatMessage
+from app.enums import ChatMessageRole, ChatMessageStatus, ContractSectionType, ContractStatus
 
 from app.database import SessionLocal, get_db
-from app.enums import ChatMessageRole, ChatMessageStatus, ContractSectionType, ContractStatus
 from app.prompts import PROMPT_STANDALONE_SEARCH_PHRASE, PROMPT_CONTRACT_CHAT
 from app.embeddings import get_text_embedding
 from app.utils import count_tokens
-from app.constants import CHAT_ENDPOINT_DESCRIPTION
 
 
 router = APIRouter()
@@ -36,20 +34,20 @@ async def get_relevant_sections(db: AsyncSession, contract_id: UUID, search_phra
     search_phrase_embedding = await get_text_embedding(search_phrase)
 
     # always include the contract preamble to provide overall context
-    preamble_sections = select(DBContractSection).where(DBContractSection.contract_id == contract_id, DBContractSection.type == ContractSectionType.PREAMBLE)
+    preamble_sections = select(ContractSection).where(ContractSection.contract_id == contract_id, ContractSection.type == ContractSectionType.PREAMBLE)
     result = await db.execute(preamble_sections)
     preamble_sections = result.scalars().all()
 
     # fetch the most relevant additional contract sections based on the standalone search phrase
     statement = (
-        select(DBContractSection)
+        select(ContractSection)
         .where(
-            DBContractSection.contract_id == contract_id,
-            DBContractSection.type != ContractSectionType.PREAMBLE,
-            DBContractSection.level == 1,
-            DBContractSection.embedding.is_not(None)
+            ContractSection.contract_id == contract_id,
+            ContractSection.type != ContractSectionType.PREAMBLE,
+            ContractSection.level == 1,
+            ContractSection.embedding.is_not(None)
         )
-        .order_by(DBContractSection.embedding.cosine_distance(search_phrase_embedding))
+        .order_by(ContractSection.embedding.cosine_distance(search_phrase_embedding))
         .limit(10)
     )
     result = await db.execute(statement)
@@ -83,7 +81,7 @@ async def extract_response_citations(db: AsyncSession, contract_id: UUID, respon
     section_numbers = set([section.strip() for match in bracket_matches for section in match.split(',')])
 
     # get the matching set of contract sections from the database
-    query = select(DBContractSection).where(DBContractSection.contract_id == contract_id, DBContractSection.number.in_(section_numbers))
+    query = select(ContractSection).where(ContractSection.contract_id == contract_id, ContractSection.number.in_(section_numbers))
     result = await db.execute(query)
     contract_sections = result.scalars().all()
     contract_sections_by_number = {section.number: section for section in contract_sections}
@@ -117,7 +115,7 @@ async def stream_chat_response(
     # send the fully-resolved user message as the first event in the response stream
     async with SessionLocal() as db:
         db: AsyncSession
-        user_message = await db.get(DBChatMessage, user_message_id)
+        user_message = await db.get(ContractChatMessage, user_message_id)
         user_message_event = ChatMessageEvent(event="user_message", data=ChatMessage.model_validate(user_message))
     yield ServerSentEvent(event=user_message_event.event, data=user_message_event.data.model_dump_json())
 
@@ -160,7 +158,7 @@ async def stream_chat_response(
             # resolve the citations, update the complete assistant message in the database, and send the full complete assistant message
             async with SessionLocal() as db:
                 db: AsyncSession
-                assistant_message = await db.get(DBChatMessage, assistant_message_id)
+                assistant_message = await db.get(ContractChatMessage, assistant_message_id)
                 response_citations = await extract_response_citations(db, contract_id, event.response.output_text)
                 assistant_message.status = ChatMessageStatus.COMPLETED
                 assistant_message.content = event.response.output_text
@@ -183,7 +181,7 @@ async def stream_chat_response(
             # update the failed assistant message in the database and send the full failed assistant message
             async with SessionLocal() as db:
                 db: AsyncSession
-                assistant_message = await db.get(DBChatMessage, assistant_message_id)
+                assistant_message = await db.get(ContractChatMessage, assistant_message_id)
                 assistant_message.status = ChatMessageStatus.FAILED
                 assistant_message.content = "There was an error generating the response. Please try again."
                 assistant_message_event = ChatMessageEvent(event="assistant_message", data=ChatMessage.model_validate(assistant_message))
@@ -191,36 +189,37 @@ async def stream_chat_response(
             yield ServerSentEvent(event=assistant_message_event.event, data=assistant_message_event.data.model_dump_json())
 
 
-@router.post("/chat", tags=["chat"], description=CHAT_ENDPOINT_DESCRIPTION)
-async def send_chat_message(request: ChatMessageCreate, db: AsyncSession = Depends(get_db)) -> EventSourceResponse:
-    """send a new chat message and get the response as a stream of server-sent events"""
+@router.post("/contracts/{contract_id}/chat/messages", tags=["contract_chat"])
+async def send_chat_message(contract_id: UUID, request: ChatMessageCreate, db: AsyncSession = Depends(get_db)) -> EventSourceResponse:
+    """send a new contract-specific chat message and get the response as a stream of server-sent events"""
 
     # create a new OpenAI client to handle the request
     openai = AsyncOpenAI()
 
     # validate the contract passed in the request
-    query = select(DBContract).where(DBContract.id == request.contract_id)
+    query = select(Contract).where(Contract.id == contract_id)
     contract_result = await db.execute(query)
     contract = contract_result.scalar_one_or_none()
     if not contract:
-        raise HTTPException(status_code=404, detail=f"contract_id={request.contract_id} not found")
+        raise HTTPException(status_code=404, detail=f"contract_id={contract_id} not found")
     if contract.status == ContractStatus.UPLOADED:
-        raise HTTPException(status_code=400, detail="contract_id={request.contract_id} must be ingested prior to chat")
+        raise HTTPException(status_code=400, detail=f"contract_id={contract_id} must be ingested prior to chat")
 
     # validate the chat thread passed in the request or create a new one for a new conversation
     if request.chat_thread_id:
-        query = select(DBChatThread).where(DBChatThread.id == request.chat_thread_id)
+        query = select(ContractChatThread).where(ContractChatThread.contract_id == contract_id, ContractChatThread.id == request.chat_thread_id)
         chat_thread_result = await db.execute(query)
         chat_thread = chat_thread_result.scalar_one_or_none()
         if not chat_thread:
             raise HTTPException(status_code=404, detail=f"chat_thread_id={request.chat_thread_id} not found")
     else:
-        chat_thread = DBChatThread(contract_id=request.contract_id, archived=False)
+        chat_thread = ContractChatThread(contract_id=contract_id, archived=False)
         db.add(chat_thread)
         await db.flush()
 
     # create a chat message record in the database for the user message
-    user_message = DBChatMessage(
+    user_message = ContractChatMessage(
+        contract_id=contract_id,
         chat_thread_id=chat_thread.id,
         status=ChatMessageStatus.COMPLETED,
         role=ChatMessageRole.USER,
@@ -230,7 +229,7 @@ async def send_chat_message(request: ChatMessageCreate, db: AsyncSession = Depen
     await db.flush()
 
     # fetch the full conversation history for this chat thread and convert the conversation history to OpenAI message format
-    query = select(DBChatMessage).where(DBChatMessage.chat_thread_id == chat_thread.id).order_by(DBChatMessage.created_at)
+    query = select(ContractChatMessage).where(ContractChatMessage.chat_thread_id == chat_thread.id).order_by(ContractChatMessage.created_at)
     chat_history_result = await db.execute(query)
     chat_thread_history = [ChatMessage.model_validate(message) for message in chat_history_result.scalars().all()]
     conversation_history = [{"role": message.role.value, "content": message.content} for message in chat_thread_history]
@@ -248,12 +247,13 @@ async def send_chat_message(request: ChatMessageCreate, db: AsyncSession = Depen
     # logger.info(f"generated standalone search phrase: {search_phrase}")
 
     # fetch the most relevant contract sections based on the standalone search phrase and resolve the system prompt
-    contract_sections = await get_relevant_sections(db, request.contract_id, search_phrase)
+    contract_sections = await get_relevant_sections(db, contract_id, search_phrase)
     system_prompt = PROMPT_CONTRACT_CHAT.format(contract_sections=contract_sections)
     # logger.info(f"resolved system prompt: {system_prompt}")
 
     # create a chat message record in the database for the assistant message
-    assistant_message = DBChatMessage(
+    assistant_message = ContractChatMessage(
+        contract_id=contract_id,
         chat_thread_id=chat_thread.id,
         parent_chat_message_id=user_message.id,
         status=ChatMessageStatus.PENDING,
@@ -273,7 +273,7 @@ async def send_chat_message(request: ChatMessageCreate, db: AsyncSession = Depen
         stream=True
     )
     streaming_chat_response = stream_chat_response(
-        contract_id=request.contract_id,
+        contract_id=contract_id,
         chat_thread_id=chat_thread.id,
         user_message_id=user_message.id,
         assistant_message_id=assistant_message.id,
@@ -284,3 +284,60 @@ async def send_chat_message(request: ChatMessageCreate, db: AsyncSession = Depen
     # NOTE: the streaming generator yields events outside the lifecycle of the request handler so we need a separate database session
     await db.commit()
     return EventSourceResponse(streaming_chat_response)
+
+
+@router.get("/contracts/{contract_id}/chat/threads", tags=["contract_chat"])
+async def get_chat_threads(contract_id: UUID, db: AsyncSession = Depends(get_db)) -> list[ChatThread]:
+    """get all chat threads for a given contract"""
+
+    query = select(ContractChatThread).where(ContractChatThread.contract_id == contract_id).order_by(ContractChatThread.created_at.desc())
+    result = await db.execute(query)
+    chat_threads = result.scalars().all()
+    return [ChatThread.model_validate(thread) for thread in chat_threads]
+
+
+@router.get("/contracts/{contract_id}/chat/threads/{thread_id}", tags=["contract_chat"])
+async def get_chat_thread(contract_id: UUID, thread_id: UUID, db: AsyncSession = Depends(get_db)) -> ChatThread:
+    """get a single chat thread for a given contract by ID"""
+
+    query = select(ContractChatThread).where(ContractChatThread.contract_id == contract_id, ContractChatThread.id == thread_id)
+    result = await db.execute(query)
+    chat_thread = result.scalar_one_or_none()
+    if not chat_thread:
+        raise HTTPException(status_code=404, detail=f"chat_thread_id={thread_id} not found")
+    return ChatThread.model_validate(chat_thread)
+
+
+@router.get("/contracts/{contract_id}/chat/threads/{thread_id}/messages", tags=["contract_chat"])
+async def get_chat_thread_messages(contract_id: UUID, thread_id: UUID, db: AsyncSession = Depends(get_db)) -> list[ChatMessage]:
+    """get all messages for a contract-specific chat thread"""
+
+    # validate that the contract-specific chat thread exists
+    query = select(ContractChatThread).where(ContractChatThread.contract_id == contract_id, ContractChatThread.id == thread_id)
+    thread_result = await db.execute(query)
+    chat_thread = thread_result.scalar_one_or_none()
+    if not chat_thread:
+        raise HTTPException(status_code=404, detail=f"chat_thread_id={thread_id} not found")
+
+    # get all messages for the contract-specific chat thread
+    query = select(ContractChatMessage).where(ContractChatMessage.chat_thread_id == thread_id).order_by(ContractChatMessage.created_at)
+    result = await db.execute(query)
+    messages = result.scalars().all()
+    return [ChatMessage.model_validate(message) for message in messages]
+
+
+@router.get("/contracts/{contract_id}/chat/threads/{thread_id}/messages/{message_id}", tags=["contract_chat"])
+async def get_chat_message(contract_id: UUID, thread_id: UUID, message_id: UUID, db: AsyncSession = Depends(get_db)) -> ChatMessage:
+    """get a given chat message by ID"""
+
+    # validate that the chat message exists for the contract-specific chat thread
+    query = select(ContractChatMessage).where(
+        ContractChatMessage.contract_id == contract_id,
+        ContractChatMessage.chat_thread_id == thread_id,
+        ContractChatMessage.id == message_id
+    )
+    message_result = await db.execute(query)
+    message = message_result.scalar_one_or_none()
+    if not message:
+        raise HTTPException(status_code=404, detail=f"chat_message_id={message_id} not found")
+    return ChatMessage.model_validate(message)

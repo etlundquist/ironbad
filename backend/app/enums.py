@@ -5,8 +5,7 @@ class ContractStatus(Enum):
     PROCESSING = "Processing"
     READY_FOR_REVIEW = "Ready for Review"
     UNDER_REVIEW = "Under Review"
-    APPROVED = "Approved"
-    REJECTED = "Rejected"
+    REVIEW_COMPLETED = "Review Completed"
 
 
 class FileType(Enum):
@@ -35,9 +34,7 @@ class IssueStatus(Enum):
 
 class IssueResolution(Enum):
     IGNORE = "ignore"
-    MANUAL_EDIT = "manual_edit"
-    SUGGESTED_EDIT = "suggested_edit"
-
+    SUGGEST_REVISION = "suggest_revision"
 
 class ChatMessageStatus(Enum):
     PENDING = "pending"

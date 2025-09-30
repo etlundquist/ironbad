@@ -5,7 +5,7 @@ from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import UUID, BYTEA
 from sqlalchemy.orm import DeclarativeBase, relationship
 
-from app.enums import ContractStatus, FileType, ContractSectionType, RuleSeverity, IssueStatus, IssueResolution, ChatMessageStatus, ChatMessageRole
+from app.enums import ContractStatus, FileType, ContractSectionType, IssueResolution, RuleSeverity, IssueStatus, ChatMessageStatus, ChatMessageRole
 from app.constants import EMBEDDING_VECTOR_DIMENSION
 
 from pgvector.sqlalchemy import Vector
@@ -98,11 +98,12 @@ class ContractIssue(Base):
     standard_clause_rule_id = Column(UUID(as_uuid=True), ForeignKey(column="standard_clause_rules.id", ondelete="CASCADE"), nullable=False)
     contract_id = Column(UUID(as_uuid=True), ForeignKey(column="contracts.id", ondelete="CASCADE"), nullable=False)
     explanation = Column(String, nullable=False)
-    citations = Column(JSON, nullable=False)
+    citations = Column(JSON, nullable=True)
     status = Column(Enum(IssueStatus), nullable=False)
     resolution = Column(Enum(IssueResolution), nullable=True)
-    suggested_text = Column(String, nullable=True)
-    resolved_text = Column(String, nullable=True)
+    ai_suggested_revision = Column(String, nullable=True)
+    user_suggested_revision = Column(String, nullable=True)
+    active_suggested_revision = Column(String, nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
@@ -111,8 +112,8 @@ class ContractIssue(Base):
     contract = relationship("Contract")
 
 
-class ChatThread(Base):
-    __tablename__ = "chat_threads"
+class ContractChatThread(Base):
+    __tablename__ = "contract_chat_threads"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     contract_id = Column(UUID(as_uuid=True), ForeignKey(column="contracts.id", ondelete="CASCADE"), nullable=False)
     archived = Column(Boolean, nullable=False)
@@ -122,11 +123,12 @@ class ChatThread(Base):
     contract = relationship("Contract")
 
 
-class ChatMessage(Base):
-    __tablename__ = "chat_messages"
+class ContractChatMessage(Base):
+    __tablename__ = "contract_chat_messages"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    chat_thread_id = Column(UUID(as_uuid=True), ForeignKey(column="chat_threads.id", ondelete="CASCADE"), nullable=False)
-    parent_chat_message_id = Column(UUID(as_uuid=True), ForeignKey(column="chat_messages.id"), nullable=True)
+    contract_id = Column(UUID(as_uuid=True), ForeignKey(column="contracts.id", ondelete="CASCADE"), nullable=False)
+    chat_thread_id = Column(UUID(as_uuid=True), ForeignKey(column="contract_chat_threads.id", ondelete="CASCADE"), nullable=False)
+    parent_chat_message_id = Column(UUID(as_uuid=True), ForeignKey(column="contract_chat_messages.id"), nullable=True)
     status = Column(Enum(ChatMessageStatus), nullable=False)
     role = Column(Enum(ChatMessageRole), nullable=False)
     content = Column(String, nullable=False)
@@ -134,4 +136,5 @@ class ChatMessage(Base):
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
-    chat_thread = relationship("ChatThread")
+    contract = relationship("Contract")
+    chat_thread = relationship("ContractChatThread")
