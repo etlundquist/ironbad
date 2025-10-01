@@ -69,10 +69,11 @@ interface ContractIssue {
   standard_clause?: StandardClause
   standard_clause_rule?: StandardClauseRule
   contract_id: string
+  relevant_text: string
   explanation: string
   citations?: ContractSectionCitation[]
   status: "Open" | "Resolved"
-  resolution?: "Ignored" | "Revised"
+  resolution?: 'ignore' | 'suggest_revision'
   ai_suggested_revision?: string
   user_suggested_revision?: string
   active_suggested_revision?: string
@@ -170,6 +171,10 @@ const ContractDetailPage: NextPage = () => {
   const [contractIssues, setContractIssues] = useState<ContractIssue[]>([])
   const [issuesLoading, setIssuesLoading] = useState(false)
   const [expandedIssueClause, setExpandedIssueClause] = useState<string | null>(null)
+  const [expandedIssueId, setExpandedIssueId] = useState<string | null>(null)
+  const [revisionDrafts, setRevisionDrafts] = useState<Record<string, string>>({})
+  const [savingIssueId, setSavingIssueId] = useState<string | null>(null)
+  const [generatingIssueId, setGeneratingIssueId] = useState<string | null>(null)
   const [hoveredIssueId, setHoveredIssueId] = useState<string | null>(null)
 
   // Chat state
@@ -260,9 +265,9 @@ const ContractDetailPage: NextPage = () => {
     }
   }, [activeTab, id, standardClauses.length])
 
-  // Fetch issues data when issues tab is active
+  // Fetch issues data when issues tab is active or when clauses tab is active (for counts)
   useEffect(() => {
-    if (activeTab === 'issues' && id && contractIssues.length === 0) {
+    if ((activeTab === 'issues' || activeTab === 'clauses') && id && contractIssues.length === 0) {
       fetchIssuesData()
     }
   }, [activeTab, id, contractIssues.length])
@@ -700,6 +705,28 @@ const ContractDetailPage: NextPage = () => {
     })
 
     return grouped
+  }
+
+  const getIssuesForStandardClause = (standardClauseId: string) => {
+    return contractIssues.filter(issue => (issue.standard_clause?.id || issue.standard_clause_id) === standardClauseId)
+  }
+
+  const getClauseSeverityClass = (issues: ContractIssue[]): string => {
+    const openIssues = issues.filter(i => i.status && i.status.toLowerCase() === 'open')
+    const hasCritical = openIssues.some(i => i.standard_clause_rule?.severity && i.standard_clause_rule.severity.toLowerCase() === 'critical')
+    const hasWarning = openIssues.some(i => i.standard_clause_rule?.severity && i.standard_clause_rule.severity.toLowerCase() === 'warning')
+    const hasInfo = openIssues.some(i => i.standard_clause_rule?.severity && i.standard_clause_rule.severity.toLowerCase() === 'info')
+
+    switch (true) {
+      case hasCritical:
+        return 'severity-critical'
+      case hasWarning:
+        return 'severity-warning'
+      case hasInfo:
+        return 'severity-info'
+      default:
+        return 'severity-resolved'
+    }
   }
 
   const toggleIssueClauseExpansion = (clauseId: string) => {
@@ -1553,7 +1580,15 @@ const ContractDetailPage: NextPage = () => {
               {activeTab === 'clauses' && (
                 <div className="tab-panel">
                   <div className="tab-header">
-                    <h3>Extracted Clauses</h3>
+                    <div className="tab-header-content">
+                      <h3>Extracted Clauses</h3>
+                      {!clausesLoading && standardClauses.length > 0 && (
+                        <div className="clauses-count">
+                          <div>{contractClauses.length} standard clauses extracted</div>
+                          <div>{standardClauses.length - contractClauses.length} standard clauses not found</div>
+                        </div>
+                      )}
+                    </div>
                     <div className="tab-header-actions">
                       {getIngestCTA()}
                     </div>
@@ -1624,9 +1659,63 @@ const ContractDetailPage: NextPage = () => {
               {activeTab === 'issues' && (
                 <div className="tab-panel">
                   <div className="tab-header">
-                    <h3>Identified Issues</h3>
+                    <div className="tab-header-content">
+                      <h3>Identified Issues</h3>
+                      {!issuesLoading && contractIssues.length > 0 && (() => {
+                        const open = contractIssues.filter(i => i.status && i.status.toLowerCase() === 'open').length
+                        const resolved = contractIssues.filter(i => i.status && i.status.toLowerCase() === 'resolved')
+                        const dismissed = resolved.filter(i => i.resolution === 'ignore').length
+                        const suggested = resolved.filter(i => i.resolution === 'suggest_revision').length
+                        return (
+                          <div className="issues-count">
+                            <div>{open} Open Issues</div>
+                            <div>{dismissed} Dismissed Issues</div>
+                            <div>{suggested} Suggested Revisions</div>
+                          </div>
+                        )
+                      })()}
+                    </div>
                     <div className="tab-header-actions">
-                      {getAnalyzeCTA()}
+                      {(() => {
+                        if (!contract) return null
+                        const openCount = contractIssues.filter(i => i.status && i.status.toLowerCase() === 'open').length
+                        if (contract.status === 'Under Review') {
+                          if (openCount > 0) return null
+                          return (
+                            <button
+                              className="cta-button primary"
+                              onClick={async () => {
+                                const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
+                                const resp = await fetch(`${backendUrl}/contracts/${contract.id}/status?status=Review%20Completed`, { method: 'PUT' })
+                                if (resp.ok) {
+                                  const updated = await resp.json()
+                                  setContract(updated)
+                                }
+                              }}
+                            >
+                              Complete Review
+                            </button>
+                          )
+                        }
+                        if (contract.status === 'Review Completed') {
+                          return (
+                            <button
+                              className="cta-button secondary"
+                              onClick={async () => {
+                                const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
+                                const resp = await fetch(`${backendUrl}/contracts/${contract.id}/status?status=Under%20Review`, { method: 'PUT' })
+                                if (resp.ok) {
+                                  const updated = await resp.json()
+                                  setContract(updated)
+                                }
+                              }}
+                            >
+                              Re-Open Review
+                            </button>
+                          )
+                        }
+                        return null
+                      })()}
                     </div>
                   </div>
 
@@ -1642,16 +1731,30 @@ const ContractDetailPage: NextPage = () => {
                         if (!standardClause) return null
 
                         const isExpanded = expandedIssueClause === clauseId
+                        const severityClass = getClauseSeverityClass(issues)
 
                         return (
-                          <div key={clauseId} className="issue-clause-item">
+                          <div key={clauseId} className={`issue-clause-item ${severityClass}`}>
                             <div className="issue-clause-header" onClick={() => toggleIssueClauseExpansion(clauseId)}>
                               <div className="issue-clause-info">
                                 <div className="issue-clause-name">
                                   {standardClause.display_name}
                                 </div>
                                 <div className="issue-count">
-                                  {issues.length} issue{issues.length !== 1 ? 's' : ''}
+                                  {issues.filter(issue => issue.status && issue.status.toLowerCase() === 'open').length} Open Issues
+                                  <br />
+                                  {(() => {
+                                    const resolved = issues.filter(issue => issue.status && issue.status.toLowerCase() === 'resolved')
+                                    const dismissed = resolved.filter(i => i.resolution === 'ignore').length
+                                    const suggested = resolved.filter(i => i.resolution === 'suggest_revision').length
+                                    return (
+                                      <>
+                                        <span>{dismissed} Dismissed Issues</span>
+                                        <br />
+                                        <span>{suggested} Suggested Revisions</span>
+                                      </>
+                                    )
+                                  })()}
                                 </div>
                               </div>
                               <div className="issue-clause-expand">
@@ -1669,51 +1772,215 @@ const ContractDetailPage: NextPage = () => {
 
                             {isExpanded && (
                               <div className="issue-clause-content">
-                                {issues.map((issue) => (
-                                  <div key={issue.id} className={`issue-item severity-${getSeverityLevel(issue.standard_clause_rule?.severity || '')}`}>
-                                    <div className="issue-header">
-                                      <div className="issue-rule">
-                                        <div
-                                          className={`issue-info-tooltip severity-${getSeverityLevel(issue.standard_clause_rule?.severity || '')}`}
-                                          onMouseEnter={() => setHoveredIssueId(issue.id)}
-                                          onMouseLeave={() => setHoveredIssueId(null)}
-                                        >
-                                          <span className="info-badge">i</span>
-                                          {hoveredIssueId === issue.id && (
-                                            <div className="custom-tooltip">
-                                              <div className="tooltip-content">
-                                                {issue.explanation}
-                                              </div>
-                                              <div className="tooltip-arrow"></div>
-                                            </div>
+                                {issues.map((issue) => {
+                                  const isResolved = issue.status && issue.status.toLowerCase() === 'resolved'
+                                  const sev = getSeverityLevel(issue.standard_clause_rule?.severity || '')
+                                  const statusTitle = `Issue Status: ${isResolved ? 'resolved' : 'open'}`
+                                  return (
+                                    <div key={issue.id} className={`issue-item ${isResolved ? 'resolved' : ''} severity-${sev}`}>
+                                      <div className="issue-header">
+                                        <div className="issue-status">
+                                          {isResolved ? (
+                                            issue.resolution === 'ignore' ? (
+                                              // cancel icon
+                                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111827" strokeWidth="2">
+                                                <circle cx="12" cy="12" r="10" />
+                                                <path d="M8 8l8 8M16 8l-8 8" strokeLinecap="round" />
+                                              </svg>
+                                            ) : issue.resolution === 'suggest_revision' ? (
+                                              // pencil icon
+                                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111827" strokeWidth="2">
+                                                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" />
+                                                <path d="M14.06 6.19l3.75 3.75" />
+                                              </svg>
+                                            ) : (
+                                              // fallback checkmark
+                                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111827" strokeWidth="2">
+                                                <circle cx="12" cy="12" r="10" />
+                                                <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                                              </svg>
+                                            )
+                                          ) : (
+                                            <span className={`status-dot ${sev}`}></span>
                                           )}
                                         </div>
                                         <div className="issue-title">
                                           {issue.standard_clause_rule?.title || 'Unknown Issue'}
                                         </div>
+                                        <div className="issue-sections">
+                                          {issue.citations && issue.citations.length > 0 ? (
+                                            <div className="section-numbers">
+                                              {issue.citations.map((citation, index) => (
+                                                <button
+                                                  key={index}
+                                                  type="button"
+                                                  className="section-number link"
+                                                  onClick={() => navigateToPage((citation.beg_page || 1))}
+                                                  title={citation.section_name || `Section ${citation.section_number}`}
+                                                >
+                                                  {citation.section_number}
+                                                </button>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <span className="no-sections">No sections</span>
+                                          )}
+                                        </div>
+                                        <div className="issue-expand" onClick={() => setExpandedIssueId(expandedIssueId === issue.id ? null : issue.id)}>
+                                          <span className="review-label">Resolve</span>
+                                          <svg
+                                            width="12"
+                                            height="12"
+                                            viewBox="0 0 12 12"
+                                            fill="currentColor"
+                                            className={`expand-icon ${expandedIssueId === issue.id ? 'expanded' : ''}`}
+                                          >
+                                            <path d="M6 8L2 4h8l-4 4z"/>
+                                          </svg>
+                                        </div>
                                       </div>
-                                      <div className="issue-sections">
-                                        {issue.citations && issue.citations.length > 0 ? (
-                                          <div className="section-numbers">
-                                            {issue.citations.map((citation, index) => (
-                                              <button
-                                                key={index}
-                                                type="button"
-                                                className="section-number link"
-                                                onClick={() => navigateToPage((citation.beg_page || 1))}
-                                                title={citation.section_name || `Section ${citation.section_number}`}
-                                              >
-                                                {citation.section_number}
-                                              </button>
-                                            ))}
+                                      {expandedIssueId === issue.id && (
+                                        <div className="issue-actions">
+                                          <div className="issue-section">
+                                            <div className="issue-section-title">Policy Rule</div>
+                                            <div className="issue-section-body clause-markdown"><ReactMarkdown>{issue.standard_clause_rule?.text || ''}</ReactMarkdown></div>
                                           </div>
-                                        ) : (
-                                          <span className="no-sections">No sections</span>
-                                        )}
-                                      </div>
+                                          <div className="issue-section">
+                                            <div className="issue-section-title">Issue Explanation</div>
+                                            <div className="issue-section-body clause-markdown"><ReactMarkdown>{issue.explanation || ''}</ReactMarkdown></div>
+                                          </div>
+                                          <div className="issue-section">
+                                            <div className="issue-section-title">Relevant Contract Text</div>
+                                            <div className="issue-section-body contract-text-block">{issue.relevant_text || ''}</div>
+                                          </div>
+                                          <div className="issue-section">
+                                            <div className="issue-section-header">
+                                              <div className="issue-section-title">Suggested Revision</div>
+                                              <div className="issue-actions-inline">
+                                              {!isResolved && (
+                                              <button
+                                                className="cta-button secondary"
+                                                onClick={async () => {
+                                                  try {
+                                                    setGeneratingIssueId(issue.id)
+                                                    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
+                                                    const resp = await fetch(`${backendUrl}/contracts/${contract!.id}/issues/${issue.id}/ai-revision`, { method: 'PUT' })
+                                                    if (resp.ok) {
+                                                      const updated = await resp.json()
+                                                      setContractIssues(prev => prev.map(i => i.id === updated.id ? updated : i))
+                                                      setRevisionDrafts(prev => ({ ...prev, [issue.id]: updated.active_suggested_revision || '' }))
+                                                    }
+                                                  } finally {
+                                                    setGeneratingIssueId(null)
+                                                  }
+                                                }}
+                                                disabled={generatingIssueId === issue.id || savingIssueId === issue.id}
+                                                title="Generate Suggested Revision with AI"
+                                              >
+                                                <span className="icon ai-sparkle" aria-hidden="true"></span>
+                                                {generatingIssueId === issue.id ? 'Generating…' : 'Generate Suggested Revision'}
+                                              </button>
+                                              )}
+                                              {!isResolved && (revisionDrafts[issue.id] ?? (issue.active_suggested_revision || '')) !== (issue.active_suggested_revision || '') && (
+                                                <button
+                                                  className="cta-button primary"
+                                                  onClick={async () => {
+                                                    try {
+                                                      setSavingIssueId(issue.id)
+                                                      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
+                                                      const resp = await fetch(`${backendUrl}/contracts/${contract!.id}/issues/${issue.id}/user-revision`, {
+                                                        method: 'PUT',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ user_suggested_revision: revisionDrafts[issue.id] ?? '' })
+                                                      })
+                                                      if (resp.ok) {
+                                                        const updated = await resp.json()
+                                                        setContractIssues(prev => prev.map(i => i.id === updated.id ? updated : i))
+                                                      }
+                                                    } finally {
+                                                      setSavingIssueId(null)
+                                                    }
+                                                  }}
+                                                  disabled={savingIssueId === issue.id || generatingIssueId === issue.id}
+                                                  title="Save Suggested Revision"
+                                                >
+                                                  <span className="icon floppy" aria-hidden="true"></span>
+                                                  {savingIssueId === issue.id ? 'Saving…' : 'Save Suggested Revision'}
+                                                </button>
+                                              )}
+                                              </div>
+                                            </div>
+                                            <textarea
+                                              className={`revision-textarea${isResolved ? ' readonly' : ''}`}
+                                              placeholder="Enter a proposed revision..."
+                                              value={revisionDrafts[issue.id] ?? (issue.active_suggested_revision || '')}
+                                              onChange={(e) => setRevisionDrafts(prev => ({ ...prev, [issue.id]: e.target.value }))}
+                                              readOnly={isResolved}
+                                            />
+                                            {/* Status-dependent CTAs */}
+                                            <div className="issue-cta-row">
+                                              {(issue.status && issue.status.toLowerCase() === 'resolved') ? (
+                                                contract?.status === 'Review Completed' ? null : (
+                                                  <button
+                                                    className="cta-button primary block"
+                                                    onClick={async () => {
+                                                      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
+                                                      const resp = await fetch(`${backendUrl}/contracts/${contract!.id}/issues/${issue.id}/unresolve`, { method: 'POST' })
+                                                      if (resp.ok) {
+                                                        const updated = await resp.json()
+                                                        setContractIssues(prev => prev.map(i => i.id === updated.id ? updated : i))
+                                                      }
+                                                    }}
+                                                  >
+                                                    Re-Open Issue
+                                                  </button>
+                                                )
+                                              ) : (
+                                                <>
+                                                  <button
+                                                    className="cta-button secondary half"
+                                                    onClick={async () => {
+                                                      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
+                                                      const resp = await fetch(`${backendUrl}/contracts/${contract!.id}/issues/${issue.id}/resolve?resolution=ignore`, { method: 'POST' })
+                                                      if (resp.ok) {
+                                                        const updated = await resp.json()
+                                                        setContractIssues(prev => prev.map(i => i.id === updated.id ? updated : i))
+                                                        setRevisionDrafts(prev => ({ ...prev, [issue.id]: '' }))
+                                                        setExpandedIssueId(prev => (prev === issue.id ? null : prev))
+                                                      }
+                                                    }}
+                                                  >
+                                                    Dismiss Issue
+                                                  </button>
+                                                  {(() => {
+                                                    const currentRevision = (revisionDrafts[issue.id] ?? (issue.active_suggested_revision || '')).trim()
+                                                    if (!currentRevision) return null
+                                                    return (
+                                                      <button
+                                                        className="cta-button primary half"
+                                                        onClick={async () => {
+                                                          const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
+                                                          const resp = await fetch(`${backendUrl}/contracts/${contract!.id}/issues/${issue.id}/resolve?resolution=suggest_revision`, { method: 'POST' })
+                                                          if (resp.ok) {
+                                                            const updated = await resp.json()
+                                                            setContractIssues(prev => prev.map(i => i.id === updated.id ? updated : i))
+                                                            setExpandedIssueId(prev => (prev === issue.id ? null : prev))
+                                                          }
+                                                        }}
+                                                      >
+                                                        Submit Suggested Revision
+                                                      </button>
+                                                    )
+                                                  })()}
+                                                </>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
-                                  </div>
-                                ))}
+                                  )
+                                })}
                               </div>
                             )}
                           </div>
@@ -1722,14 +1989,26 @@ const ContractDetailPage: NextPage = () => {
 
                       {Object.keys(getIssuesByStandardClause()).length === 0 && (
                         <div className="no-issues">
-                          <div className="no-issues-icon">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M9 12l2 2 4-4"/>
-                              <circle cx="12" cy="12" r="10"/>
-                            </svg>
-                          </div>
-                          <h4>No Issues Found</h4>
-                          <p>This contract appears to be compliant with all standard clause rules.</p>
+                          {contract?.status === 'Ready for Review' ? (
+                            <>
+                              <h4>Ready for Analysis</h4>
+                              <p>Analyze the contract to detect potential issues</p>
+                              <div className="no-issues-actions">
+                                {getAnalyzeCTA()}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="no-issues-icon">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M9 12l2 2 4-4"/>
+                                  <circle cx="12" cy="12" r="10"/>
+                                </svg>
+                              </div>
+                              <h4>No Issues Found</h4>
+                              <p>This contract appears to be compliant with all standard clause rules.</p>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1741,9 +2020,6 @@ const ContractDetailPage: NextPage = () => {
                   <div className="tab-header">
                     <h3>Contract Chat</h3>
                     <div className="tab-header-actions">
-                      <button className="cta-button secondary" onClick={handleNewChat} disabled={isSendingMessage}>
-                        {isSendingMessage ? 'New Chat' : 'New Chat'}
-                      </button>
                       {getIngestCTA()}
                     </div>
                   </div>
@@ -1808,6 +2084,13 @@ const ContractDetailPage: NextPage = () => {
                             ) : (
                               'Send'
                             )}
+                          </button>
+                          <button
+                            className="cta-button secondary"
+                            onClick={handleNewChat}
+                            disabled={isSendingMessage}
+                          >
+                            New Chat
                           </button>
                         </div>
                       </>

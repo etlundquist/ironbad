@@ -107,21 +107,27 @@ Synthesize a version of the standard clause using only the relevant terms and co
 
 PROMPT_RULE_COMPLIANCE_CLASSIFICATION = """
 You are an expert legal analyst tasked with determining whether a contract clause violates a clause-specific policy rule.
-You are presented with a clause-specific policy rule and an input contract including the contract preamble and the relevant contract clause.
+You are presented with a policy rule and an input contract including the contract preamble and the relevant contract clause.
 Determine whether the contract clause violates the policy rule.
 Output your response in JSON format corresponding to the Example Output provided below.
 
 # Instructions
 - read the contract preamble carefully to understand the contract's named parties and their associated roles (e.g. customer, supplier, etc.)
 - read the policy rule carefully to understand to which contract parties and to what terms and conditions it applies
-- carefully evaluate whether the terms and conditions in the contract clause violate the policy rule for the relevant party
-- output an overall true/false violation classification for all responses
-- for violations, additionally provide an explanation of the violation
-- for violations, additionally provide an array of citations to the relevant section numbers that violate the policy rule
+- carefully evaluate whether the terms and conditions in the contract clause violate the policy rule for the relevant party or parties
+- output an overall true/false `violation` classification for all responses
+- for violations, additionally provide the `relevant_text` from the contract clause that violates the policy rule
+- for violations, additionally provide an `explanation` of the violation in clear, understandable language
+- for violations, additionally provide an array of `citations` to the relevant section numbers that violate the policy rule
 
 ## Violation Classification Additional Guidance
 - consider it a violation if the contract either explicitly or implicitly violates the policy rule
 - do not consider it a violation if there is not enough information to evaluate the policy rule
+
+## Violation Relevant Text Additional Guidance
+- for violations, additionally provide the relevant text from the contract clause that violates the policy rule
+- the relevant text should be the smallest possible section, sub-section, paragraph, or sentence of the contract clause that contains the violation
+- the relevant text should be copied verbatim from the contract clause without any additional formatting or markdown headers
 
 ## Violation Explanation Additional Guidance
 - for violations, provide a concise explanation of why the contract violates the policy rule
@@ -139,6 +145,7 @@ Output your response in JSON format corresponding to the Example Output provided
 # Example Output
 {{
   "violation": true,
+  "relevant_text": "The foregoing limitations of this Section 11 shall be inapplicable (a) to the indemnification provisions of this Agreement or their breach, (b) to claims for personal injury (including death) and damage to tangible personal property to the extent either is proximately caused by the negligence, acts or omissions of a Party, (c) to damages relating to violations of Article 10 (Confidentiality, Privacy and Data Security) negligence of either Party,or (e) Customer's undisputed payment obligations.",
   "explanation": "The stated liability limits contain exceptions for indemnification obligations (section 11.1), personal injury or death (section 11.2), and confidentiality (section 11.3).",
   "citations": ["11.1", "11.2", "11.3"]
 }}
@@ -155,7 +162,11 @@ Output your response in JSON format corresponding to the Example Output provided
 # Contract Clause
 {contract_clause}
 
-Think step-by-step to first determine whether the input contract violates the policy rule, and if so, provide a concise explanation along with an array of citations to the relevant section numbers from the input contract.
+Think step-by-step:
+1. determine whether the input contract violates the policy rule
+2. for violations, first extract the most concise segment of the contract clause that contains the violation
+3. for violations, then provide a concise explanation of the violation in clear, understandable language
+4. for violations, finally provide an array of citations to the relevant contract section numbers to support your explanation
 """.strip()
 
 
@@ -206,7 +217,7 @@ The initial term of the contract is 12 months, after which the contract will aut
 
 PROMPT_CONTRACT_ISSUE_REVISION = """
 You are an expert legal analyst tasked with generating a suggested revision to fix a contract issue.
-You are presented with a contract clause which contains one or more terms and conditions which violate a clause-specific policy rule.
+You are presented with an excerpt of a contract clause which contains one or more terms and conditions which violate a clause-specific policy rule.
 You are also presented with an issue description which explains why the contract clause violates the policy rule.
 You are also presented with the full set of clause-specific policy rules and the standard approved language for the clause.
 Generate a suggested revision to the contract clause which will fix the issue without violating any other policy rules.
@@ -215,15 +226,15 @@ Generate a suggested revision to the contract clause which will fix the issue wi
 - read the issue description carefully to understand which terms and conditions in the contract clause violate the provided policy rule
 - read the full set of policy rules and the standard approved language to understand how to suggest a revision which will fix the identified issue without violating any other policy rules
 - generate a suggested revision which will fix the identified issue by modifying, adding, and/or removing relevant terms and conditions from the contract clause
-- your revision must be consistent with the full set of policy rules but not add, modify, or remove any terms or conditions which are not relevant to the identified issue
-- your revision should replace the smallest possible section, sub-section, paragraph, or sentence of the contract clause necessary to fix the identified issue
-- output your revision in markdown format (without any backticks) using headers, lists, tables, and other markdown formatting as appropriate to match the format of the original contract clause
+- your response must fully replace the relevant text from the contract clause with the suggested revision
+- your response must be consistent with the full set of policy rules but not add, modify, or remove any terms or conditions which are irrelevant to the identified issue
+- output your response without any additional formatting or markdown headers
 
 # Clause Name
 {clause_name}
 
-# Contract Clause Text
-{contract_clause}
+# Contract Clause
+{relevant_text}
 
 # Issue Description
 {issue_description}

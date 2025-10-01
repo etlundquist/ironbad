@@ -146,7 +146,7 @@ async def get_contract_contents(contract_id: UUID, db: AsyncSession = Depends(ge
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.put("/contracts/{contract_id}", response_model=Contract, tags=["contracts"])
+@router.put("/contracts/{contract_id}/metadata", response_model=Contract, tags=["contracts"])
 async def update_contract_metadata(contract_id: UUID, metadata: dict, db: AsyncSession = Depends(get_db)) -> Contract:
     """update/refresh the metadata for a contract by ID"""
 
@@ -165,6 +165,28 @@ async def update_contract_metadata(contract_id: UUID, metadata: dict, db: AsyncS
     except Exception as e:
         await db.rollback()
         logger.error("failed to update contract metadata", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/contracts/{contract_id}/status", response_model=Contract, tags=["contracts"])
+async def update_contract_status(contract_id: UUID, status: ContractStatus, db: AsyncSession = Depends(get_db)) -> Contract:
+    """update the status of a contract by ID"""
+
+    try:
+        query = select(DBContract).where(DBContract.id == contract_id)
+        result = await db.execute(query)
+        contract = result.scalar_one_or_none()
+        if not contract:
+            raise HTTPException(status_code=404, detail="contract not found")
+        contract.status = status
+        await db.commit()
+        await db.refresh(contract)
+        return Contract.model_validate(contract)
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error("failed to update contract status", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

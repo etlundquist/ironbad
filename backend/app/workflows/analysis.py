@@ -23,7 +23,7 @@ async def evaluate_clause_rule(contract_preamble: ContractSection, contract_clau
 
     openai = AsyncOpenAI()
     response: ParsedResponse = await openai.responses.parse(
-        model="gpt-4.1-mini",
+        model="gpt-4.1",
         input=PROMPT_RULE_COMPLIANCE_CLASSIFICATION.format(
             clause_name=standard_clause.display_name,
             policy_rule=rule.text,
@@ -95,6 +95,7 @@ async def identify_clause_issues(db: AsyncSession, contract_preamble: ContractSe
             standard_clause_id=standard_clause.id,
             standard_clause_rule_id=violation.standard_clause_rule_id,
             contract_id=contract_clause.contract_id,
+            relevant_text=violation.relevant_text,
             explanation=violation.explanation,
             citations=[citation.model_dump() for citation in citations],
             status=IssueStatus.OPEN,

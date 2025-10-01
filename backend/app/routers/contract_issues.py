@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import ContractClause, ContractIssue as DBContractIssue, Contract as DBContract, StandardClause
+from app.models import ContractIssue as DBContractIssue, Contract as DBContract, StandardClause
 from app.schemas import ContractIssue, ContractIssueUserRevision
 from app.database import get_db
 from app.enums import  IssueResolution, IssueStatus
@@ -96,11 +96,6 @@ async def update_contract_issue_ai_revision(contract_id: UUID, issue_id: UUID, d
     if not issue:
         raise HTTPException(status_code=404, detail="issue not found")
 
-    # fetch the relevant contract-specific clause text
-    query = select(ContractClause).where(ContractClause.contract_id == contract_id, ContractClause.standard_clause_id == issue.standard_clause_id)
-    result = await db.execute(query)
-    contract_clause = result.scalar_one_or_none()
-
     # fetch the relevant standard clause text and standard clause rules to provide guidance for suggested revisions
     query = select(StandardClause).where(StandardClause.id == issue.standard_clause_id).options(selectinload(StandardClause.rules))
     result = await db.execute(query)
@@ -110,7 +105,7 @@ async def update_contract_issue_ai_revision(contract_id: UUID, issue_id: UUID, d
     openai = AsyncOpenAI()
     resolved_prompt = PROMPT_CONTRACT_ISSUE_REVISION.format(
         clause_name=standard_clause.display_name,
-        contract_clause=contract_clause.raw_markdown,
+        relevant_text=issue.relevant_text,
         issue_description=issue.explanation,
         policy_rules="\n".join([rule.text for rule in standard_clause.rules]),
         standard_approved_language=standard_clause.standard_text
@@ -118,9 +113,9 @@ async def update_contract_issue_ai_revision(contract_id: UUID, issue_id: UUID, d
     logger.info(f"resolved prompt: {resolved_prompt}")
 
     response: Response = await openai.responses.create(
-        model="gpt-4.1-mini",
+        model="gpt-4.1",
         input=resolved_prompt,
-        temperature=0.0,
+        temperature=0.5,
         timeout=60
     )
     suggested_revision = response.output_text
@@ -169,6 +164,10 @@ async def resolve_contract_issue(contract_id: UUID, issue_id: UUID, resolution: 
     issue = result.scalar_one_or_none()
     if not issue:
         raise HTTPException(status_code=404, detail="issue not found")
+
+    # clear the active suggested revision if the resolution method is to ignore the issue
+    if resolution == IssueResolution.IGNORE:
+        issue.active_suggested_revision = None
 
     # mark the issue as resolved and note the resolution
     issue.status = IssueStatus.RESOLVED

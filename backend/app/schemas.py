@@ -139,6 +139,7 @@ class SectionRelevanceEvaluation(ConfiguredBaseModel):
 
 class ClauseRuleEvaluation(ConfiguredBaseModel):
     violation: bool
+    relevant_text: Optional[str] = None
     explanation: Optional[str] = None
     citations: Optional[list[str]] = None
 
@@ -146,6 +147,7 @@ class ClauseRuleEvaluation(ConfiguredBaseModel):
 class EvaluatedClauseRule(ConfiguredBaseModel):
     standard_clause_rule_id: UUID
     violation: bool
+    relevant_text: Optional[str] = None
     explanation: Optional[str] = None
     citations: Optional[list[str]] = None
 
@@ -164,6 +166,7 @@ class ContractIssue(ConfiguredBaseModel):
     standard_clause: Optional[StandardClause] = None
     standard_clause_rule: Optional[StandardClauseRule] = None
     contract_id: UUID
+    relevant_text: str
     explanation: str
     citations: Optional[list[ContractSectionCitation]] = None
     status: IssueStatus

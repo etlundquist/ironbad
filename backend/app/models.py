@@ -97,6 +97,7 @@ class ContractIssue(Base):
     standard_clause_id = Column(UUID(as_uuid=True), ForeignKey(column="standard_clauses.id", ondelete="CASCADE"), nullable=False)
     standard_clause_rule_id = Column(UUID(as_uuid=True), ForeignKey(column="standard_clause_rules.id", ondelete="CASCADE"), nullable=False)
     contract_id = Column(UUID(as_uuid=True), ForeignKey(column="contracts.id", ondelete="CASCADE"), nullable=False)
+    relevant_text = Column(String, nullable=False)
     explanation = Column(String, nullable=False)
     citations = Column(JSON, nullable=True)
     status = Column(Enum(IssueStatus), nullable=False)
