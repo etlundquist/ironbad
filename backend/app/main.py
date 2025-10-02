@@ -14,7 +14,8 @@ from app.routers.contract_clauses import router as contract_clauses_router
 from app.routers.contract_sections import router as contract_sections_router
 from app.routers.contract_chat import router as contract_chat_router
 from app.routers.contract_issues import router as contract_issues_router
-from app.tasks import broker
+from app.routers.notifications import router as notifications_router
+from app.services.notifications import get_notifications_client, close_notifications_client
 
 
 logging.basicConfig(level=logging.INFO)
@@ -26,9 +27,9 @@ async def lifespan(app: FastAPI):
     await create_tables()
     await add_generated_columns()
     await load_sample_data()
-    await broker.startup()
+    await get_notifications_client()
     yield
-    await broker.shutdown()
+    await close_notifications_client()
 
 app = FastAPI(
     title="Ironbad Backend",
@@ -53,3 +54,4 @@ app.include_router(contract_clauses_router)
 app.include_router(contract_sections_router)
 app.include_router(contract_chat_router)
 app.include_router(contract_issues_router)
+app.include_router(notifications_router)

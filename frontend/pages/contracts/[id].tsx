@@ -4,6 +4,7 @@ import { useRouter } from 'next/router'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import ReactMarkdown from 'react-markdown'
+import { useNotificationContext } from '../../components/NotificationProvider'
 
 // Dynamically import react-pdf to avoid SSR issues
 const Document = dynamic(() => import('react-pdf').then(mod => mod.Document), { ssr: false })
@@ -133,6 +134,7 @@ const ContractDetailPage: NextPage = () => {
   const [activeTab, setActiveTab] = useState('metadata')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const { isConnected } = useNotificationContext()
   const [numPages, setNumPages] = useState<number | null>(null)
   const [pageNumber, setPageNumber] = useState(1)
   const [pdfLoading, setPdfLoading] = useState(false)
@@ -261,6 +263,36 @@ const ContractDetailPage: NextPage = () => {
       setContractIssues([])
     }
   }, [id, tab])
+
+  // Listen for contract status updates from notifications
+  useEffect(() => {
+    const handleContractStatusUpdate = (event: CustomEvent) => {
+      console.log('Contract detail page received contractStatusUpdate:', event.detail)
+      const { contractId, status, jobType } = event.detail
+
+      // Only handle updates for the current contract
+      if (contractId === id) {
+        console.log('Handling status update for current contract:', id)
+        // Clear the loading state for the specific job type
+        if (jobType === 'analysis') {
+          console.log('Clearing analyzing state')
+          setIsAnalyzing(false)
+        }
+
+        // Refresh contract to get updated status
+        console.log('Refreshing contract after status update')
+        fetchContract()
+      } else {
+        console.log('Ignoring status update for different contract:', contractId, 'current:', id)
+      }
+    }
+
+    window.addEventListener('contractStatusUpdate', handleContractStatusUpdate as EventListener)
+
+    return () => {
+      window.removeEventListener('contractStatusUpdate', handleContractStatusUpdate as EventListener)
+    }
+  }, [id])
 
   // Fetch clauses data when clauses tab is active
   useEffect(() => {
@@ -1203,16 +1235,16 @@ const ContractDetailPage: NextPage = () => {
       })
 
       if (response.ok) {
-        // Refresh contract data to get updated status
+        // Immediately refresh contract data to show ANALYZING status
         await fetchContract()
-        alert('Contract analysis started successfully!')
+        // Don't clear isAnalyzing here - let the notification handle it
       } else {
         const error = await response.text()
         alert(`Failed to start analysis: ${error}`)
+        setIsAnalyzing(false)
       }
     } catch (error) {
       alert(`Network error: ${error}`)
-    } finally {
       setIsAnalyzing(false)
     }
   }

@@ -21,5 +21,6 @@ dependencies = [
     "taskiq[reload]>=0.11.18",
     "taskiq-redis>=1.1.0",
     "sse-starlette>=3.0.2",
+    "redis>=4.2",
 ]
 requires-python = ">=3.11"

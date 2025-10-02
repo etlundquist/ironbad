@@ -6,14 +6,15 @@ from tempfile import NamedTemporaryFile
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from taskiq_redis import RedisAsyncResultBackend, RedisStreamBroker
+from taskiq import TaskiqEvents, TaskiqState
 
 from app.workflows.ingestion import parse_contract, extract_clauses
 from app.workflows.analysis import extract_issues
 from app.models import Contract as DBContract, ContractSection, ContractClause, StandardClause, ContractIssue
-from app.schemas import ContractIngestionJob, ContractAnalysisJob
-from app.enums import ContractStatus
+from app.schemas import ContractIngestionJob, ContractAnalysisJob, JobStatusUpdate, NotificationEvent
+from app.enums import ContractStatus, JobStatus
 from app.database import engine
-
+from app.services.notifications import NOTIFICATIONS_CHANNEL, get_notifications_client, close_notifications_client
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,15 @@ broker = RedisStreamBroker(
 ).with_result_backend(backend)
 
 
+@broker.on_event(TaskiqEvents.WORKER_STARTUP)
+async def worker_startup(state: TaskiqState):
+    await get_notifications_client()
+
+@broker.on_event(TaskiqEvents.WORKER_SHUTDOWN)
+async def worker_shutdown(state: TaskiqState):
+    await close_notifications_client()
+
+
 @broker.task()
 async def ingest_contract(job: ContractIngestionJob) -> None:
     """parse/ingest a contract and update it's status"""
@@ -40,11 +50,15 @@ async def ingest_contract(job: ContractIngestionJob) -> None:
         query = select(DBContract).where(DBContract.id == job.contract_id)
         result = await db.execute(query)
         contract = result.scalar_one()
+        contract_id = contract.id
 
         # get the up-to-date set of standard clauses to map/extract
         query = select(StandardClause)
         result = await db.execute(query)
         standard_clauses = result.scalars().all()
+
+        # get the notifications client to send job progress updates
+        notifications_client = await get_notifications_client()
 
         # log the start time for contract ingestion
         logger.info(f"*** ingesting contract: {contract.filename} ({contract.id}) ***")
@@ -90,6 +104,10 @@ async def ingest_contract(job: ContractIngestionJob) -> None:
             logger.info(f"*** contract ingestion ({contract.id}: {contract.filename}) successful! ({duration}) ***")
             await db.commit()
 
+            # send a notification that the contract ingestion was successful
+            status_update = JobStatusUpdate(contract_id=contract_id, status=JobStatus.COMPLETED, timestamp=datetime.now())
+            await notifications_client.publish(channel=NOTIFICATIONS_CHANNEL, event=NotificationEvent(event="ingestion", data=status_update))
+
         except Exception as e:
 
             # if ingestion failed then leave the contract in the current state and discard all extracted sections and clauses
@@ -103,6 +121,11 @@ async def ingest_contract(job: ContractIngestionJob) -> None:
             contract.meta = None
             await db.commit()
 
+            # send a notification that the contract ingestion failed
+            status_update = JobStatusUpdate(contract_id=contract_id, status=JobStatus.FAILED, errors=[{"step": "ingestion", "message": str(e)}], timestamp=datetime.now())
+            await notifications_client.publish(channel=NOTIFICATIONS_CHANNEL, event=NotificationEvent(event="ingestion", data=status_update))
+
+
 
 @broker.task()
 async def analyze_contract(job: ContractAnalysisJob) -> None:
@@ -114,11 +137,15 @@ async def analyze_contract(job: ContractAnalysisJob) -> None:
         query = select(DBContract).where(DBContract.id == job.contract_id)
         result = await db.execute(query)
         contract = result.scalar_one()
+        contract_id = contract.id
 
         # get the up-to-date set of standard clauses to evaluate
         query = select(StandardClause)
         result = await db.execute(query)
         standard_clauses = result.scalars().all()
+
+        # get the notifications client to send job progress updates
+        notifications_client = await get_notifications_client()
 
         # log the start time for issue identification
         logger.info(f"*** analyzing contract: {contract.filename} ({contract.id}) ***")
@@ -136,6 +163,10 @@ async def analyze_contract(job: ContractAnalysisJob) -> None:
             logger.info(f"*** contract analysis ({contract.id}: {contract.filename}) successful! ({duration}) ***")
             await db.commit()
 
+            # send a notification that the contract analysis was successful
+            status_update = JobStatusUpdate(contract_id=contract_id, status=JobStatus.COMPLETED, timestamp=datetime.now())
+            await notifications_client.publish(channel=NOTIFICATIONS_CHANNEL, event=NotificationEvent(event="analysis", data=status_update))
+
         except Exception as e:
 
             # if issue identification failed then leave the contract in the current state and discard all extracted issues
@@ -145,3 +176,7 @@ async def analyze_contract(job: ContractAnalysisJob) -> None:
             # record the error and discard any extracted issues
             contract.errors = [{"step": "analysis", "message": str(e)}]
             await db.commit()
+
+            # send a notification that the contract analysis failed
+            status_update = JobStatusUpdate(contract_id=contract_id, status=JobStatus.FAILED, errors=[{"step": "analysis", "message": str(e)}], timestamp=datetime.now())
+            await notifications_client.publish(channel=NOTIFICATIONS_CHANNEL, event=NotificationEvent(event="analysis", data=status_update))

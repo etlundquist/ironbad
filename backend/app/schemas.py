@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Literal, Optional, Union
+from typing import Literal, Optional, TypedDict, Union
 from uuid import UUID
 from datetime import datetime
 
@@ -236,3 +236,13 @@ class ChatMessageEvent(ConfiguredBaseModel):
     event: Literal["init", "user_message", "assistant_message", "message_status_update", "message_token_delta"]
     data: Union[ChatMessage, ChatMessageStatusUpdate, ChatMessageTokenDelta, ChatInitEventData]
 
+
+class JobStatusUpdate(ConfiguredBaseModel):
+    contract_id: UUID
+    status: JobStatus
+    errors: Optional[list[dict]] = None
+    timestamp: datetime
+
+class NotificationEvent(ConfiguredBaseModel):
+    event: Literal["ingestion", "analysis"]
+    data: Union[JobStatusUpdate]

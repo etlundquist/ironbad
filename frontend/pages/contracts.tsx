@@ -1,6 +1,7 @@
 import { NextPage } from 'next'
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useNotificationContext } from '../components/NotificationProvider'
 
 interface Contract {
   id: string
@@ -17,9 +18,37 @@ const ContractsPage: NextPage = () => {
   const [error, setError] = useState<string | null>(null)
   const [analyzingContract, setAnalyzingContract] = useState<string | null>(null)
   const [ingestingContract, setIngestingContract] = useState<string | null>(null)
+  const { isConnected } = useNotificationContext()
 
   useEffect(() => {
     fetchContracts()
+  }, [])
+
+  // Listen for contract status updates from notifications
+  useEffect(() => {
+    const handleContractStatusUpdate = (event: CustomEvent) => {
+      console.log('Contracts page received contractStatusUpdate:', event.detail)
+      const { contractId, status, jobType } = event.detail
+
+      // Clear the loading state for the specific contract
+      if (jobType === 'ingestion') {
+        console.log('Clearing ingesting state for contract:', contractId)
+        setIngestingContract(null)
+      } else if (jobType === 'analysis') {
+        console.log('Clearing analyzing state for contract:', contractId)
+        setAnalyzingContract(null)
+      }
+
+      // Refresh contracts to get updated status
+      console.log('Refreshing contracts after status update')
+      fetchContracts()
+    }
+
+    window.addEventListener('contractStatusUpdate', handleContractStatusUpdate as EventListener)
+
+    return () => {
+      window.removeEventListener('contractStatusUpdate', handleContractStatusUpdate as EventListener)
+    }
   }, [])
 
   const fetchContracts = async () => {
@@ -54,16 +83,16 @@ const ContractsPage: NextPage = () => {
       })
 
       if (response.ok) {
-        // Refresh contracts to get updated status
+        // Immediately refresh contracts to show INGESTING status
         await fetchContracts()
-        alert('Contract ingestion started successfully!')
+        // Don't clear ingestingContract here - let the notification handle it
       } else {
         const error = await response.text()
         alert(`Failed to start ingestion: ${error}`)
+        setIngestingContract(null)
       }
     } catch (error) {
       alert(`Network error: ${error}`)
-    } finally {
       setIngestingContract(null)
     }
   }
@@ -81,16 +110,16 @@ const ContractsPage: NextPage = () => {
       })
 
       if (response.ok) {
-        // Refresh contracts to get updated status
+        // Immediately refresh contracts to show ANALYZING status
         await fetchContracts()
-        alert('Contract analysis started successfully!')
+        // Don't clear analyzingContract here - let the notification handle it
       } else {
         const error = await response.text()
         alert(`Failed to start analysis: ${error}`)
+        setAnalyzingContract(null)
       }
     } catch (error) {
       alert(`Network error: ${error}`)
-    } finally {
       setAnalyzingContract(null)
     }
   }
@@ -318,7 +347,30 @@ const ContractsPage: NextPage = () => {
   return (
     <div className="page-container">
       <main className="main-content">
-      <div className="contracts-table-container">
+        <div className="connection-status" style={{
+          padding: '0.5rem 1rem',
+          backgroundColor: isConnected ? '#d1fae5' : '#fef3c7',
+          color: isConnected ? '#065f46' : '#92400e',
+          borderRadius: '6px',
+          marginBottom: '1rem',
+          fontSize: '0.875rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}>
+          {isConnected ? (
+            <>
+              <div style={{ width: '8px', height: '8px', backgroundColor: '#10b981', borderRadius: '50%' }}></div>
+              Connected to notifications
+            </>
+          ) : (
+            <>
+              <div className="spinner small"></div>
+              Connecting to notifications...
+            </>
+          )}
+        </div>
+        <div className="contracts-table-container">
         <table className="contracts-table">
           <thead>
             <tr>
