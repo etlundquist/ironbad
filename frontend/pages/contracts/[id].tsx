@@ -277,6 +277,9 @@ const ContractDetailPage: NextPage = () => {
         if (jobType === 'analysis') {
           console.log('Clearing analyzing state')
           setIsAnalyzing(false)
+          // Reset issues fetch flag so issues will be refetched
+          setIssuesFetched(false)
+          setContractIssues([])
         }
 
         // Refresh contract to get updated status
