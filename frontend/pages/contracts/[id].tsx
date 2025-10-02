@@ -800,7 +800,7 @@ const ContractDetailPage: NextPage = () => {
             )}
           </button>
         )
-      case 'Processing':
+      case 'Ingesting':
         return (
           <div className="cta-banner processing">
             <div className="spinner small"></div>
@@ -836,7 +836,7 @@ const ContractDetailPage: NextPage = () => {
           </button>
         )
       case 'Uploaded':
-      case 'Processing':
+      case 'Ingesting':
         return (
           <div className="cta-banner info">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -2004,6 +2004,14 @@ const ContractDetailPage: NextPage = () => {
                                 {getAnalyzeCTA()}
                               </div>
                             </>
+                          ) : contract?.status === 'Analyzing' ? (
+                            <>
+                              <div className="no-issues-icon">
+                                <div className="spinner large"></div>
+                              </div>
+                              <h4>Analyzing Contract</h4>
+                              <p>Please wait while we analyze the contract for potential issues...</p>
+                            </>
                           ) : (
                             <>
                               <div className="no-issues-icon">
@@ -2076,12 +2084,12 @@ const ContractDetailPage: NextPage = () => {
                                 sendChatMessage()
                               }
                             }}
-                            disabled={isSendingMessage || contract.status === 'Uploaded' || contract.status === 'Processing'}
+                            disabled={isSendingMessage || contract.status === 'Uploaded' || contract.status === 'Ingesting'}
                           />
                           <button
                             className="cta-button primary"
                             onClick={sendChatMessage}
-                            disabled={isSendingMessage || !chatInput.trim() || contract.status === 'Uploaded' || contract.status === 'Processing'}
+                            disabled={isSendingMessage || !chatInput.trim() || contract.status === 'Uploaded' || contract.status === 'Ingesting'}
                           >
                             {isSendingMessage ? (
                               <>

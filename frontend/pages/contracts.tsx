@@ -125,7 +125,7 @@ const ContractsPage: NextPage = () => {
           </button>
         )
 
-      case 'Processing':
+      case 'Ingesting':
         return (
           <div
             className="action-link"
@@ -143,6 +143,27 @@ const ContractsPage: NextPage = () => {
           >
             <div className="spinner small"></div>
             Ingesting Contract
+          </div>
+        )
+
+      case 'Analyzing':
+        return (
+          <div
+            className="action-link"
+            style={{
+              background: '#f3f4f6',
+              color: '#6b7280',
+              padding: '0.375rem 0.75rem',
+              borderRadius: '6px',
+              fontWeight: '500',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              cursor: 'not-allowed'
+            }}
+          >
+            <div className="spinner small"></div>
+            Analyzing Contract
           </div>
         )
 
@@ -244,7 +265,8 @@ const ContractsPage: NextPage = () => {
   const getStatusBadge = (status: string) => {
     const statusClasses = {
       'Uploaded': 'status-uploaded',
-      'Processing': 'status-processing',
+      'Ingesting': 'status-ingesting',
+      'Analyzing': 'status-analyzing',
       'Ready for Review': 'status-ready',
       'Under Review': 'status-review',
       'Review Completed': 'status-completed'

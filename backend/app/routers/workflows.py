@@ -23,17 +23,17 @@ async def ingest_contracts(contract_ids: List[UUID], db: AsyncSession = Depends(
     """parse the raw contract file into a markdown string and set of structured section objects"""
 
     # fetch the set of contracts to ingest and ensure none of them are currently being ingested
-    query = select(DBContract).where(DBContract.id.in_(contract_ids), DBContract.status.not_in([ContractStatus.PROCESSING]))
+    query = select(DBContract).where(DBContract.id.in_(contract_ids), DBContract.status.not_in([ContractStatus.INGESTING]))
     result = await db.execute(query)
     contracts = result.scalars().all()
     if len(contracts) != len(contract_ids):
         logger.error("one or more requested contracts cannot be ingested", exc_info=True)
         raise HTTPException(status_code=400, detail="one or more requested contracts cannot be ingested")
 
-    # update contract status to processing to prevent duplicate runs and queue each contract for ingestion
+    # update contract status to ingesting to prevent duplicate runs and queue each contract for ingestion
     for contract in contracts:
         try:
-            contract.status = ContractStatus.PROCESSING
+            contract.status = ContractStatus.INGESTING
             ingestion_job = ContractIngestionJob(contract_id=contract.id, status=JobStatus.QUEUED)
             await ingest_contract.kiq(ingestion_job)
         except Exception:
@@ -57,9 +57,10 @@ async def analyze_contracts(contract_ids: List[UUID], db: AsyncSession = Depends
         logger.error("one or more requested contracts cannot be analyzed", exc_info=True)
         raise HTTPException(status_code=400, detail="one or more requested contracts cannot be analyzed")
 
-    # trigger an analysis job for each contract in the request
+    # update contract status to analyzing to prevent duplicate runs and queue each contract for analysis
     for contract in contracts:
         try:
+            contract.status = ContractStatus.ANALYZING
             analysis_job = ContractAnalysisJob(contract_id=contract.id, status=JobStatus.QUEUED)
             await analyze_contract.kiq(analysis_job)
         except Exception:

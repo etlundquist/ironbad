@@ -449,9 +449,14 @@ main {
   color: #92400e;
 }
 
-.status-processing {
+.status-ingesting {
   background-color: #dbeafe;
   color: #1e40af;
+}
+
+.status-analyzing {
+  background-color: #fef3c7;
+  color: #92400e;
 }
 
 .status-ready {

@@ -2,8 +2,9 @@ from enum import Enum
 
 class ContractStatus(Enum):
     UPLOADED = "Uploaded"
-    PROCESSING = "Processing"
+    INGESTING = "Ingesting"
     READY_FOR_REVIEW = "Ready for Review"
+    ANALYZING = "Analyzing"
     UNDER_REVIEW = "Under Review"
     REVIEW_COMPLETED = "Review Completed"
 
