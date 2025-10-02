@@ -26,7 +26,7 @@ class ParsedContractSection(ConfiguredBaseModel):
     number: str
     name: Optional[str] = None
     markdown: str
-    embedding: Optional[list[float]] = None
+    embedding: Optional[list[float]] = Field(default=None, exclude=True)
     beg_page: Optional[int] = None
     end_page: Optional[int] = None
 
@@ -64,28 +64,6 @@ class ContractAnalysisJob(ConfiguredBaseModel):
     updated_at: datetime = Field(default_factory=datetime.now)
 
 
-class StandardClause(ConfiguredBaseModel):
-    id: UUID
-    name: str
-    display_name: str
-    description: str
-    standard_text: str
-    embedding: Optional[list[float]] = Field(default=None, exclude=True)
-    created_at: datetime
-    updated_at: datetime
-
-class StandardClauseCreate(ConfiguredBaseModel):
-    name: str
-    display_name: str
-    description: str
-    standard_text: str
-
-class StandardClauseUpdate(ConfiguredBaseModel):
-    display_name: Optional[str] = None
-    description: Optional[str] = None
-    standard_text: Optional[str] = None
-
-
 class StandardClauseRule(ConfiguredBaseModel):
     id: UUID
     standard_clause_id: UUID
@@ -106,6 +84,38 @@ class StandardClauseRuleUpdate(ConfiguredBaseModel):
     text: Optional[str] = None
 
 
+class StandardClause(ConfiguredBaseModel):
+    id: UUID
+    name: str
+    display_name: str
+    description: str
+    standard_text: str
+    embedding: Optional[list[float]] = Field(default=None, exclude=True)
+    rules: Optional[list[StandardClauseRule]] = None
+    created_at: datetime
+    updated_at: datetime
+
+class StandardClauseFlat(ConfiguredBaseModel):
+    id: UUID
+    name: str
+    display_name: str
+    description: str
+    standard_text: str
+    created_at: datetime
+    updated_at: datetime
+
+class StandardClauseCreate(ConfiguredBaseModel):
+    name: str
+    display_name: str
+    description: str
+    standard_text: str
+
+class StandardClauseUpdate(ConfiguredBaseModel):
+    display_name: Optional[str] = None
+    description: Optional[str] = None
+    standard_text: Optional[str] = None
+
+
 class ContractSection(ConfiguredBaseModel):
     id: UUID
     contract_id: UUID
@@ -123,7 +133,7 @@ class ContractSection(ConfiguredBaseModel):
 class ContractClause(ConfiguredBaseModel):
     id: UUID
     standard_clause_id: UUID
-    standard_clause: Optional[StandardClause] = None
+    standard_clause: Optional[StandardClauseFlat] = None
     contract_id: UUID
     contract_sections: list[UUID]
     raw_markdown: str
@@ -163,7 +173,7 @@ class ContractIssue(ConfiguredBaseModel):
     id: UUID
     standard_clause_id: UUID
     standard_clause_rule_id: UUID
-    standard_clause: Optional[StandardClause] = None
+    standard_clause: Optional[StandardClauseFlat] = None
     standard_clause_rule: Optional[StandardClauseRule] = None
     contract_id: UUID
     relevant_text: str

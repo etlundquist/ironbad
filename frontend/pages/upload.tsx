@@ -144,16 +144,12 @@ const UploadPage: NextPage = () => {
   const hasSuccessfulUploads = uploadedContracts.some((c: UploadedContract) => c.status === 'success')
 
   return (
-    <div className="upload-container">
-      <div className="upload-header">
-        <h1>Upload Contracts</h1>
-        <p>Upload PDF or DOCX contracts to begin the analysis process</p>
-        <div className="header-actions">
-          <Link href="/contracts" className="view-contracts-link">
-            View All Contracts →
-          </Link>
+    <div className="page-container">
+      <main className="main-content">
+        <div className="upload-header">
+          <h1>Upload Contracts</h1>
+          <p>Upload PDF or DOCX contracts to begin the analysis process</p>
         </div>
-      </div>
 
       <div
         className={`upload-zone ${isDragOver ? 'drag-over' : ''}`}
@@ -234,6 +230,7 @@ const UploadPage: NextPage = () => {
           </button>
         </div>
       )}
+      </main>
     </div>
   )
 }

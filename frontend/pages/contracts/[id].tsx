@@ -170,6 +170,7 @@ const ContractDetailPage: NextPage = () => {
   // Issues data state
   const [contractIssues, setContractIssues] = useState<ContractIssue[]>([])
   const [issuesLoading, setIssuesLoading] = useState(false)
+  const [issuesFetched, setIssuesFetched] = useState(false)
   const [expandedIssueClause, setExpandedIssueClause] = useState<string | null>(null)
   const [expandedIssueId, setExpandedIssueId] = useState<string | null>(null)
   const [revisionDrafts, setRevisionDrafts] = useState<Record<string, string>>({})
@@ -255,22 +256,25 @@ const ContractDetailPage: NextPage = () => {
     }
     if (id) {
       fetchContract()
+      // Reset fetch flags when contract changes
+      setIssuesFetched(false)
+      setContractIssues([])
     }
   }, [id, tab])
 
   // Fetch clauses data when clauses tab is active
   useEffect(() => {
-    if (activeTab === 'clauses' && id && standardClauses.length === 0) {
+    if (activeTab === 'clauses' && id && !clausesLoading && standardClauses.length === 0) {
       fetchClausesData()
     }
-  }, [activeTab, id, standardClauses.length])
+  }, [activeTab, id, clausesLoading, standardClauses.length])
 
   // Fetch issues data when issues tab is active or when clauses tab is active (for counts)
   useEffect(() => {
-    if ((activeTab === 'issues' || activeTab === 'clauses') && id && contractIssues.length === 0) {
+    if ((activeTab === 'issues' || activeTab === 'clauses') && id && !issuesLoading && !issuesFetched) {
       fetchIssuesData()
     }
-  }, [activeTab, id, contractIssues.length])
+  }, [activeTab, id, issuesLoading, issuesFetched])
 
   // Fetch chat current thread and messages when chat tab becomes active
   useEffect(() => {
@@ -399,11 +403,14 @@ const ContractDetailPage: NextPage = () => {
       if (response.ok) {
         const issuesData = await response.json()
         setContractIssues(issuesData)
+        setIssuesFetched(true)
       } else {
         console.error('Failed to fetch issues data')
+        setIssuesFetched(true) // Mark as fetched even on error to prevent retries
       }
     } catch (err) {
       console.error('Error fetching issues data:', err)
+      setIssuesFetched(true) // Mark as fetched even on error to prevent retries
     } finally {
       setIssuesLoading(false)
     }
@@ -656,7 +663,7 @@ const ContractDetailPage: NextPage = () => {
     setIsSaving(true)
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
-      const response = await fetch(`${backendUrl}/contracts/${contract.id}`, {
+      const response = await fetch(`${backendUrl}/contracts/${contract.id}/metadata`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'

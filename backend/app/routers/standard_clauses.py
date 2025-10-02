@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models import StandardClause as DBStandardClause
 from app.schemas import StandardClause, StandardClauseCreate, StandardClauseUpdate
@@ -46,7 +47,7 @@ async def get_standard_clauses(db: AsyncSession = Depends(get_db)) -> list[Stand
     """fetch all standard clauses from the database"""
 
     try:
-        query = select(DBStandardClause)
+        query = select(DBStandardClause).options(selectinload(DBStandardClause.rules))
         result = await db.execute(query)
         standard_clauses = result.scalars().all()
         return [StandardClause.model_validate(clause) for clause in standard_clauses]
@@ -60,7 +61,7 @@ async def get_standard_clause(clause_id: UUID, db: AsyncSession = Depends(get_db
     """fetch a single standard clause by ID"""
 
     try:
-        query = select(DBStandardClause).where(DBStandardClause.id == clause_id)
+        query = select(DBStandardClause).where(DBStandardClause.id == clause_id).options(selectinload(DBStandardClause.rules))
         result = await db.execute(query)
         standard_clause = result.scalar_one_or_none()
         if not standard_clause:
@@ -78,7 +79,7 @@ async def update_standard_clause(clause_id: UUID, request: StandardClauseUpdate,
     """update a specific standard clause by ID"""
 
     try:
-        query = select(DBStandardClause).where(DBStandardClause.id == clause_id)
+        query = select(DBStandardClause).where(DBStandardClause.id == clause_id).options(selectinload(DBStandardClause.rules))
         result = await db.execute(query)
         standard_clause = result.scalar_one_or_none()
         if not standard_clause:
