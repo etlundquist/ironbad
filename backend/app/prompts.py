@@ -1,23 +1,70 @@
-PROMPT_CLEAN_MARKDOWN = """
-You are presented with markdown text parsed from a single page of a PDF legal contract.
-You task is to clean the parsed markdown text to prepare the document for further processing.
-Clean the markdown text by applying the following rules:
+PROMPT_ADD_ANCHORS = """
+You are an expert legal analyst tasked with adding node anchors to identify relevant elements in a contract text.
+We will use these anchors to parse the contract into a tree of structured nodes for downstream analysis.
+You will be provided with a single page of markdown-formatted contract text.
+Add anchors to the markdown text as HTML comments following the instructions and output format provided below.
 
-- convert all sections to the following format: "## <section_number> <section_name>\n<section_text>"
-    - <section_number> is the section number exactly as it appears in the contract text
-    - <section_name> is the section name (if present) following the section number on the same line
-    - <section_text> is the section body text following the section number/name until the next section number/name
-    - the section number may be alphanumeric and/or hierarchical (e.g. "1.1", "2.3.4", "A.1", "B.2.3")
-    - some sections do not have section names - in these cases omit the <section_name> from the output
-    - all section numbers must be appear on a separate line with "##" markdown headers
-    - the section text must be output on subsequent lines following the section number/name
-- convert all exhibit, schedule, attachment, etc. appendix headers to the following format: "## <appendix_type> <appendix_number> <appendix_name>"
-    - <appendix_type> is the type of the appendix header (e.g. "EXHIBIT", "SCHEDULE", "ATTACHMENT", etc.) exactly as it appears in the contract text
-    - <appendix_number> is the number of the appendix header exactly as it appears in the contract text
-    - <appendix_name> is the name of the appendix header exactly as it appears following the appendix number on the same line
-    - every appendix header should have a <appendix_type> and <appendix_number> but not all headers have a <appendix_name>
-    - any appendix text that appears after the appendix type/number/name on the same line should be moved to the next line
-- only lines with section headers should have "##" markdown headers - all other lines should be regular text
+# Instructions
+
+- add anchors as HTML comments on a separate line directly above the start of each relevant element in the contract text
+- use the element descriptions provided below and your knowledge of legal contracts to identify elements - do not rely on markdown formatting in the raw contract text
+- only add anchors for the relevant element types described below
+- only add anchors to mark the start of relevant elements - do not add anchors to elements which are continued from the previous page
+- elements can contain other elements (e.g. a section can contain a sub-section) - add anchors at the start of each nested element
+- each anchor should include the element type and the type-specific anchor attributes as described below
+- output the original contract text verbatim with anchors added as HTML comments above the start of each relevant element
+
+# Relevant Element Types
+
+## Table of Contents
+### Description
+- a table of contents is any list of sections or appendices
+- a table of contents will typically contain a list of section numbers/names or appendix numbers/names and may provide corresponding page numbers
+- an appendix list should also be considered a table of contents element
+### Anchor Format and Attributes
+- anchor format: <!-- type="toc" -->
+- anchor attributes: type (required)
+
+## Definitions
+### Description
+- a definitions element is a block of text that defines specific terms to be referenced throughout the contract
+- a definitions element usually contains a list of terms along with the associated definitions and may be numbered or unnumbered
+- a defined term may or may not be numbered within the definitions element but does not represent a new section
+- definitions elements and defined terms should not be annotated as new regular sections
+### Anchor Format and Attributes
+- anchor format: <!-- type="definitions" number="1" name="Definitions" -->
+- anchor attributes: type (required), number (optional), name (optional)
+
+## Section
+### Description
+- sections are numbered blocks of contract text
+- sections may appear in the main contract body or within appendices
+- sections always begin with the section number which may contain a mix of numbers, letters, and/or roman numerals
+- section numbers may be hierarchical (e.g. "1.1", "2.3.4", "A.1", "B.2.3") and sections may be nested within other sections
+- only add section anchors above the start of a new section - do not add anchors to sections that are continued from the previous page and therefore don't start with a section number
+- some sections have a section name immediately following the section number on the same line (e.g. "1.1 Termination") whereas other sections do not have a section name
+- do not invent or summarize section names - only extract a section name if it is explicitly provided in the contract text and do not use the section text as the section name
+- do not create new sections for term definitions that exist within a definitions element
+### Anchor Format and Attributes
+- anchor format: <!-- type="section" number="1.2" name="Termination" -->
+- anchor attributes: type (required), number (required), name (optional)
+
+## Appendix
+### Description
+- appendices are additional blocks of content that follow the main contract body
+- appendices may be called "exhibits", "schedules", "attachments", etc.
+- appendices always begin with the appendix type and number/letter (e.g. "EXHIBIT A", "SCHEDULE 1")
+- an appendix list item within a larger appendix list should not be considered a new appendix element
+### Anchor Format and Attributes
+- anchor format: <!-- type="appendix" number="A" name="Exhibit A" -->
+- anchor attributes: type (required), number (required), name (required)
+
+# Step-by-Step Process
+
+1. determine whether the contract text contains the start of one or more relevant elements (as defined above)
+2. identify the start of each relevant element in the contract text (if any)
+3. determine the appropriate anchor format and attributes for each identified element
+4. output the original contract text verbatim with the anchors added as HTML comments above the start of each relevant element
 """.strip()
 
 
