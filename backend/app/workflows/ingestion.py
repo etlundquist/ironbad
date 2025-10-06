@@ -2,6 +2,7 @@ import os
 import re
 import logging
 import asyncio
+from typing import Optional
 
 from uuid import UUID
 
@@ -12,10 +13,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Contract, StandardClause, ContractSection, ContractClause
-from app.schemas import ContractMetadata, ParsedContract, ParsedContractSection, SectionRelevanceEvaluation
+from app.schemas import ContractMetadata, ContractSectionNode, ParsedContract, ParsedContractSection, SectionRelevanceEvaluation
 from app.enums import ContractSectionType
-from app.prompts import PROMPT_METADATA_EXTRACTION, PROMPT_SECTION_RELEVANCE, PROMPT_CLAUSE_SUMMARY
+from app.prompts import PROMPT_IDENTIFY_FIRST_NUMBERED_SECTION, PROMPT_METADATA_EXTRACTION, PROMPT_SECTION_RELEVANCE, PROMPT_CLAUSE_SUMMARY
 from app.embeddings import get_section_embeddings
+from app.utils import string_truncate
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -66,6 +68,26 @@ async def parse_contract_markdown(path: str) -> str:
 # STRUCTURED SECTION EXTRACTION #
 #################################
 
+async def identify_first_section_line(contract_markdown: str) -> str:
+    """identify the first numbered section in the contract text to determine the start of the main body"""
+
+    openai = AsyncOpenAI()
+    truncated_markdown = string_truncate(contract_markdown, max_tokens=4096)
+
+    response: Response = await openai.responses.create(
+        model="gpt-4.1-mini",
+        instructions=PROMPT_IDENTIFY_FIRST_NUMBERED_SECTION,
+        input=truncated_markdown,
+        temperature=0.0,
+        timeout=60
+    )
+    first_section_line = re.sub(r"^\s*[-#]*\s*", "", response.output_text).strip()
+    # NOTE: normalize lines by removing leading whitespace and markdown header/list markers
+
+    logger.info(f"first_section_line: {first_section_line}")
+    return first_section_line
+
+
 def split_contract_lines(contract_markdown: str) -> list[str]:
     """split the cleaned contract markdown text into individual lines for further processing"""
 
@@ -77,7 +99,7 @@ def split_contract_lines(contract_markdown: str) -> list[str]:
     return contract_lines
 
 
-def parse_leaf_sections(contract_lines: list[str], line_separator: str = " ") -> list[ParsedContractSection]:
+def parse_leaf_sections(contract_lines: list[str], first_section_line: str, line_separator: str = " ") -> list[ParsedContractSection]:
     """parse the contract lines into lowest-level (leaf) section objects"""
 
     # initialize the list of leaf sections to parse and the running current page to keep track of section page boundaries
@@ -88,56 +110,74 @@ def parse_leaf_sections(contract_lines: list[str], line_separator: str = " ") ->
     current_section = ParsedContractSection(type=ContractSectionType.PREAMBLE, level=1, number="0", name="PREAMBLE", markdown="", beg_page=current_page, end_page=current_page)
     current_section_lines = []
     current_section_prefix = ""
+    preamble = True
 
     # define regular expressions to match new body/appendix sections and extract section numbers/names with capture groups
-    body_regex = re.compile(r"^(?:ARTICLE|SECTION)?\s*(\d+(\.\d+)*)(?:\.)?(?:\s+(.+))?$", re.IGNORECASE)
-    appendix_regex = re.compile(r"^(ATTACHMENT|EXHIBIT|SCHEDULE)\s+(\w+)(?:\s+(.+))?$", re.IGNORECASE)
+    body_regex = re.compile(r"^(?:ARTICLE|SECTION)?\s*(\d+(\.\d+)*[A-Za-z]?)(?:\.|:)?(?:\s+(.+))?$", re.IGNORECASE)
+    appendix_regex = re.compile(r"^(APPENDIX|ATTACHMENT|EXHIBIT|SCHEDULE)\s+(\w+)(?:\s+(.+))?$", re.IGNORECASE)
     page_break_text = "<!-- pagebreak -->"
 
     for line in contract_lines:
-        if appendix_match := appendix_regex.match(line):
-            # close the current section: join all lines and update the ending page number
+
+        # begin to parse the main body + appendices after the first section line
+        if preamble and line == first_section_line:
+            logger.info("detected first section line - closing preamble section and parsing numbered body/appendix sections")
+            preamble = False
+
+        # close the current section and start a new appendix section
+        if (appendix_match := appendix_regex.match(line)) and not preamble:
             current_section.markdown = line_separator.join(current_section_lines).strip()
             current_section.end_page = current_page
             leaf_sections.append(current_section)
-            # start a new appendix section: prefix the section number with the first letter of the appendix type to disambiguate from body sections
             appendix_section_type = appendix_match.group(1).lower()
             current_section_prefix = appendix_section_type[0].upper() + appendix_match.group(2)
             section_number = current_section_prefix
             section_name = appendix_match.group(3) or ""
             current_section = ParsedContractSection(type=ContractSectionType.APPENDIX, level=1, number=section_number, name=section_name, markdown="", beg_page=current_page, end_page=current_page)
             current_section_lines = [line]
-        elif body_match := body_regex.match(line):
-            # close the current section: join all lines and update the ending page number
+
+        # close the current section and start a new body section
+        elif (body_match := body_regex.match(line)) and not preamble:
             current_section.markdown = line_separator.join(current_section_lines).strip()
             current_section.end_page = current_page
             leaf_sections.append(current_section)
-            # determine the new section type based on the current section prefix (only appendix sections have a prefix)
             if current_section_prefix and current_section_prefix[0] in ["A", "E", "S"]:
                 section_type = ContractSectionType.APPENDIX
             else:
                 section_type = ContractSectionType.BODY
-            # initialize a new section: the current section prefix is used to disambiguate between body and appendix sections
             section_number = current_section_prefix + "." + body_match.group(1) if current_section_prefix else body_match.group(1)
             section_level = section_number.count(".") + 1
             section_name = body_match.group(3) or ""
             current_section = ParsedContractSection(type=section_type, level=section_level, number=section_number, name=section_name, markdown="", beg_page=current_page, end_page=current_page)
             current_section_lines = [line]
+
+        # increment the current page number and then discard the page brake placeholder line
         elif line.strip() == page_break_text:
-            # increment the current page number and then discard the page brake placeholder line
             current_page += 1
+
+        # append all regular text lines to the current section
         else:
-            # add the line to the current section if the line is not the start of a new section or a page break placeholder
             current_section_lines.append(line)
 
-    # close the final section and return the full list of leaf sections
+    # close the final section after parsing all lines
     current_section.markdown = line_separator.join(current_section_lines).strip()
     current_section.end_page = current_page
     leaf_sections.append(current_section)
-    return leaf_sections
+
+    # discard duplicate section numbers - these are usually the result of parsing errors
+    unique_section_numbers, unique_leaf_sections = set(), []
+    for section in leaf_sections:
+        if section.number in unique_section_numbers:
+            continue
+        else:
+            unique_section_numbers.add(section.number)
+            unique_leaf_sections.append(section)
+
+    # return the full list of unique leaf sections
+    return unique_leaf_sections
 
 
-def combine_leaf_sections(leaf_sections: list[ParsedContractSection], target_level: int = 1, line_separator: str = "\n") -> list[ParsedContractSection]:
+def get_section_list(leaf_sections: list[ParsedContractSection], target_level: int = 1, line_separator: str = "\n") -> list[ParsedContractSection]:
     """combine leaf sections at the desired section level by joining all sub-sections until the next sibling/parent section"""
 
     # initialize the list of combined sections to parse
@@ -176,6 +216,57 @@ def combine_leaf_sections(leaf_sections: list[ParsedContractSection], target_lev
     return merged_sections
 
 
+def get_section_tree(leaf_sections: list[ParsedContractSection]) -> ContractSectionNode:
+    """parse the leaf sections into a hierarchical tree of parent/child section nodes"""
+
+    # convert all parsed sections to ContractSectionNode objects
+    nodes_by_number = {
+        section.number: ContractSectionNode(
+            id=section.number,
+            type=section.type,
+            level=section.level,
+            number=section.number,
+            name=section.name,
+            markdown=section.markdown,
+            parent_id=None,
+            children=[]
+        )
+        for section in leaf_sections
+    }
+
+    # build parent-child relationships for all non-top-level sections
+    for section in leaf_sections:
+        node = nodes_by_number[section.number]
+        if section.level == 1:
+            parent_number = None
+        else:
+            parent_number = ".".join(section.number.split(".")[:-1])
+        if parent_number and parent_number in nodes_by_number:
+            parent_node = nodes_by_number[parent_number]
+            node.parent_id = parent_number
+            parent_node.children.append(node)
+
+    # create the root node (level=0) of the contract
+    root_node = ContractSectionNode(
+        id="root",
+        type=ContractSectionType.ROOT,
+        level=0,
+        number="",
+        name="Contract",
+        markdown="",
+        parent_id=None,
+    )
+
+    # add the top-level sections as children of the root node
+    top_level_nodes = [node for node in nodes_by_number.values() if node.level == 1]
+    for node in top_level_nodes:
+        node.parent_id = "root"
+        root_node.children.append(node)
+
+    # return the root node with all parent-child relationships represented
+    return root_node
+
+
 async def add_section_embeddings(sections: list[ParsedContractSection]) -> list[ParsedContractSection]:
     """add embedding vectors to the structured contract sections"""
 
@@ -188,25 +279,25 @@ async def add_section_embeddings(sections: list[ParsedContractSection]) -> list[
     return sections
 
 
-async def parse_contract_sections(contract_markdown: str) -> list[ParsedContractSection]:
+async def parse_contract_sections(contract_markdown: str) -> tuple[list[ParsedContractSection], ContractSectionNode]:
     """parse the contract markdown text into structured section objects at multiple levels of granularity"""
 
     # parse the contract into lowest-level atomic (leaf) sections
     contract_lines = split_contract_lines(contract_markdown)
-    leaf_sections = parse_leaf_sections(contract_lines)
+    first_section_line = await identify_first_section_line(contract_markdown)
+    leaf_sections = parse_leaf_sections(contract_lines, first_section_line)
 
-    # combine leaf sections at the desired level to form higher-level sections
+    # parse the leaf sections into a flat list of sections at all levels of granularity
     max_level = max(section.level for section in leaf_sections)
-    combined_sections = [combine_leaf_sections(leaf_sections, level) for level in range(1, max_level + 1)]
+    section_lists = [get_section_list(leaf_sections, level) for level in range(1, max_level + 1)]
+    flat_section_list = [section for level_sections in section_lists for section in level_sections]
+    embedded_flat_section_list = await add_section_embeddings(sections=flat_section_list)
 
-    # flatten the list of combined sections into a single list of sections at all levels of granularity
-    flattened_sections = [section for level_sections in combined_sections for section in level_sections]
-
-    # add embedding vectors to the structured contract sections
-    embedded_sections = await add_section_embeddings(sections=flattened_sections)
+    # parse the leaf sections into a hierarchical tree of parent/child section nodes
+    section_tree = get_section_tree(leaf_sections)
 
     # return the parsed and embedded structured contract sections
-    return embedded_sections
+    return embedded_flat_section_list, section_tree
 
 
 # ##############################
@@ -327,7 +418,7 @@ async def parse_contract(path: str) -> ParsedContract:
     contract_markdown = await parse_contract_markdown(path)
 
     logger.info("parsing contract sections as structured objects...")
-    contract_sections = await parse_contract_sections(contract_markdown)
+    section_list, section_tree = await parse_contract_sections(contract_markdown)
 
     logger.info("extracting contract metadata...")
     contract_metadata = await extract_contract_metadata(contract_markdown)
@@ -336,7 +427,8 @@ async def parse_contract(path: str) -> ParsedContract:
         filename=os.path.basename(path),
         markdown=contract_markdown,
         metadata=contract_metadata,
-        sections=contract_sections
+        section_list=section_list,
+        section_tree=section_tree,
     )
     return contract
 
@@ -368,7 +460,7 @@ async def main():
     args = parser.parse_args()
 
     parsed_contract = await parse_contract(args.contract_path)
-    for section in parsed_contract.sections:
+    for section in parsed_contract.section_list:
         section.embedding = None
 
     output_folder = "../sample_output"

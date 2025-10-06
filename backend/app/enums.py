@@ -14,6 +14,7 @@ class FileType(Enum):
     DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 class ContractSectionType(Enum):
+    ROOT = "root"
     PREAMBLE = "preamble"
     BODY = "body"
     APPENDIX = "appendix"

@@ -68,6 +68,18 @@ Add anchors to the markdown text as HTML comments following the instructions and
 """.strip()
 
 
+PROMPT_IDENTIFY_FIRST_NUMBERED_SECTION = """
+You are an expert legal analyst tasked with identifying the first numbered section in a contract text.
+You will be provided with a contract text in markdown format.
+Extract the single line of text that marks the start of the first numbered section exactly as it appears in the contract text.
+
+# Instructions
+- read the contract text carefully to identify the first numbered section in the main body of the contract
+- the first numbered section will have a section number and section name, optionally preceded by a prefix (e.g. "ARTICLE", "SECTION", etc.)
+- output the entire line of text that marks the start of the first numbered section exactly as it appears in the contract text and nothing else
+""".strip()
+
+
 PROMPT_METADATA_EXTRACTION = """
 You are an expert legal analyst tasked with extracting structured metadata from a contract text.
 Extract the following metadata attributes from the contract text provided below as a valid JSON object.

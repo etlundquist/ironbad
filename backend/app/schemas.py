@@ -30,11 +30,24 @@ class ParsedContractSection(ConfiguredBaseModel):
     beg_page: Optional[int] = None
     end_page: Optional[int] = None
 
+
+class ContractSectionNode(ConfiguredBaseModel):
+    id: str
+    type: ContractSectionType
+    level: int
+    number: str
+    name: Optional[str] = None
+    markdown: str
+    parent_id: Optional[str] = None
+    children: Optional[list["ContractSectionNode"]] = Field(default_factory=list)
+
+
 class ParsedContract(ConfiguredBaseModel):
     filename: str
     markdown: str
     metadata: ContractMetadata
-    sections: list[ParsedContractSection]
+    section_list: list[ParsedContractSection]
+    section_tree: ContractSectionNode
 
 
 class Contract(ConfiguredBaseModel):
