@@ -12,7 +12,7 @@ from taskiq import TaskiqEvents, TaskiqState
 from app.workflows.ingestion import parse_contract, extract_clauses
 from app.workflows.analysis import extract_issues
 from app.models import Contract as DBContract, ContractSection, ContractClause, StandardClause, ContractIssue
-from app.schemas import ContractIngestionJob, ContractAnalysisJob, JobStatusUpdate, NotificationEvent
+from app.schemas import ContractAnnotations, ContractIngestionJob, ContractAnalysisJob, JobStatusUpdate, NotificationEvent
 from app.enums import ContractStatus, JobStatus
 from app.database import engine
 from app.services.notifications import NOTIFICATIONS_CHANNEL, get_notifications_client, close_notifications_client
@@ -74,6 +74,7 @@ async def ingest_contract(job: ContractIngestionJob) -> None:
                 parsed_contract = await parse_contract(path=f.name)
                 contract.markdown = parsed_contract.markdown
                 contract.section_tree = json.loads(parsed_contract.section_tree.model_dump_json())
+                contract.annotations = json.loads(ContractAnnotations().model_dump_json())
                 contract.meta = parsed_contract.metadata.model_dump()
                 await db.flush()
 

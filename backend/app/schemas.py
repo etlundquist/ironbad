@@ -3,7 +3,7 @@ from typing import Literal, Optional, Union
 from uuid import UUID
 from datetime import datetime
 
-from app.enums import AnnotationStatus, ChatMessageRole, ChatMessageStatus, ContractSectionType, IssueResolution, JobStatus, ContractStatus, FileType, RuleSeverity, IssueStatus
+from app.enums import AnnotationStatus, ChatMessageRole, ChatMessageStatus, ContractActionType, ContractAnnotationResolution, ContractSectionType, IssueResolution, JobStatus, ContractStatus, FileType, RuleSeverity, IssueStatus
 
 
 class ConfiguredBaseModel(BaseModel):
@@ -41,6 +41,18 @@ class ContractSectionNode(ConfiguredBaseModel):
     parent_id: Optional[str] = None
     children: Optional[list["ContractSectionNode"]] = Field(default_factory=list)
 
+    def get_node_by_id(self, node_id: str) -> "ContractSectionNode":
+        """find a given node in the tree by its ID"""
+
+        if self.id == node_id:
+            return self
+        for child in self.children or []:
+            try:
+                return child.get_node_by_id(node_id)
+            except ValueError:
+                continue
+        raise ValueError(f"node_id={node_id} not found")
+
 
 class ParsedContract(ConfiguredBaseModel):
     filename: str
@@ -55,7 +67,8 @@ class CommentAnnotation(ConfiguredBaseModel):
     node_id: str
     offset_beg: int
     offset_end: int
-    text: str
+    anchor_text: str
+    comment_text: str
     status: AnnotationStatus = AnnotationStatus.PENDING
     created_at: datetime
     resolved_at: Optional[datetime] = None
@@ -107,6 +120,70 @@ class Contract(ConfiguredBaseModel):
     errors: Optional[list[dict]] = None
     created_at: datetime
     updated_at: datetime
+
+
+class NewCommentAnnotationRequest(ConfiguredBaseModel):
+    node_id: str
+    offset_beg: int
+    offset_end: int
+    anchor_text: str
+    comment_text: str
+
+class EditCommentAnnotationRequest(ConfiguredBaseModel):
+    annotation_id: UUID
+    comment_text: str
+
+class NewRevisionAnnotationRequest(ConfiguredBaseModel):
+    node_id: str
+    offset_beg: int
+    offset_end: int
+    old_text: str
+    new_text: str
+
+class EditRevisionAnnotationRequest(ConfiguredBaseModel):
+    annotation_id: UUID
+    new_text: str
+
+class SectionAddAnnotationRequest(ConfiguredBaseModel):
+    target_parent_id: str
+    insertion_index: int
+    new_node: ContractSectionNode
+
+class SectionRemoveAnnotationRequest(ConfiguredBaseModel):
+    target_node_id: str
+
+class ContractActionRequest(ConfiguredBaseModel):
+    action: ContractActionType
+    data: Union[NewCommentAnnotationRequest, EditCommentAnnotationRequest, NewRevisionAnnotationRequest, EditRevisionAnnotationRequest, SectionAddAnnotationRequest, SectionRemoveAnnotationRequest]
+
+class ContractActionResponse(ConfiguredBaseModel):
+    # top-level action information
+    status: Literal["applied", "rejected", "conflict"]
+    action: ContractActionType
+    action_id: UUID
+    new_contract_version: int
+    # contract tree/text changes
+    updated_nodes: list[ContractSectionNode] = Field(default_factory=list)
+    deleted_node_ids: list[str] = Field(default_factory=list)
+    # contract annotation changes
+    updated_annotations: ContractAnnotations = Field(default_factory=ContractAnnotations)
+    rebased_annotations: ContractAnnotations = Field(default_factory=ContractAnnotations)
+
+
+class AnnotationResolutionRequest(ConfiguredBaseModel):
+    annotation_id: UUID
+    resolution: ContractAnnotationResolution
+
+class AnnotationResolutionResponse(ConfiguredBaseModel):
+    # top-level action information
+    status: Literal["applied", "rejected", "conflict"]
+    annotation_id: UUID
+    resolution: ContractAnnotationResolution
+    new_contract_version: int
+    # updated state after applying the resolution
+    updated_annotations: ContractAnnotations = Field(default_factory=ContractAnnotations)
+    updated_nodes: list[ContractSectionNode] = Field(default_factory=list)
+    rebased_annotations: ContractAnnotations = Field(default_factory=ContractAnnotations)
 
 
 class ContractIngestionJob(ConfiguredBaseModel):

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 
 interface ContractSectionNode {
@@ -12,8 +12,47 @@ interface ContractSectionNode {
   children?: ContractSectionNode[]
 }
 
+interface CommentAnnotation {
+  id: string
+  node_id: string
+  offset_beg: number
+  offset_end: number
+  anchor_text: string
+  comment_text: string
+  status: string
+  created_at: string
+}
+
+interface RevisionAnnotation {
+  id: string
+  node_id: string
+  offset_beg: number
+  offset_end: number
+  old_text: string
+  new_text: string
+  status: string
+  created_at: string
+}
+
+interface ContractAnnotations {
+  comments: CommentAnnotation[]
+  revisions: RevisionAnnotation[]
+  section_adds: any[]
+  section_removes: any[]
+}
+
 interface ContractSectionTreeProps {
   section: ContractSectionNode
+  annotations?: ContractAnnotations
+  onCommentCreate?: (nodeId: string, offsetBeg: number, offsetEnd: number, anchorText: string, commentText: string) => void
+  onCommentEdit?: (annotationId: string, commentText: string) => void
+  // revision handlers
+  onRevisionCreate?: (nodeId: string, offsetBeg: number, offsetEnd: number, oldText: string, newText: string) => void
+  onRevisionEdit?: (annotationId: string, newText: string) => void
+  selectedComment?: CommentAnnotation | null
+  onCommentSelect?: (comment: CommentAnnotation | null) => void
+  selectedRevision?: RevisionAnnotation | null
+  onRevisionSelect?: (revision: RevisionAnnotation | null) => void
 }
 
 interface AnnotationModal {
@@ -25,7 +64,18 @@ interface AnnotationModal {
   type: 'comment' | 'revision' | null
 }
 
-const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({ section }) => {
+const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
+  section,
+  annotations,
+  onCommentCreate,
+  onCommentEdit,
+  onRevisionCreate,
+  onRevisionEdit,
+  selectedComment,
+  onCommentSelect,
+  selectedRevision,
+  onRevisionSelect
+}) => {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set([section.id]))
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [annotationModal, setAnnotationModal] = useState<AnnotationModal>({
@@ -36,6 +86,72 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({ section }) =>
     selectedText: '',
     type: null
   })
+
+  // Build a quick lookup of nodeId -> node for expansion/navigation
+  const nodeById = useMemo(() => {
+    const map = new Map<string, ContractSectionNode>()
+    const walk = (n: ContractSectionNode) => {
+      map.set(n.id, n)
+      n.children?.forEach(walk)
+    }
+    walk(section)
+    return map
+  }, [section])
+
+  // On selected comment from sidebar: expand its node chain and scroll to the highlight
+  useEffect(() => {
+    if (!selectedComment) return
+    const nodeId = selectedComment.node_id
+    if (!nodeById.has(nodeId)) return
+
+    // Expand the chain up to root
+    setExpandedNodes(prev => {
+      const next = new Set(prev)
+      let current: ContractSectionNode | undefined = nodeById.get(nodeId)
+      while (current) {
+        next.add(current.id)
+        current = current.parent_id ? nodeById.get(current.parent_id) : undefined
+      }
+      return next
+    })
+
+    // After expand state applies, scroll to the comment highlight
+    const timer = setTimeout(() => {
+      const container = document.querySelector(`[data-node-id="${nodeId}"] .section-markdown-inline`)
+      const highlight = container?.querySelector(`[data-comment-id="${selectedComment.id}"]`) as HTMLElement | null
+      if (highlight) {
+        highlight.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        // brief emphasis
+        highlight.style.outline = '2px solid #3b82f6'
+        setTimeout(() => { if (highlight) highlight.style.outline = 'none' }, 800)
+      }
+    }, 120)
+    return () => clearTimeout(timer)
+  }, [selectedComment, nodeById])
+
+  // On selected revision from sidebar: expand and scroll
+  useEffect(() => {
+    if (!selectedRevision) return
+    const nodeId = selectedRevision.node_id
+    if (!nodeById.has(nodeId)) return
+
+    setExpandedNodes(prev => {
+      const next = new Set(prev)
+      let current: ContractSectionNode | undefined = nodeById.get(nodeId)
+      while (current) {
+        next.add(current.id)
+        current = current.parent_id ? nodeById.get(current.parent_id) : undefined
+      }
+      return next
+    })
+
+    const timer = setTimeout(() => {
+      const container = document.querySelector(`[data-node-id="${nodeId}"] .section-markdown-inline`)
+      const revEl = container?.querySelector(`[data-revision-id="${selectedRevision.id}"]`) as HTMLElement | null
+      if (revEl) revEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 120)
+    return () => clearTimeout(timer)
+  }, [selectedRevision, nodeById])
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -107,17 +223,24 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({ section }) =>
 
 
   const handleAnnotationSubmit = (type: 'comment' | 'revision', content: string) => {
-    const annotation = {
-      node_id: annotationModal.nodeId,
-      offset_beg: annotationModal.offsetBeg,
-      offset_end: annotationModal.offsetEnd,
-      type,
-      content,
-      selected_text: annotationModal.selectedText
+    if (type === 'comment' && onCommentCreate) {
+      onCommentCreate(
+        annotationModal.nodeId,
+        annotationModal.offsetBeg,
+        annotationModal.offsetEnd,
+        annotationModal.selectedText,
+        content
+      )
     }
-
-    console.log('Annotation created:', annotation)
-    // TODO: Send to backend
+    if (type === 'revision' && onRevisionCreate) {
+      onRevisionCreate(
+        annotationModal.nodeId,
+        annotationModal.offsetBeg,
+        annotationModal.offsetEnd,
+        annotationModal.selectedText, // old_text (anchor)
+        content // new_text
+      )
+    }
 
     // Close modal
     setAnnotationModal({
@@ -129,6 +252,196 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({ section }) =>
       type: null
     })
   }
+
+  const getCommentsForNode = (nodeId: string): CommentAnnotation[] => annotations?.comments?.filter(c => c.node_id === nodeId) || []
+  const getRevisionsForNode = (nodeId: string): RevisionAnnotation[] => annotations?.revisions?.filter(r => r.node_id === nodeId) || []
+
+  const applyCommentHighlights = (container: HTMLElement, nodeId: string) => {
+    const comments = getCommentsForNode(nodeId)
+    if (!comments || comments.length === 0) return
+
+    const ranges = comments
+      .slice()
+      .sort((a, b) => a.offset_beg - b.offset_beg)
+      .map(c => ({ start: c.offset_beg, end: c.offset_end, id: c.id, selected: selectedComment?.id === c.id }))
+
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null)
+    let globalOffset = 0
+    let node: Node | null
+    let rangeIdx = 0
+
+    while ((node = walker.nextNode())) {
+      const textNode = node as Text
+      const text = textNode.nodeValue || ''
+      const len = text.length
+      if (len === 0) { continue }
+
+      const nodeStart = globalOffset
+      const nodeEnd = nodeStart + len
+
+      // Advance rangeIdx past ranges that end before this node starts
+      while (rangeIdx < ranges.length && ranges[rangeIdx].end <= nodeStart) rangeIdx++
+
+      // Collect overlapping ranges for this node
+      const overlaps: { start: number, end: number, id: string, selected: boolean }[] = []
+      let k = rangeIdx
+      while (k < ranges.length && ranges[k].start < nodeEnd) {
+        overlaps.push(ranges[k])
+        if (ranges[k].end <= nodeEnd) {
+          k++
+        } else {
+          // this range continues into next node; do not advance further
+          break
+        }
+      }
+
+      if (overlaps.length === 0) {
+        globalOffset += len
+        continue
+      }
+
+      // Build replacement fragment for this text node
+      const frag = document.createDocumentFragment()
+      let localPos = 0
+      overlaps.forEach(r => {
+        const localStart = Math.max(0, r.start - nodeStart)
+        const localEnd = Math.min(len, r.end - nodeStart)
+        if (localStart > localPos) {
+          frag.appendChild(document.createTextNode(text.slice(localPos, localStart)))
+        }
+        const span = document.createElement('span')
+        span.className = r.selected ? 'comment-highlight-selected' : 'comment-highlight'
+        span.setAttribute('data-comment-id', r.id)
+        span.style.backgroundColor = r.selected ? '#bfdbfe' : '#fef08a'
+        span.style.padding = '1px 2px'
+        span.style.borderRadius = '2px'
+        span.style.cursor = 'pointer'
+        span.textContent = text.slice(localStart, localEnd)
+        span.onclick = (e) => handleCommentClick(r.id, e)
+        frag.appendChild(span)
+        localPos = localEnd
+      })
+      if (localPos < len) frag.appendChild(document.createTextNode(text.slice(localPos)))
+
+      textNode.parentNode?.replaceChild(frag, textNode)
+
+      // Advance globalOffset by original text length
+      globalOffset += len
+
+      // Advance rangeIdx past ranges fully consumed by this node
+      while (rangeIdx < ranges.length && ranges[rangeIdx].end <= nodeEnd) rangeIdx++
+    }
+  }
+
+  const applyRevisionHighlights = (container: HTMLElement, nodeId: string) => {
+    const revisions = getRevisionsForNode(nodeId)
+    if (!revisions || revisions.length === 0) return
+
+    const ranges = revisions
+      .slice()
+      .sort((a, b) => a.offset_beg - b.offset_beg)
+      .map(r => ({ start: r.offset_beg, end: r.offset_end, id: r.id, old_text: r.old_text, new_text: r.new_text }))
+
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null)
+    let globalOffset = 0
+    let node: Node | null
+    let rangeIdx = 0
+    const insertedNewText = new Set<string>()
+
+    while ((node = walker.nextNode())) {
+      const textNode = node as Text
+      const text = textNode.nodeValue || ''
+      const len = text.length
+      if (len === 0) { continue }
+      const nodeStart = globalOffset
+      const nodeEnd = nodeStart + len
+      while (rangeIdx < ranges.length && ranges[rangeIdx].end <= nodeStart) rangeIdx++
+
+      const overlaps: typeof ranges = [] as any
+      let k = rangeIdx
+      while (k < ranges.length && ranges[k].start < nodeEnd) {
+        overlaps.push(ranges[k])
+        if (ranges[k].end <= nodeEnd) k++; else break
+      }
+
+      if (overlaps.length === 0) { globalOffset += len; continue }
+
+      const frag = document.createDocumentFragment()
+      let localPos = 0
+      overlaps.forEach(r => {
+        const localStart = Math.max(0, r.start - nodeStart)
+        const localEnd = Math.min(len, r.end - nodeStart)
+        if (localStart > localPos) frag.appendChild(document.createTextNode(text.slice(localPos, localStart)))
+
+        // Strike-through old_text (red)
+        const del = document.createElement('del')
+        del.className = 'revision-old'
+        del.style.color = '#dc2626'
+        del.setAttribute('data-revision-id', r.id)
+        del.onclick = (e) => handleRevisionClick(r.id, e)
+        del.textContent = text.slice(localStart, localEnd)
+        frag.appendChild(del)
+
+        // Insert suggested new_text once at the end of the revision span
+        const isFinalSliceInThisNode = r.end <= nodeEnd
+        if (isFinalSliceInThisNode && !insertedNewText.has(r.id)) {
+          const ins = document.createElement('span')
+          ins.className = 'revision-new'
+          ins.style.color = '#dc2626'
+          ins.setAttribute('data-revision-id', r.id)
+          ins.onclick = (e) => handleRevisionClick(r.id, e)
+          ins.textContent = r.new_text
+          frag.appendChild(ins)
+          insertedNewText.add(r.id)
+        }
+
+        localPos = localEnd
+      })
+      if (localPos < len) frag.appendChild(document.createTextNode(text.slice(localPos)))
+      textNode.parentNode?.replaceChild(frag, textNode)
+      globalOffset += len
+      while (rangeIdx < ranges.length && ranges[rangeIdx].end <= nodeEnd) rangeIdx++
+    }
+  }
+
+  const handleCommentClick = (commentId: string, event: Event) => {
+    event.stopPropagation?.()
+    const comment = annotations?.comments?.find(c => c.id === commentId)
+    if (comment && onCommentSelect) {
+      onCommentSelect(comment)
+    }
+  }
+
+  const handleRevisionClick = (revisionId: string, event: Event) => {
+    event.stopPropagation?.()
+    const rev = annotations?.revisions?.find(r => r.id === revisionId)
+    if (rev && onRevisionSelect) onRevisionSelect(rev)
+  }
+
+  // Re-apply highlights when annotations or selection change
+  useEffect(() => {
+    const containers = Array.from(document.querySelectorAll('.section-node .section-markdown-inline')) as HTMLElement[]
+    containers.forEach((markdownInline) => {
+      const inner = markdownInline.firstElementChild as HTMLElement | null
+      if (!inner) return
+      // clear existing overlays (comments + revisions)
+      const existing = inner.querySelectorAll('.comment-highlight, .comment-highlight-selected, del.revision-old, span.revision-new')
+      existing.forEach(node => {
+        const parent = node.parentNode
+        if (!parent) return
+        parent.replaceChild(document.createTextNode((node as HTMLElement).tagName === 'DEL' ? (node.textContent || '') : (node.textContent || '')), node)
+        parent.normalize()
+      })
+      // apply for this node id
+      const sectionNode = markdownInline.closest('.section-node') as HTMLElement | null
+      const nodeId = sectionNode?.getAttribute('data-node-id') || ''
+      if (nodeId) {
+        // Apply revisions first, then comment highlights so highlights wrap revised text
+        applyRevisionHighlights(inner, nodeId)
+        applyCommentHighlights(inner, nodeId)
+      }
+    })
+  }, [annotations, selectedComment, expandedNodes])
 
   const toggleNode = (nodeId: string) => {
     setExpandedNodes(prev => {
@@ -305,14 +618,23 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({ section }) =>
                       return
                     }
 
-                    // Compute offsets using DOM Range to account for nested elements
-                    const preRange = document.createRange()
-                    preRange.selectNodeContents(markdownContainer)
-                    preRange.setEnd(range.startContainer, range.startOffset)
-                    const offsetBeg = preRange.toString().length
-                    const offsetEnd = offsetBeg + range.toString().length
+                    // Prefer computing offsets from the raw markdown to match backend exactly
+                    let offsetBeg = node.markdown.indexOf(selectedText)
+                    let offsetEnd = -1
+                    if (offsetBeg !== -1) {
+                      offsetEnd = offsetBeg + selectedText.length
+                    } else {
+                      // Fallback: compute offsets from rendered text if not found in raw
+                      const preRange = document.createRange()
+                      preRange.selectNodeContents(markdownContainer)
+                      preRange.setEnd(range.startContainer, range.startOffset)
+                      offsetBeg = preRange.toString().length
+                      offsetEnd = offsetBeg + range.toString().length
+                    }
 
-                    console.log('Annotation modal:', { nodeId: node.id, offset_beg: offsetBeg, offset_end: offsetEnd, selected_text: selectedText })
+                    const anchorText = node.markdown.slice(offsetBeg, offsetEnd)
+
+                    console.log('Annotation modal:', { nodeId: node.id, offset_beg: offsetBeg, offset_end: offsetEnd, selected_text: anchorText })
 
                     // Show the annotation modal
                     setAnnotationModal({
@@ -320,13 +642,32 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({ section }) =>
                       nodeId: node.id,
                       offsetBeg,
                       offsetEnd,
-                      selectedText,
+                      selectedText: anchorText,
                       type: null
                     })
                   }, 50) // Increased delay to ensure selection is complete
                 }}
               >
-                <ReactMarkdown>{node.markdown}</ReactMarkdown>
+                <div
+                  ref={(el) => {
+                    if (el) {
+                      // Clear any existing highlights first
+                      const existingHighlights = el.querySelectorAll('.comment-highlight, .comment-highlight-selected')
+                      existingHighlights.forEach(highlight => {
+                        const parent = highlight.parentNode
+                        if (parent) {
+                          parent.replaceChild(document.createTextNode(highlight.textContent || ''), highlight)
+                          parent.normalize()
+                        }
+                      })
+
+                      // Apply new highlights
+                      applyCommentHighlights(el, node.id)
+                    }
+                  }}
+                >
+                  <ReactMarkdown>{node.markdown}</ReactMarkdown>
+                </div>
               </div>
             )}
           </div>
@@ -476,7 +817,8 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({ section }) =>
         backgroundColor: '#f8fafc',
         borderRadius: '8px',
         border: '1px solid #e5e7eb',
-        minWidth: '800px' // Ensure consistent width
+        width: '100%',
+        minWidth: 0
       }}>
         {section.children && section.children.map(child => renderSectionNode(child, 0))}
       </div>

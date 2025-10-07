@@ -14,6 +14,8 @@ from app.routers.contract_clauses import router as contract_clauses_router
 from app.routers.contract_sections import router as contract_sections_router
 from app.routers.contract_chat import router as contract_chat_router
 from app.routers.contract_issues import router as contract_issues_router
+from app.routers.contract_actions import router as contract_actions_router
+
 from app.routers.notifications import router as notifications_router
 from app.services.notifications import get_notifications_client, close_notifications_client
 
@@ -54,4 +56,5 @@ app.include_router(contract_clauses_router)
 app.include_router(contract_sections_router)
 app.include_router(contract_chat_router)
 app.include_router(contract_issues_router)
+app.include_router(contract_actions_router)
 app.include_router(notifications_router)

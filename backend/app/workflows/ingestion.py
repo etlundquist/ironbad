@@ -93,7 +93,8 @@ def split_contract_lines(contract_markdown: str) -> list[str]:
 
     contract_lines = contract_markdown.split("\n")
     contract_lines = [re.sub(r"^\s*[-#]*\s*", "", line).strip() for line in contract_lines]
-    # NOTE: normalize lines by removing leading whitespace and markdown header/list markers
+    contract_lines = [re.sub(r"\s+", " ", line).strip() for line in contract_lines]
+    # NOTE: normalize lines by removing leading whitespace, removing markdown header/list markers, and collapsing multiple spaces into a single space
 
     contract_lines = [line for line in contract_lines if line.strip()]
     return contract_lines

@@ -63,3 +63,16 @@ class AnnotationType(Enum):
     REVISION = "revision"
     SECTION_ADD = "section_add"
     SECTION_REMOVE = "section_remove"
+
+class ContractActionType(Enum):
+    MAKE_COMMENT = "make_comment"
+    EDIT_COMMENT = "edit_comment"
+    MAKE_REVISION = "make_revision"
+    EDIT_REVISION = "edit_revision"
+    SECTION_ADD = "section_add"
+    SECTION_REMOVE = "section_remove"
+
+class ContractAnnotationResolution(Enum):
+    ACCEPT = "accepted"
+    REJECT = "rejected"
+    RESOLVE = "resolved"
