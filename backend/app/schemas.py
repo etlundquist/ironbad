@@ -1,9 +1,9 @@
 from pydantic import BaseModel, Field
-from typing import Literal, Optional, TypedDict, Union
+from typing import Literal, Optional, Union
 from uuid import UUID
 from datetime import datetime
 
-from app.enums import ChatMessageRole, ChatMessageStatus, ContractSectionType, IssueResolution, JobStatus, ContractStatus, FileType, RuleSeverity, IssueStatus
+from app.enums import AnnotationStatus, ChatMessageRole, ChatMessageStatus, ContractSectionType, IssueResolution, JobStatus, ContractStatus, FileType, RuleSeverity, IssueStatus
 
 
 class ConfiguredBaseModel(BaseModel):
@@ -50,11 +50,59 @@ class ParsedContract(ConfiguredBaseModel):
     section_tree: ContractSectionNode
 
 
+class CommentAnnotation(ConfiguredBaseModel):
+    id: UUID
+    node_id: str
+    offset_beg: int
+    offset_end: int
+    text: str
+    status: AnnotationStatus = AnnotationStatus.PENDING
+    created_at: datetime
+    resolved_at: Optional[datetime] = None
+
+class RevisionAnnotation(ConfiguredBaseModel):
+    id: UUID
+    node_id: str
+    offset_beg: int
+    offset_end: int
+    old_text: str
+    new_text: str
+    status: AnnotationStatus = AnnotationStatus.PENDING
+    created_at: datetime
+    resolved_at: Optional[datetime] = None
+
+class SectionAddAnnotation(ConfiguredBaseModel):
+    id: UUID
+    target_parent_id: str
+    insertion_index: int
+    new_node: ContractSectionNode
+    status: AnnotationStatus = AnnotationStatus.PENDING
+    created_at: datetime
+    resolved_at: Optional[datetime] = None
+
+class SectionRemoveAnnotation(ConfiguredBaseModel):
+    id: UUID
+    target_node_id: str
+    status: AnnotationStatus = AnnotationStatus.PENDING
+    created_at: datetime
+    resolved_at: Optional[datetime] = None
+
+class ContractAnnotations(ConfiguredBaseModel):
+    comments: list[CommentAnnotation] = Field(default_factory=list)
+    revisions: list[RevisionAnnotation] = Field(default_factory=list)
+    section_adds: list[SectionAddAnnotation] = Field(default_factory=list)
+    section_removes: list[SectionRemoveAnnotation] = Field(default_factory=list)
+
+
 class Contract(ConfiguredBaseModel):
     id: UUID
     status: ContractStatus
     filename: str
     filetype: FileType
+    markdown: Optional[str] = Field(default=None, exclude=True)
+    section_tree: Optional[ContractSectionNode] = None
+    annotations: Optional[ContractAnnotations] = None
+    version: int = 1
     meta: Optional[ContractMetadata] = None
     errors: Optional[list[dict]] = None
     created_at: datetime

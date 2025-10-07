@@ -55,6 +55,7 @@ async def upload_contract(file: UploadFile = File(...), db: AsyncSession = Depen
             filename=file.filename,
             filetype=filetype,
             contents=contents,
+            version=1,
         )
 
         db.add(contract)

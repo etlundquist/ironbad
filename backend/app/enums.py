@@ -49,3 +49,17 @@ class ChatMessageRole(Enum):
     SYSTEM = "system"
     USER = "user"
     ASSISTANT = "assistant"
+
+
+class AnnotationStatus(Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    CONFLICT = "conflict"
+    RESOLVED = "resolved"
+
+class AnnotationType(Enum):
+    COMMENT = "comment"
+    REVISION = "revision"
+    SECTION_ADD = "section_add"
+    SECTION_REMOVE = "section_remove"

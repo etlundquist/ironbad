@@ -1,3 +1,4 @@
+import json
 import logging
 
 from datetime import datetime
@@ -72,6 +73,7 @@ async def ingest_contract(job: ContractIngestionJob) -> None:
                 f.flush()
                 parsed_contract = await parse_contract(path=f.name)
                 contract.markdown = parsed_contract.markdown
+                contract.section_tree = json.loads(parsed_contract.section_tree.model_dump_json())
                 contract.meta = parsed_contract.metadata.model_dump()
                 await db.flush()
 
@@ -88,7 +90,7 @@ async def ingest_contract(job: ContractIngestionJob) -> None:
                     beg_page=section.beg_page,
                     end_page=section.end_page
                 )
-                for section in parsed_contract.sections
+                for section in parsed_contract.section_list
             ]
             db.add_all(contract_sections)
             await db.flush()

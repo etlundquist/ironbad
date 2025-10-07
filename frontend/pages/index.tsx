@@ -16,6 +16,9 @@ const Home: NextPage = () => {
           <Link href="/contracts" className="secondary-button">
             View Contracts
           </Link>
+          <Link href="/review" className="secondary-button">
+            Review & Redline
+          </Link>
           <Link href="/standard-clauses" className="secondary-button">
             Manage Standard Clauses
           </Link>
