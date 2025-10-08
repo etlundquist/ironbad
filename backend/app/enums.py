@@ -53,10 +53,11 @@ class ChatMessageRole(Enum):
 
 class AnnotationStatus(Enum):
     PENDING = "pending"
+    RESOLVED = "resolved"
     ACCEPTED = "accepted"
     REJECTED = "rejected"
     CONFLICT = "conflict"
-    RESOLVED = "resolved"
+    STALE = "stale"
 
 class AnnotationType(Enum):
     COMMENT = "comment"
@@ -73,6 +74,6 @@ class ContractActionType(Enum):
     SECTION_REMOVE = "section_remove"
 
 class ContractAnnotationResolution(Enum):
-    ACCEPT = "accepted"
-    REJECT = "rejected"
-    RESOLVE = "resolved"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    RESOLVED = "resolved"

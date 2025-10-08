@@ -49,6 +49,9 @@ interface ContractSectionTreeProps {
   // revision handlers
   onRevisionCreate?: (nodeId: string, offsetBeg: number, offsetEnd: number, oldText: string, newText: string) => void
   onRevisionEdit?: (annotationId: string, newText: string) => void
+  // section handlers
+  onSectionAdd?: (targetParentId: string, insertionIndex: number, newSectionNode: any) => void
+  onSectionRemove?: (targetNodeId: string) => void
   selectedComment?: CommentAnnotation | null
   onCommentSelect?: (comment: CommentAnnotation | null) => void
   selectedRevision?: RevisionAnnotation | null
@@ -64,6 +67,13 @@ interface AnnotationModal {
   type: 'comment' | 'revision' | null
 }
 
+interface SectionModal {
+  isOpen: boolean
+  targetParentId: string
+  insertionIndex: number
+  action: 'add-above' | 'add-below' | null
+}
+
 const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
   section,
   annotations,
@@ -71,6 +81,8 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
   onCommentEdit,
   onRevisionCreate,
   onRevisionEdit,
+  onSectionAdd,
+  onSectionRemove,
   selectedComment,
   onCommentSelect,
   selectedRevision,
@@ -85,6 +97,17 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
     offsetEnd: 0,
     selectedText: '',
     type: null
+  })
+  const [sectionModal, setSectionModal] = useState<SectionModal>({
+    isOpen: false,
+    targetParentId: '',
+    insertionIndex: 0,
+    action: null
+  })
+  const [sectionForm, setSectionForm] = useState({
+    number: '',
+    name: '',
+    text: ''
   })
 
   // Build a quick lookup of nodeId -> node for expansion/navigation
@@ -173,7 +196,177 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
 
   const handleMenuAction = (action: string, nodeId: string) => {
     setOpenMenuId(null) // Close menu after action
-    // TODO: Implement actual section manipulation logic
+
+    if (action === 'add-above' || action === 'add-below') {
+      // Find the parent node and insertion index
+      const parentNode = findParentNode(section, nodeId)
+      if (parentNode) {
+        const insertionIndex = action === 'add-above'
+          ? parentNode.children?.findIndex(child => child.id === nodeId) || 0
+          : (parentNode.children?.findIndex(child => child.id === nodeId) || 0) + 1
+
+        setSectionModal({
+          isOpen: true,
+          targetParentId: parentNode.id,
+          insertionIndex,
+          action: action as 'add-above' | 'add-below'
+        })
+        setSectionForm({ number: '', name: '', text: '' })
+      }
+    } else if (action === 'delete') {
+      if (confirm('Are you sure you want to delete this section?') && onSectionRemove) {
+        onSectionRemove(nodeId)
+      }
+    }
+  }
+
+  const findParentNode = (root: ContractSectionNode, targetId: string): ContractSectionNode | null => {
+    if (root.children) {
+      for (const child of root.children) {
+        if (child.id === targetId) {
+          return root
+        }
+        const found = findParentNode(child, targetId)
+        if (found) return found
+      }
+    }
+    return null
+  }
+
+  const findNodeById = (root: ContractSectionNode, targetId: string): ContractSectionNode | null => {
+    if (root.id === targetId) return root
+    if (root.children) {
+      for (const child of root.children) {
+        const found = findNodeById(child, targetId)
+        if (found) return found
+      }
+    }
+    return null
+  }
+
+  const inferSectionType = (parentNode: ContractSectionNode): string => {
+    // Infer type based on parent - if parent is root, use 'body', otherwise inherit from parent
+    if (parentNode.type === 'root') return 'body'
+    return parentNode.type || 'body'
+  }
+
+  const inferSectionLevel = (parentNode: ContractSectionNode): number => {
+    // Infer level based on parent - increment parent's level
+    return (parentNode.level || 0) + 1
+  }
+
+  const handleSectionFormSubmit = () => {
+    if (!sectionForm.number.trim()) {
+      alert('Section number is required')
+      return
+    }
+
+    const parentNode = findNodeById(section, sectionModal.targetParentId)
+    if (!parentNode || !onSectionAdd) return
+
+    const sectionType = inferSectionType(parentNode)
+    const sectionLevel = inferSectionLevel(parentNode)
+
+    // Create the new section node
+    const newSectionNode = {
+      id: sectionForm.number.trim(), // Use number as ID
+      type: sectionType,
+      level: sectionLevel,
+      number: sectionForm.number.trim(),
+      name: sectionForm.name.trim() || undefined,
+      markdown: sectionForm.text.trim() || `# ${sectionForm.number.trim()}${sectionForm.name.trim() ? ` - ${sectionForm.name.trim()}` : ''}\n\n[New section content]`,
+      parent_id: sectionModal.targetParentId,
+      children: []
+    }
+
+    onSectionAdd(sectionModal.targetParentId, sectionModal.insertionIndex, newSectionNode)
+
+    // Close modal and reset form
+    setSectionModal({ isOpen: false, targetParentId: '', insertionIndex: 0, action: null })
+    setSectionForm({ number: '', name: '', text: '' })
+  }
+
+  const handleSectionFormCancel = () => {
+    setSectionModal({ isOpen: false, targetParentId: '', insertionIndex: 0, action: null })
+    setSectionForm({ number: '', name: '', text: '' })
+  }
+
+  const renderPendingSectionAdd = (sectionAdd: any, depth: number) => {
+    const indentStyle = { marginLeft: `${depth * 20}px` }
+
+    return (
+      <div key={`pending-${sectionAdd.id}`} className="pending-section-node" data-section-add-id={sectionAdd.id} style={indentStyle}>
+        <div
+          className="pending-section-header"
+          style={{
+            padding: '8px 12px',
+            border: '1px solid #fecaca',
+            borderRadius: '6px',
+            marginBottom: '4px',
+            backgroundColor: '#fef2f2',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '8px',
+            position: 'relative',
+            cursor: 'pointer'
+          }}
+          onClick={() => {
+            // Navigate to this pending section (scroll into view)
+            const element = document.querySelector(`[data-section-add-id="${sectionAdd.id}"]`)
+            element && (element as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+          }}
+        >
+          {/* Placeholder expander (non-functional for pending sections) */}
+          <div
+            style={{
+              width: '16px',
+              height: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '12px',
+              color: '#dc2626',
+              flexShrink: 0,
+              marginTop: '2px'
+            }}
+          >
+            +
+          </div>
+          <div className="pending-section-info" style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '4px'
+            }}>
+              <span style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#dc2626'
+              }}>
+                {sectionAdd.new_node?.number || 'New Section'}
+              </span>
+              <span style={{
+                fontSize: '12px',
+                color: '#dc2626',
+                backgroundColor: '#fecaca',
+                padding: '2px 6px',
+                borderRadius: '4px'
+              }}>
+                PENDING
+              </span>
+            </div>
+            <div style={{
+              fontSize: '13px',
+              color: '#dc2626',
+              lineHeight: '1.4'
+            }}>
+              {sectionAdd.new_node?.markdown?.split('\n')[0]?.replace(/^#+\s*/, '') || sectionAdd.new_node?.name || 'New Section'}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const handleTextSelection = (nodeId: string, event: React.MouseEvent) => {
@@ -255,12 +448,17 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
 
   const getCommentsForNode = (nodeId: string): CommentAnnotation[] => annotations?.comments?.filter(c => c.node_id === nodeId) || []
   const getRevisionsForNode = (nodeId: string): RevisionAnnotation[] => annotations?.revisions?.filter(r => r.node_id === nodeId) || []
+  const getPendingSectionAddsForParent = (parentId: string): any[] => annotations?.section_adds?.filter(s => s.target_parent_id === parentId && s.status === 'pending') || []
 
   const applyCommentHighlights = (container: HTMLElement, nodeId: string) => {
     const comments = getCommentsForNode(nodeId)
     if (!comments || comments.length === 0) return
 
-    const ranges = comments
+    // Only highlight comments that are not resolved
+    const activeComments = comments.filter(c => c.status !== 'resolved')
+    if (activeComments.length === 0) return
+
+    const ranges = activeComments
       .slice()
       .sort((a, b) => a.offset_beg - b.offset_beg)
       .map(c => ({ start: c.offset_beg, end: c.offset_end, id: c.id, selected: selectedComment?.id === c.id }))
@@ -337,7 +535,11 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
     const revisions = getRevisionsForNode(nodeId)
     if (!revisions || revisions.length === 0) return
 
-    const ranges = revisions
+    // Only process pending revisions for highlighting
+    const activeRevisions = revisions.filter(r => r.status === 'pending')
+    if (activeRevisions.length === 0) return
+
+    const ranges = activeRevisions
       .slice()
       .sort((a, b) => a.offset_beg - b.offset_beg)
       .map(r => ({ start: r.offset_beg, end: r.offset_end, id: r.id, old_text: r.old_text, new_text: r.new_text }))
@@ -441,7 +643,7 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
         applyCommentHighlights(inner, nodeId)
       }
     })
-  }, [annotations, selectedComment, expandedNodes])
+  }, [annotations, selectedComment, selectedRevision, expandedNodes])
 
   const toggleNode = (nodeId: string) => {
     setExpandedNodes(prev => {
@@ -648,24 +850,7 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
                   }, 50) // Increased delay to ensure selection is complete
                 }}
               >
-                <div
-                  ref={(el) => {
-                    if (el) {
-                      // Clear any existing highlights first
-                      const existingHighlights = el.querySelectorAll('.comment-highlight, .comment-highlight-selected')
-                      existingHighlights.forEach(highlight => {
-                        const parent = highlight.parentNode
-                        if (parent) {
-                          parent.replaceChild(document.createTextNode(highlight.textContent || ''), highlight)
-                          parent.normalize()
-                        }
-                      })
-
-                      // Apply new highlights
-                      applyCommentHighlights(el, node.id)
-                    }
-                  }}
-                >
+                <div>
                   <ReactMarkdown>{node.markdown}</ReactMarkdown>
                 </div>
               </div>
@@ -799,9 +984,39 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
           </div>
         </div>
 
-        {isExpanded && hasChildren && (
+        {isExpanded && (
           <div className="section-children" style={{ marginTop: '4px' }}>
-            {node.children!.map(child => renderSectionNode(child, depth + 1))}
+            {(() => {
+              // Get pending section additions for this parent
+              const pendingAdds = getPendingSectionAddsForParent(node.id)
+
+              // Create a combined list of children and pending additions
+              const allChildren: Array<{ type: 'existing' | 'pending', data: any, index: number }> = []
+
+              // Add existing children
+              if (node.children) {
+                node.children.forEach((child, index) => {
+                  allChildren.push({ type: 'existing', data: child, index })
+                })
+              }
+
+              // Add pending section additions at their insertion points
+              pendingAdds.forEach(sectionAdd => {
+                allChildren.push({ type: 'pending', data: sectionAdd, index: sectionAdd.insertion_index })
+              })
+
+              // Sort by index
+              allChildren.sort((a, b) => a.index - b.index)
+
+              // Render all children
+              return allChildren.map((item, renderIndex) => {
+                if (item.type === 'existing') {
+                  return renderSectionNode(item.data, depth + 1)
+                } else {
+                  return renderPendingSectionAdd(item.data, depth + 1)
+                }
+              })
+            })()}
           </div>
         )}
       </div>
@@ -858,7 +1073,7 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
                 fontStyle: 'italic',
                 border: '1px solid #e5e7eb'
               }}>
-                "{annotationModal.selectedText}"
+                {annotationModal.selectedText}
               </div>
             </div>
 
@@ -968,6 +1183,125 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
                   {annotationModal.type === 'comment' ? 'Add Comment' : 'Suggest Revision'}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Section Add Modal */}
+      {sectionModal.isOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '8px',
+            padding: '24px',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '600' }}>
+              Add New Section {sectionModal.action === 'add-above' ? 'Above' : 'Below'}
+            </h3>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
+                Section Number *
+              </label>
+              <input
+                type="text"
+                value={sectionForm.number}
+                onChange={(e) => setSectionForm(prev => ({ ...prev, number: e.target.value }))}
+                placeholder="e.g., 1.1, 2.3, A.1"
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  fontSize: '14px'
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
+                Section Name (Optional)
+              </label>
+              <input
+                type="text"
+                value={sectionForm.name}
+                onChange={(e) => setSectionForm(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="e.g., Definitions, Payment Terms"
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  fontSize: '14px'
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
+                Section Text
+              </label>
+              <textarea
+                value={sectionForm.text}
+                onChange={(e) => setSectionForm(prev => ({ ...prev, text: e.target.value }))}
+                placeholder="Enter the content for this section..."
+                rows={6}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  resize: 'vertical',
+                  fontFamily: 'inherit'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={handleSectionFormCancel}
+                style={{
+                  padding: '8px 16px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  backgroundColor: '#ffffff',
+                  color: '#374151',
+                  fontSize: '14px',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSectionFormSubmit}
+                style={{
+                  padding: '8px 16px',
+                  border: 'none',
+                  borderRadius: '4px',
+                  backgroundColor: '#3b82f6',
+                  color: '#ffffff',
+                  fontSize: '14px',
+                  cursor: 'pointer'
+                }}
+              >
+                Add Section
+              </button>
             </div>
           </div>
         </div>

@@ -3,7 +3,7 @@ from typing import Literal, Optional, Union
 from uuid import UUID
 from datetime import datetime
 
-from app.enums import AnnotationStatus, ChatMessageRole, ChatMessageStatus, ContractActionType, ContractAnnotationResolution, ContractSectionType, IssueResolution, JobStatus, ContractStatus, FileType, RuleSeverity, IssueStatus
+from app.enums import AnnotationStatus, AnnotationType, ChatMessageRole, ChatMessageStatus, ContractActionType, ContractAnnotationResolution, ContractSectionType, IssueResolution, JobStatus, ContractStatus, FileType, RuleSeverity, IssueStatus
 
 
 class ConfiguredBaseModel(BaseModel):
@@ -95,16 +95,27 @@ class SectionAddAnnotation(ConfiguredBaseModel):
 
 class SectionRemoveAnnotation(ConfiguredBaseModel):
     id: UUID
-    target_node_id: str
+    node_id: str
     status: AnnotationStatus = AnnotationStatus.PENDING
     created_at: datetime
     resolved_at: Optional[datetime] = None
+
+ContractAnnotation = Union[CommentAnnotation, RevisionAnnotation, SectionAddAnnotation, SectionRemoveAnnotation]
 
 class ContractAnnotations(ConfiguredBaseModel):
     comments: list[CommentAnnotation] = Field(default_factory=list)
     revisions: list[RevisionAnnotation] = Field(default_factory=list)
     section_adds: list[SectionAddAnnotation] = Field(default_factory=list)
     section_removes: list[SectionRemoveAnnotation] = Field(default_factory=list)
+
+    def get_annotation_by_id(self, annotation_id: UUID) -> ContractAnnotation:
+        """get an annotation by ID and type"""
+
+        annotations = self.comments + self.revisions + self.section_adds + self.section_removes
+        try:
+            return next(annotation for annotation in annotations if annotation.id == annotation_id)
+        except StopIteration:
+            raise ValueError(f"{annotation_id=} not found in annotations")
 
 
 class Contract(ConfiguredBaseModel):
@@ -150,7 +161,7 @@ class SectionAddAnnotationRequest(ConfiguredBaseModel):
     new_node: ContractSectionNode
 
 class SectionRemoveAnnotationRequest(ConfiguredBaseModel):
-    target_node_id: str
+    node_id: str
 
 class ContractActionRequest(ConfiguredBaseModel):
     action: ContractActionType
@@ -172,18 +183,27 @@ class ContractActionResponse(ConfiguredBaseModel):
 
 class AnnotationResolutionRequest(ConfiguredBaseModel):
     annotation_id: UUID
+    annotation_type: AnnotationType
     resolution: ContractAnnotationResolution
 
 class AnnotationResolutionResponse(ConfiguredBaseModel):
     # top-level action information
     status: Literal["applied", "rejected", "conflict"]
     annotation_id: UUID
+    annotation_type: AnnotationType
     resolution: ContractAnnotationResolution
     new_contract_version: int
     # updated state after applying the resolution
     updated_annotations: ContractAnnotations = Field(default_factory=ContractAnnotations)
     updated_nodes: list[ContractSectionNode] = Field(default_factory=list)
     rebased_annotations: ContractAnnotations = Field(default_factory=ContractAnnotations)
+
+
+class AnnotationDeleteResponse(ConfiguredBaseModel):
+    status: Literal["applied", "rejected", "conflict"]
+    annotation_id: UUID
+    new_contract_version: int
+    updated_annotations: ContractAnnotations = Field(default_factory=ContractAnnotations)
 
 
 class ContractIngestionJob(ConfiguredBaseModel):

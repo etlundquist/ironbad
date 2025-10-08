@@ -300,7 +300,6 @@ async def parse_contract_sections(contract_markdown: str) -> tuple[list[ParsedCo
     # return the parsed and embedded structured contract sections
     return embedded_flat_section_list, section_tree
 
-
 # ##############################
 # CONTRACT METADATA EXTRACTION #
 ################################
