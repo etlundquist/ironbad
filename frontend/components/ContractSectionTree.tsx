@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
+import { useNotificationContext } from './common/NotificationProvider'
 
 interface ContractSectionNode {
   id: string
@@ -88,6 +89,7 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
   selectedRevision,
   onRevisionSelect
 }) => {
+  const { showToast } = useNotificationContext()
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set([section.id]))
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [annotationModal, setAnnotationModal] = useState<AnnotationModal>({
@@ -147,8 +149,14 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
         // brief emphasis
         highlight.style.outline = '2px solid #3b82f6'
         setTimeout(() => { if (highlight) highlight.style.outline = 'none' }, 800)
+      } else {
+        // If highlight not found, scroll to the node itself
+        const nodeElement = document.querySelector(`[data-node-id="${nodeId}"]`)
+        if (nodeElement) {
+          (nodeElement as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
       }
-    }, 120)
+    }, 200)
     return () => clearTimeout(timer)
   }, [selectedComment, nodeById])
 
@@ -171,8 +179,19 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
     const timer = setTimeout(() => {
       const container = document.querySelector(`[data-node-id="${nodeId}"] .section-markdown-inline`)
       const revEl = container?.querySelector(`[data-revision-id="${selectedRevision.id}"]`) as HTMLElement | null
-      if (revEl) revEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }, 120)
+      if (revEl) {
+        revEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        // brief emphasis
+        revEl.style.outline = '2px solid #3b82f6'
+        setTimeout(() => { if (revEl) revEl.style.outline = 'none' }, 800)
+      } else {
+        // If revision not found, scroll to the node itself
+        const nodeElement = document.querySelector(`[data-node-id="${nodeId}"]`)
+        if (nodeElement) {
+          (nodeElement as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }
+    }, 200)
     return () => clearTimeout(timer)
   }, [selectedRevision, nodeById])
 
@@ -257,7 +276,11 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
 
   const handleSectionFormSubmit = () => {
     if (!sectionForm.number.trim()) {
-      alert('Section number is required')
+      showToast({
+        type: 'warning',
+        title: 'Missing Section Number',
+        message: 'Section number is required'
+      })
       return
     }
 
@@ -535,14 +558,14 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
     const revisions = getRevisionsForNode(nodeId)
     if (!revisions || revisions.length === 0) return
 
-    // Only process pending revisions for highlighting
-    const activeRevisions = revisions.filter(r => r.status === 'pending')
+    // Process pending, accepted, and rejected revisions (but not stale/conflict for now)
+    const activeRevisions = revisions.filter(r => ['pending', 'accepted', 'rejected'].includes(r.status))
     if (activeRevisions.length === 0) return
 
     const ranges = activeRevisions
       .slice()
       .sort((a, b) => a.offset_beg - b.offset_beg)
-      .map(r => ({ start: r.offset_beg, end: r.offset_end, id: r.id, old_text: r.old_text, new_text: r.new_text }))
+      .map(r => ({ start: r.offset_beg, end: r.offset_end, id: r.id, old_text: r.old_text, new_text: r.new_text, status: r.status }))
 
     const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null)
     let globalOffset = 0
@@ -575,26 +598,45 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
         const localEnd = Math.min(len, r.end - nodeStart)
         if (localStart > localPos) frag.appendChild(document.createTextNode(text.slice(localPos, localStart)))
 
-        // Strike-through old_text (red)
-        const del = document.createElement('del')
-        del.className = 'revision-old'
-        del.style.color = '#dc2626'
-        del.setAttribute('data-revision-id', r.id)
-        del.onclick = (e) => handleRevisionClick(r.id, e)
-        del.textContent = text.slice(localStart, localEnd)
-        frag.appendChild(del)
+        if (r.status === 'pending') {
+          // Pending: Strike-through old_text (red) + show new_text
+          const del = document.createElement('del')
+          del.className = 'revision-old'
+          del.style.color = '#dc2626'
+          del.setAttribute('data-revision-id', r.id)
+          del.onclick = (e) => handleRevisionClick(r.id, e)
+          del.textContent = text.slice(localStart, localEnd)
+          frag.appendChild(del)
 
-        // Insert suggested new_text once at the end of the revision span
-        const isFinalSliceInThisNode = r.end <= nodeEnd
-        if (isFinalSliceInThisNode && !insertedNewText.has(r.id)) {
-          const ins = document.createElement('span')
-          ins.className = 'revision-new'
-          ins.style.color = '#dc2626'
-          ins.setAttribute('data-revision-id', r.id)
-          ins.onclick = (e) => handleRevisionClick(r.id, e)
-          ins.textContent = r.new_text
-          frag.appendChild(ins)
-          insertedNewText.add(r.id)
+          // Insert suggested new_text once at the end of the revision span
+          const isFinalSliceInThisNode = r.end <= nodeEnd
+          if (isFinalSliceInThisNode && !insertedNewText.has(r.id)) {
+            const ins = document.createElement('span')
+            ins.className = 'revision-new'
+            ins.style.color = '#dc2626'
+            ins.setAttribute('data-revision-id', r.id)
+            ins.onclick = (e) => handleRevisionClick(r.id, e)
+            ins.textContent = r.new_text
+            frag.appendChild(ins)
+            insertedNewText.add(r.id)
+          }
+        } else if (r.status === 'rejected') {
+          // Rejected: Show only old_text without strikethrough
+          frag.appendChild(document.createTextNode(text.slice(localStart, localEnd)))
+        } else if (r.status === 'accepted') {
+          // Accepted: Show only new_text (no strikethrough)
+          const isFinalSliceInThisNode = r.end <= nodeEnd
+          if (isFinalSliceInThisNode && !insertedNewText.has(r.id)) {
+            const span = document.createElement('span')
+            span.className = 'revision-accepted'
+            span.style.color = '#059669'
+            span.setAttribute('data-revision-id', r.id)
+            span.onclick = (e) => handleRevisionClick(r.id, e)
+            span.textContent = r.new_text
+            frag.appendChild(span)
+            insertedNewText.add(r.id)
+          }
+          // Don't show old text for accepted revisions
         }
 
         localPos = localEnd
@@ -626,15 +668,28 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
     containers.forEach((markdownInline) => {
       const inner = markdownInline.firstElementChild as HTMLElement | null
       if (!inner) return
-      // clear existing overlays (comments + revisions)
-      const existing = inner.querySelectorAll('.comment-highlight, .comment-highlight-selected, del.revision-old, span.revision-new')
-      existing.forEach(node => {
-        const parent = node.parentNode
-        if (!parent) return
-        parent.replaceChild(document.createTextNode((node as HTMLElement).tagName === 'DEL' ? (node.textContent || '') : (node.textContent || '')), node)
-        parent.normalize()
-      })
-      // apply for this node id
+
+      // Get the original markdown text from data attribute
+      const originalMarkdown = markdownInline.getAttribute('data-original-markdown') || ''
+      if (!originalMarkdown) return
+
+      // Reset to original plain text by clearing and re-rendering
+      // We need to extract just the text content from the markdown
+      // For simplicity, we'll use the current inner text on first render
+      // and store it for subsequent renders
+      if (!markdownInline.hasAttribute('data-original-text')) {
+        markdownInline.setAttribute('data-original-text', inner.textContent || '')
+      }
+
+      const originalText = markdownInline.getAttribute('data-original-text') || ''
+
+      // Clear all markup by replacing with plain text
+      while (inner.firstChild) {
+        inner.removeChild(inner.firstChild)
+      }
+      inner.appendChild(document.createTextNode(originalText))
+
+      // Apply highlights to clean text
       const sectionNode = markdownInline.closest('.section-node') as HTMLElement | null
       const nodeId = sectionNode?.getAttribute('data-node-id') || ''
       if (nodeId) {
@@ -780,6 +835,7 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
             {isExpanded && node.markdown && (
               <div
                 className="section-markdown-inline"
+                data-original-markdown={node.markdown}
                 style={{
                   fontSize: '14px',
                   lineHeight: '1.6',

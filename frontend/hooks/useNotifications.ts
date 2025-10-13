@@ -25,6 +25,7 @@ export interface ToastMessage {
 export interface UseNotificationsReturn {
   toasts: ToastMessage[]
   removeToast: (id: string) => void
+  addToast: (toast: Omit<ToastMessage, 'id' | 'timestamp'>) => void
   isConnected: boolean
 }
 
@@ -177,6 +178,7 @@ export function useNotifications(): UseNotificationsReturn {
   return {
     toasts,
     removeToast,
+    addToast,
     isConnected
   }
 }
