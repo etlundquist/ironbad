@@ -181,9 +181,7 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
       const revEl = container?.querySelector(`[data-revision-id="${selectedRevision.id}"]`) as HTMLElement | null
       if (revEl) {
         revEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        // brief emphasis
-        revEl.style.outline = '2px solid #3b82f6'
-        setTimeout(() => { if (revEl) revEl.style.outline = 'none' }, 800)
+        // The persistent blue highlight is now handled in applyRevisionHighlights
       } else {
         // If revision not found, scroll to the node itself
         const nodeElement = document.querySelector(`[data-node-id="${nodeId}"]`)
@@ -565,7 +563,15 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
     const ranges = activeRevisions
       .slice()
       .sort((a, b) => a.offset_beg - b.offset_beg)
-      .map(r => ({ start: r.offset_beg, end: r.offset_end, id: r.id, old_text: r.old_text, new_text: r.new_text, status: r.status }))
+      .map(r => ({ 
+        start: r.offset_beg, 
+        end: r.offset_end, 
+        id: r.id, 
+        old_text: r.old_text, 
+        new_text: r.new_text, 
+        status: r.status,
+        selected: selectedRevision?.id === r.id
+      }))
 
     const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null)
     let globalOffset = 0
@@ -606,6 +612,15 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
           del.setAttribute('data-revision-id', r.id)
           del.onclick = (e) => handleRevisionClick(r.id, e)
           del.textContent = text.slice(localStart, localEnd)
+          
+          // Add blue highlight box if this revision is selected
+          if (r.selected) {
+            del.style.backgroundColor = '#dbeafe'
+            del.style.padding = '2px 4px'
+            del.style.borderRadius = '4px'
+            del.style.border = '2px solid #3b82f6'
+          }
+          
           frag.appendChild(del)
 
           // Insert suggested new_text once at the end of the revision span
@@ -613,10 +628,19 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
           if (isFinalSliceInThisNode && !insertedNewText.has(r.id)) {
             const ins = document.createElement('span')
             ins.className = 'revision-new'
-            ins.style.color = '#dc2626'
+            ins.style.color = '#059669'
             ins.setAttribute('data-revision-id', r.id)
             ins.onclick = (e) => handleRevisionClick(r.id, e)
             ins.textContent = r.new_text
+            
+            // Add blue highlight box if this revision is selected
+            if (r.selected) {
+              ins.style.backgroundColor = '#dbeafe'
+              ins.style.padding = '2px 4px'
+              ins.style.borderRadius = '4px'
+              ins.style.border = '2px solid #3b82f6'
+            }
+            
             frag.appendChild(ins)
             insertedNewText.add(r.id)
           }
@@ -633,6 +657,15 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
             span.setAttribute('data-revision-id', r.id)
             span.onclick = (e) => handleRevisionClick(r.id, e)
             span.textContent = r.new_text
+            
+            // Add blue highlight box if this revision is selected
+            if (r.selected) {
+              span.style.backgroundColor = '#dbeafe'
+              span.style.padding = '2px 4px'
+              span.style.borderRadius = '4px'
+              span.style.border = '2px solid #3b82f6'
+            }
+            
             frag.appendChild(span)
             insertedNewText.add(r.id)
           }

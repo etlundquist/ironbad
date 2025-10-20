@@ -13,6 +13,9 @@ WORKDIR /src
 COPY pyproject.toml uv.lock ./
 RUN uv sync --locked
 
+# add logfire credentials
+COPY .logfire/ .logfire/
+
 # copy source code
 COPY app/ ./app/
 

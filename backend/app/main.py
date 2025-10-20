@@ -1,4 +1,6 @@
 import logging
+import logfire
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -15,12 +17,14 @@ from app.routers.contract_sections import router as contract_sections_router
 from app.routers.contract_chat import router as contract_chat_router
 from app.routers.contract_issues import router as contract_issues_router
 from app.routers.contract_actions import router as contract_actions_router
+from app.routers.agent import router as agent_router
 
 from app.routers.notifications import router as notifications_router
 from app.services.notifications import get_notifications_client, close_notifications_client
 
 
 logging.basicConfig(level=logging.INFO)
+logfire.configure()
 
 
 @asynccontextmanager
@@ -46,6 +50,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+logfire.instrument_fastapi(app, capture_headers=True)
+logfire.instrument_asyncpg()
+logfire.instrument_pydantic_ai()
 
 app.include_router(index_router)
 app.include_router(contracts_router)
@@ -58,3 +65,4 @@ app.include_router(contract_chat_router)
 app.include_router(contract_issues_router)
 app.include_router(contract_actions_router)
 app.include_router(notifications_router)
+app.include_router(agent_router)

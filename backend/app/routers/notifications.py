@@ -21,7 +21,7 @@ class PubSubMessage(TypedDict):
     data: str
 
 
-@router.get("/notifications")
+@router.get("/notifications", tags=["notifications"])
 async def notifications() -> EventSourceResponse:
     """long-lived SSE endpoint to send notifications for each client connection"""
 

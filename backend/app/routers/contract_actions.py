@@ -161,7 +161,6 @@ async def delete_contract_annotation(contract_id: UUID, annotation_id: UUID, db:
 #############################
 
 
-
 def handle_make_comment(contract: Contract, request: NewCommentAnnotationRequest) -> ContractActionResponse:
     """handle a request to make a new comment annotation"""
 

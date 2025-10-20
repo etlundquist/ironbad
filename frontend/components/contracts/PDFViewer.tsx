@@ -320,16 +320,18 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ contract }) => {
                   </div>
                 }
               >
-                {Array.from(new Array(numPages || 0), (_el, index) => (
-                  <div key={`page_${index + 1}`} id={`pdf-page-${index + 1}`} className="pdf-scroll-page">
-                    <Page
-                      pageNumber={index + 1}
-                      width={600}
-                      renderTextLayer={true}
-                      renderAnnotationLayer={true}
-                    />
-                  </div>
-                ))}
+                <div className="pdf-pages-wrapper">
+                  {Array.from(new Array(numPages || 0), (_el, index) => (
+                    <div key={`page_${index + 1}`} id={`pdf-page-${index + 1}`} className="pdf-scroll-page">
+                      <Page
+                        pageNumber={index + 1}
+                        width={600}
+                        renderTextLayer={true}
+                        renderAnnotationLayer={true}
+                      />
+                    </div>
+                  ))}
+                </div>
               </Document>
             </div>
           </div>

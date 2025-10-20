@@ -22,5 +22,7 @@ dependencies = [
     "taskiq-redis>=1.1.0",
     "sse-starlette>=3.0.2",
     "redis>=4.2",
+    "pydantic-ai>=1.1.0",
+    "logfire[asyncpg,fastapi]>=4.13.2",
 ]
 requires-python = ">=3.11"

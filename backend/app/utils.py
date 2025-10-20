@@ -10,6 +10,7 @@ from tiktoken import Encoding
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+default_tokenizer = tiktoken.encoding_for_model("gpt-5-mini")
 
 
 async def with_semaphore(coro: CoroutineType, sema: asyncio.Semaphore) -> asyncio.Future:
@@ -32,13 +33,12 @@ def string_truncate(string: str, max_tokens: int = 100_000, tokenizer: Optional[
     """truncate the input string to the specified number of tokens"""
 
     if not tokenizer:
-        tokenizer = tiktoken.get_encoding("cl100k_base")
+        tokenizer = default_tokenizer
 
     tokens = tokenizer.encode(string)
     token_count = len(tokens)
 
     if token_count > max_tokens:
-        logger.info(f"truncating input string with {token_count} input tokens to {max_tokens} output tokens")
         return tokenizer.decode(tokens[:max_tokens])
     else:
         return string
@@ -48,5 +48,5 @@ def count_tokens(string: str, tokenizer: Optional[Encoding] = None) -> int:
     """count the number of tokens in the input string"""
 
     if not tokenizer:
-        tokenizer = tiktoken.get_encoding("cl100k_base")
+        tokenizer = default_tokenizer
     return len(tokenizer.encode(string))
