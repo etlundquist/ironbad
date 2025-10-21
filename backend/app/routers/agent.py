@@ -1,11 +1,10 @@
 import re
-import json
 import logging
 
+from typing import AsyncGenerator, AsyncIterator
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
 from sse_starlette import EventSourceResponse, ServerSentEvent
 
 from sqlalchemy import select
@@ -23,9 +22,9 @@ from app.utils import string_truncate
 from app.routers.contract_actions import handle_make_comment, handle_make_revision
 
 
-from pydantic_ai import Agent, AgentRunResult, RunContext
+from pydantic_ai import Agent, AgentStreamEvent, AgentRunResultEvent, FinalResultEvent, FunctionToolCallEvent, FunctionToolResultEvent, PartDeltaEvent, PartStartEvent, RunContext, ModelRetry, ThinkingPartDelta
 from pydantic_ai.models.openai import OpenAIResponsesModelSettings
-from pydantic_ai.exceptions import ModelRetry
+
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -80,15 +79,15 @@ class AgentDependencies(ConfiguredBaseModel):
 model_settings = OpenAIResponsesModelSettings(
     timeout=60,
     max_tokens=4096,
-    openai_reasoning_effort="low",
-    openai_reasoning_generate_summary="concise",
+    openai_reasoning_effort="medium",
+    openai_reasoning_summary="detailed",
     openai_text_verbosity="medium",
     parallel_tool_calls=True
 )
 
 agent = Agent(
     name="Redline Agent",
-    model="openai:gpt-5",
+    model="openai:gpt-5-mini",
     instructions=PROMPT_REDLINE_AGENT,
     deps_type=AgentDependencies,
     model_settings=model_settings,
@@ -306,12 +305,47 @@ def make_revision(ctx: RunContext[AgentDependencies], section_number: str, old_t
     annotation = AgentRevisionAnnotation(section_number=section_number, old_text=old_text, new_text=new_text)
     return annotation
 
+# agent runs helper functions
+# ---------------------------
+
+async def handle_stream_events(stream_events: AsyncIterator[AgentStreamEvent | AgentRunResultEvent]) -> AsyncGenerator[ServerSentEvent, None]:
+    """convert agent stream events into server-sent events and forward them to the client"""
+
+    async for event in stream_events:
+        if not isinstance(event, PartDeltaEvent):
+            logger.info(f"agent stream event: {event}")
+        if isinstance(event, PartStartEvent):
+            event_type = "part_start_event"
+            event_data = {"index": event.index, "part_kind": event.part.part_kind}
+            yield ServerSentEvent(event=event_type, data=event_data)
+        elif isinstance(event, PartDeltaEvent):
+            if isinstance(event.delta, ThinkingPartDelta):
+                event_type = "thinking_part_delta_event"
+                event_data = {"delta": event.delta}
+                yield ServerSentEvent(event=event_type, data=event_data)
+        elif isinstance(event, FunctionToolCallEvent):
+            event_type = "function_tool_call_event"
+            event_data = {"tool_name": event.part.tool_name, "tool_call_id": event.part.tool_call_id, "tool_call_args": event.part.args_as_dict()}
+            yield ServerSentEvent(event=event_type, data=event_data)
+        elif isinstance(event, FunctionToolResultEvent):
+            event_type = "function_tool_result_event"
+            event_data = {"tool_call_id": event.tool_call_id, "tool_call_result": event.result.content}
+            yield ServerSentEvent(event=event_type, data=event_data)
+        elif isinstance(event, FinalResultEvent):
+            event_type = "final_result_event"
+            event_data = {"tool_name": event.tool_name}
+            yield ServerSentEvent(event=event_type, data=event_data)
+        elif isinstance(event, AgentRunResultEvent):
+            event_type = "agent_run_result_event"
+            event_data = {"agent_run_result": event.result.output}
+            yield ServerSentEvent(event=event_type, data=event_data)
+
 
 # agent runs endpoint definitions
 # -------------------------------
 
-@router.post("/agent/runs", response_model=AgentRunResponse, tags=["agent"])
-async def run_agent(request: AgentRunRequest, db: AsyncSession = Depends(get_db)) -> AgentRunResponse:
+@router.post("/agent/runs", tags=["agent"])
+async def run_agent(request: AgentRunRequest, db: AsyncSession = Depends(get_db)) -> EventSourceResponse:
     """create and execute a new agent run"""
 
     # fetch the relevant contract from the database and convert to pydantic for the run
@@ -322,17 +356,8 @@ async def run_agent(request: AgentRunRequest, db: AsyncSession = Depends(get_db)
         raise HTTPException(status_code=404, detail="contract not found")
     contract = Contract.model_validate(dbcontract)
 
-    # create the agent dependencies and exeucte the run
+    # create the dependencies and execute the agent run
     run_id = uuid4()
     deps = AgentDependencies(run_id=run_id, db=db, contract=contract)
-    run_result: AgentRunResult = await agent.run(user_prompt=request.message, deps=deps)
-
-    # persist contract/annotation updates to the database
-    dbcontract.section_tree = json.loads(contract.section_tree.model_dump_json())
-    dbcontract.annotations = json.loads(contract.annotations.model_dump_json())
-    dbcontract.version += 1
-    await db.commit()
-
-    # return the agent's final response to the client
-    response = AgentRunResponse(id=run_id, message=run_result.output)
-    return response
+    stream_events = handle_stream_events(agent.run_stream_events(user_prompt=request.message, deps=deps))
+    return EventSourceResponse(stream_events)
