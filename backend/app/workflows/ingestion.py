@@ -115,7 +115,7 @@ def parse_leaf_sections(contract_lines: list[str], first_section_line: str, line
 
     # define regular expressions to match new body/appendix sections and extract section numbers/names with capture groups
     body_regex = re.compile(r"^(?:ARTICLE|SECTION)?\s*(\d+(\.\d+)*[A-Za-z]?)(?:\.|:)?(?:\s+(.+))?$", re.IGNORECASE)
-    appendix_regex = re.compile(r"^(APPENDIX|ATTACHMENT|EXHIBIT|SCHEDULE)\s+(\w+)(?:\s+(.+))?$", re.IGNORECASE)
+    appendix_regex = re.compile(r"^(APPENDIX|ATTACHMENT|EXHIBIT|ANNEXURE|SCHEDULE)\s+(\w+)(?:\s+(.+))?$", re.IGNORECASE)
     page_break_text = "<!-- pagebreak -->"
 
     for line in contract_lines:

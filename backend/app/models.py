@@ -1,5 +1,6 @@
 import uuid
 
+from opentelemetry.sdk.trace import id_generator
 from sqlalchemy import Boolean, Column, String, Integer, DateTime, Enum, JSON, ForeignKey, ARRAY
 from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import UUID, BYTEA
@@ -142,3 +143,29 @@ class ContractChatMessage(Base):
 
     contract = relationship("Contract")
     chat_thread = relationship("ContractChatThread")
+
+
+class AgentChatThread(Base):
+    __tablename__ = "agent_chat_threads"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    contract_id = Column(UUID(as_uuid=True), ForeignKey(column="contracts.id", ondelete="CASCADE"), nullable=False)
+    openai_conversation_id = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    contract = relationship("Contract")
+
+class AgentChatMessage(Base):
+    __tablename__ = "agent_chat_messages"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    contract_id = Column(UUID(as_uuid=True), ForeignKey(column="contracts.id", ondelete="CASCADE"), nullable=False)
+    chat_thread_id = Column(UUID(as_uuid=True), ForeignKey(column="agent_chat_threads.id", ondelete="CASCADE"), nullable=False)
+    status = Column(Enum(ChatMessageStatus), nullable=False)
+    role = Column(Enum(ChatMessageRole), nullable=False)
+    content = Column(String, nullable=False, default="")
+    parent_chat_message_id = Column(UUID(as_uuid=True), ForeignKey(column="agent_chat_messages.id"), nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    contract = relationship("Contract")
+    chat_thread = relationship("AgentChatThread")

@@ -40,8 +40,10 @@ class IssueResolution(Enum):
     SUGGEST_REVISION = "suggest_revision"
 
 class ChatMessageStatus(Enum):
+    QUEUED = "queued"
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
+    CANCELLED = "cancelled"
     COMPLETED = "completed"
     FAILED = "failed"
 

@@ -24,6 +24,6 @@ dependencies = [
     "redis>=4.2",
     "pydantic-ai>=1.1.0",
     "logfire[asyncpg,fastapi]>=4.13.2",
-    "openai-agents>=0.3.3",
+    "openai-agents>=0.4",
 ]
 requires-python = ">=3.11"

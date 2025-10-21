@@ -2,8 +2,10 @@ import re
 import json
 import logging
 
-from typing import AsyncGenerator, AsyncIterator
-from uuid import UUID, uuid4
+from asyncio import CancelledError
+from datetime import datetime
+from typing import AsyncGenerator, AsyncIterator, Literal, Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from sse_starlette import EventSourceResponse, ServerSentEvent
@@ -11,35 +13,33 @@ from sse_starlette import EventSourceResponse, ServerSentEvent
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from openai import AsyncOpenAI
+from openai.types.responses import ResponseInProgressEvent, ResponseFailedEvent, ResponseTextDeltaEvent
+
+from agents import Agent, RawResponsesStreamEvent, RunContextWrapper, RunItemStreamEvent, Runner, StreamEvent, function_tool
+from agents.model_settings import Reasoning, ModelSettings
+from agents.items import  MessageOutputItem, ToolCallItem, ToolCallOutputItem, ReasoningItem
+
 from app.schemas import ConfiguredBaseModel, Contract, ContractSectionNode, NewCommentAnnotationRequest, NewRevisionAnnotationRequest
-from app.models import Contract as DBContract, ContractSection as DBContractSection
-from app.enums import ContractSectionType
+from app.enums import ChatMessageRole, ChatMessageStatus, ContractSectionType
+from app.models import (
+    Contract as DBContract, 
+    ContractSection as DBContractSection,
+    AgentChatMessage as DBAgentChatMessage, 
+    AgentChatThread as DBAgentChatThread
+)
 
 from app.database import get_db
 from app.prompts import PROMPT_REDLINE_AGENT
 from app.embeddings import get_text_embedding
 from app.utils import string_truncate
-
 from app.routers.contract_actions import handle_make_comment, handle_make_revision
-
-from agents import Agent, RunContextWrapper, RunItemStreamEvent, Runner, StreamEvent, function_tool
-from agents.model_settings import Reasoning, ModelSettings
-from agents.items import  MessageOutputItem, ToolCallItem, ToolCallOutputItem, ReasoningItem
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# agent run request/response types
-# --------------------------------
-
-class AgentRunRequest(ConfiguredBaseModel):
-    contract_id: UUID
-    message: str
-
-class AgentRunResponse(ConfiguredBaseModel):
-    id: UUID
-    message: str
-
+# agent tool definitions
+# ----------------------
 
 class AgentContractSectionPreview(ConfiguredBaseModel):
     type: ContractSectionType
@@ -69,12 +69,9 @@ class AgentRevisionAnnotation(ConfiguredBaseModel):
     new_text: str
 
 class AgentContext(ConfiguredBaseModel):
-    run_id: UUID
     db: AsyncSession
     contract: Contract
 
-# agent tool helper functions
-# ---------------------------
 
 def flatten_section_tree(node: ContractSectionNode) -> list[ContractSectionNode]:
     """convert the section tree into a flat list of ordered section nodes"""
@@ -108,8 +105,6 @@ async def get_relevant_sections(db: AsyncSession, contract_id: UUID, search_phra
     relevant_sections = result.scalars().all()
     return relevant_sections
 
-# agent tool definitions
-# ----------------------
 
 @function_tool(docstring_style="sphinx", use_docstring_info=True)
 async def list_contract_sections(wrapper: RunContextWrapper[AgentContext]) -> list[AgentContractSectionPreview]:
@@ -284,46 +279,229 @@ def make_revision(wrapper: RunContextWrapper[AgentContext], section_number: str,
     annotation = AgentRevisionAnnotation(section_number=section_number, old_text=old_text, new_text=new_text)
     return annotation
 
-# core agent configuration and dependencies
-# -----------------------------------------
+# agent configuration and definition
+# ----------------------------------
 
 model_settings = ModelSettings(
-    reasoning=Reasoning(effort="medium", summary="detailed"),
-    verbosity="medium",
+    reasoning=Reasoning(effort="medium", summary="detailed"), 
+    verbosity="medium", 
+    store=True
 )
 
 agent = Agent[AgentContext](
-    name="Redline Agent",
-    instructions=PROMPT_REDLINE_AGENT,
+    name="Contract Redline Agent",
     model="gpt-5-mini",
+    instructions=PROMPT_REDLINE_AGENT,
     model_settings=model_settings,
     tools=[list_contract_sections, get_contract_section_text, search_contract_sections, search_contract_lines, make_comment, make_revision]
 )
 
-# agent runs helper functions
+# agent runs type definitions
 # ---------------------------
 
-async def handle_event_stream(event_stream: AsyncIterator[StreamEvent]) -> AsyncGenerator[ServerSentEvent, None]:
+class AgentRunRequest(ConfiguredBaseModel):
+    contract_id: UUID
+    chat_thread_id: Optional[UUID] = None
+    content: str
+
+class AgentRunEventStreamContext(ConfiguredBaseModel):
+    db: AsyncSession
+    chat_thread_id: UUID
+    user_message_id: UUID
+    assistant_message_id: UUID
+
+
+class AgentChatThread(ConfiguredBaseModel):
+    id: UUID
+    contract_id: UUID
+    openai_conversation_id: str
+    created_at: datetime
+    updated_at: datetime
+
+class AgentChatMessage(ConfiguredBaseModel):
+    id: UUID
+    chat_thread_id: UUID
+    parent_chat_message_id: Optional[UUID] = None
+    status: ChatMessageStatus
+    role: ChatMessageRole
+    content: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class AgentRunCreatedEvent(ConfiguredBaseModel):
+    event: Literal["run_created"] = "run_created"
+    chat_thread: AgentChatThread
+    user_message: AgentChatMessage
+    assistant_message: AgentChatMessage
+
+class AgentRunCompletedEvent(ConfiguredBaseModel):
+    event: Literal["run_completed"] = "run_completed"
+    assistant_message: AgentChatMessage
+
+class AgentRunFailedEvent(ConfiguredBaseModel):
+    event: Literal["run_failed"] = "run_failed"
+    assistant_message: AgentChatMessage
+
+class AgentRunCancelledEvent(ConfiguredBaseModel):
+    event: Literal["run_cancelled"] = "run_cancelled"
+    assistant_message: AgentChatMessage
+
+class AgentRunMessageStatusUpdateEvent(ConfiguredBaseModel):
+    event: Literal["message_status_update"] = "message_status_update"
+    chat_thread_id: UUID
+    chat_message_id: UUID
+    status: ChatMessageStatus
+
+class AgentRunMessageTokenDeltaEvent(ConfiguredBaseModel):
+    event: Literal["message_token_delta"] = "message_token_delta"
+    chat_thread_id: UUID
+    chat_message_id: UUID
+    delta: str
+
+class AgentToolCallEvent(ConfiguredBaseModel):
+    event: Literal["tool_call"] = "tool_call"
+    chat_thread_id: UUID
+    chat_message_id: UUID
+    tool_name: str
+    tool_call_id: str 
+    tool_call_args: dict
+    
+class AgentToolCallOutputEvent(ConfiguredBaseModel):
+    event: Literal["tool_call_output"] = "tool_call_output"
+    chat_thread_id: UUID
+    chat_message_id: UUID
+    tool_call_id: str   
+    tool_call_output: str
+
+class AgentReasoningSummaryEvent(ConfiguredBaseModel):
+    event: Literal["reasoning_summary"] = "reasoning_summary"
+    chat_thread_id: UUID
+    chat_message_id: UUID
+    reasoning_id: str
+    reasoning_summary: str
+
+# agent runs event stream handler definition
+# ------------------------------------------
+
+async def handle_event_stream(event_stream: AsyncIterator[StreamEvent], context: AgentRunEventStreamContext) -> AsyncGenerator[ServerSentEvent, None]:
     """convert agent stream events into server-sent events and forward them to the client"""
 
-    async for event in event_stream:
-        if isinstance(event, RunItemStreamEvent):
-            if isinstance(event.item, ToolCallItem):
-                event_type = "tool_call"
-                event_data = {"tool_name": event.item.raw_item.name, "tool_call_id": event.item.raw_item.call_id, "tool_call_args": event.item.raw_item.arguments}
-                yield ServerSentEvent(event=event_type, data=event_data)
-            elif isinstance(event.item, ToolCallOutputItem):
-                event_type = "tool_call_output"
-                event_data = {"tool_call_id": event.item.raw_item["call_id"], "tool_call_output": event.item.raw_item["output"]}
-                yield ServerSentEvent(event=event_type, data=event_data)
-            elif isinstance(event.item, ReasoningItem):
-                event_type = "reasoning"
-                event_data = {"reasoning_id": event.item.raw_item.id, "reasoning_summary": event.item.raw_item.summary, "reasoning_content": event.item.raw_item.content}
-                yield ServerSentEvent(event=event_type, data=event_data)
-            elif isinstance(event.item, MessageOutputItem):
-                event_type = "message_output"
-                event_data = {"message_id": event.item.raw_item.id, "message_role": event.item.raw_item.role, "message_content": event.item.raw_item.content}
-                yield ServerSentEvent(event=event_type, data=event_data)
+    # send the initial run created event initializing the chat thread and user/assistant messages
+    chat_thread = await context.db.get(DBAgentChatThread, context.chat_thread_id)
+    user_message = await context.db.get(DBAgentChatMessage, context.user_message_id)
+    assistant_message = await context.db.get(DBAgentChatMessage, context.assistant_message_id)
+    run_created_event = AgentRunCreatedEvent(
+        chat_thread=AgentChatThread.model_validate(chat_thread),
+        user_message=AgentChatMessage.model_validate(user_message),
+        assistant_message=AgentChatMessage.model_validate(assistant_message)
+    )
+    yield ServerSentEvent(event=run_created_event.event, data=run_created_event.model_dump_json())
+
+    try:
+
+        async for event in event_stream:
+
+            # handle relevant (low-level) raw response stream events
+            if isinstance(event, RawResponsesStreamEvent):
+                if isinstance(event.data, ResponseInProgressEvent):
+                    # send an in-progress status update event to the client
+                    sse_event = AgentRunMessageStatusUpdateEvent(
+                        chat_thread_id=context.chat_thread_id,
+                        chat_message_id=context.assistant_message_id,
+                        status=ChatMessageStatus.IN_PROGRESS
+                    )
+                    yield ServerSentEvent(event=sse_event.event, data=sse_event.model_dump_json())
+                    # update the assistant message status in the database
+                    assistant_message = await context.db.get(DBAgentChatMessage, context.assistant_message_id)
+                    assistant_message.status = ChatMessageStatus.IN_PROGRESS
+                    await context.db.commit()
+                elif isinstance(event.data, ResponseTextDeltaEvent):
+                    # send a token delta event to the client to build the response content in real-time
+                    sse_event = AgentRunMessageTokenDeltaEvent(
+                        chat_thread_id=context.chat_thread_id,
+                        chat_message_id=context.assistant_message_id,
+                        delta=event.data.delta
+                    )
+                    yield ServerSentEvent(event=sse_event.event, data=sse_event.model_dump_json())
+                elif isinstance(event.data, ResponseFailedEvent):
+                    # log the error details for debugging
+                    logger.error(f"agent run failed: {event.data.response.error}")
+                    # send a failed status update event to the client
+                    sse_event = AgentRunMessageStatusUpdateEvent(
+                        chat_thread_id=context.chat_thread_id,
+                        chat_message_id=context.assistant_message_id,
+                        status=ChatMessageStatus.FAILED
+                    )
+                    yield ServerSentEvent(event=sse_event.event, data=sse_event.model_dump_json())
+                    # update the finalized assistant message status/content in the database for the failed run
+                    assistant_message = await context.db.get(DBAgentChatMessage, context.assistant_message_id)
+                    assistant_message.status = ChatMessageStatus.FAILED
+                    assistant_message.content = "There was an error generating the response. Please try again."
+                    sse_event = AgentRunFailedEvent(assistant_message=AgentChatMessage.model_validate(assistant_message))
+                    await context.db.commit()
+                    yield ServerSentEvent(event=sse_event.event, data=sse_event.model_dump_json())
+                    break
+
+            # handle the (high-level) agent run item stream events
+            elif isinstance(event, RunItemStreamEvent):
+                if isinstance(event.item, ToolCallItem):
+                    # send a tool call event to the client with the tool name and call id/args
+                    sse_event = AgentToolCallEvent(
+                        chat_thread_id=context.chat_thread_id,
+                        chat_message_id=context.assistant_message_id,
+                        tool_name=event.item.raw_item.name, 
+                        tool_call_id=event.item.raw_item.call_id, 
+                        tool_call_args=json.loads(event.item.raw_item.arguments)
+                    )
+                    yield ServerSentEvent(event=sse_event.event, data=sse_event.model_dump_json())
+                elif isinstance(event.item, ToolCallOutputItem):
+                    # send a tool call output event to the client with the tool call id and tool call output
+                    sse_event = AgentToolCallOutputEvent(
+                        chat_thread_id=context.chat_thread_id,
+                        chat_message_id=context.assistant_message_id,
+                        tool_call_id=event.item.raw_item["call_id"], 
+                        tool_call_output=str(event.item.raw_item["output"])
+                    )
+                    yield ServerSentEvent(event=sse_event.event, data=sse_event.model_dump_json())
+                elif isinstance(event.item, ReasoningItem):
+                    # send a reasoning summary event to the client with the reasoning id and summary
+                    sse_event = AgentReasoningSummaryEvent(
+                        chat_thread_id=context.chat_thread_id,
+                        chat_message_id=context.assistant_message_id,
+                        reasoning_id=event.item.raw_item.id, 
+                        reasoning_summary="\n\n".join([summary.text for summary in event.item.raw_item.summary if summary.type == "summary_text"])
+                    )
+                    yield ServerSentEvent(event=sse_event.event, data=sse_event.model_dump_json())
+                elif isinstance(event.item, MessageOutputItem):
+                    # update the finalized assistant message status/content in the database for the completed run
+                    assistant_message = await context.db.get(DBAgentChatMessage, context.assistant_message_id)
+                    assistant_message.status = ChatMessageStatus.COMPLETED
+                    assistant_message.content = "".join([message.text for message in event.item.raw_item.content if message.type == "output_text"])
+                    sse_event = AgentRunCompletedEvent(assistant_message=AgentChatMessage.model_validate(assistant_message))
+                    await context.db.commit()
+                    yield ServerSentEvent(event=sse_event.event, data=sse_event.model_dump_json())
+                    break
+
+    except CancelledError:
+        # log the cancellation for debugging and update the cancelled assistant message status/content in the database for the cancelled run
+        logger.error("agent run cancelled!", exc_info=True)
+        assistant_message = await context.db.get(DBAgentChatMessage, context.assistant_message_id)
+        assistant_message.status = ChatMessageStatus.CANCELLED
+        assistant_message.content = "The agent run was cancelled. Please try again."
+        sse_event = AgentRunCancelledEvent(assistant_message=AgentChatMessage.model_validate(assistant_message))
+        await context.db.commit()
+        yield ServerSentEvent(event=sse_event.event, data=sse_event.model_dump_json())
+    except Exception:
+        # log the error details for debugging and update the failed assistant message status/content in the database for the failed run
+        logger.error("agent run failed!", exc_info=True)
+        assistant_message = await context.db.get(DBAgentChatMessage, context.assistant_message_id)
+        assistant_message.status = ChatMessageStatus.FAILED
+        assistant_message.content = "There was an error generating the response. Please try again."
+        sse_event = AgentRunFailedEvent(assistant_message=AgentChatMessage.model_validate(assistant_message))
+        await context.db.commit()
+        yield ServerSentEvent(event=sse_event.event, data=sse_event.model_dump_json())
+
 
 # agent runs endpoint definitions
 # -------------------------------
@@ -331,18 +509,67 @@ async def handle_event_stream(event_stream: AsyncIterator[StreamEvent]) -> Async
 @router.post("/agent/runs", tags=["agent"])
 async def run_agent(request: AgentRunRequest, db: AsyncSession = Depends(get_db)) -> EventSourceResponse:
     """create and execute a new agent run"""
-
-    # fetch the relevant contract from the database and convert to pydantic for the run
+    
+    # fetch the relevant contract from the database and deserialize to pydantic to add to the agent's runtime context
     query = select(DBContract).where(DBContract.id == request.contract_id)
     result = await db.execute(query)
     dbcontract = result.scalar_one_or_none()
     if not dbcontract:
-        raise HTTPException(status_code=404, detail="contract not found")
+        raise HTTPException(status_code=404, detail=f"contract_id={request.contract_id} not found")
     contract = Contract.model_validate(dbcontract)
 
-    # create the dependencies and execute the agent run
-    run_id = uuid4()
-    context = AgentContext(run_id=run_id, db=db, contract=contract)
+    # get/create the relevant chat thread for the agent run
+    # NOTE: conversation state/history is managed server-side via the OpenAI Conversations API
+    if request.chat_thread_id:
+        query = select(DBAgentChatThread).where(DBAgentChatThread.id == request.chat_thread_id)
+        result = await db.execute(query)
+        chat_thread = result.scalar_one_or_none()
+        if not chat_thread:
+            raise HTTPException(status_code=404, detail=f"chat_thread_id={request.chat_thread_id} not found")
+    else:
+        openai = AsyncOpenAI()
+        openai_conversation = await openai.conversations.create()
+        chat_thread = DBAgentChatThread(contract_id=contract.id, openai_conversation_id=openai_conversation.id)
+        db.add(chat_thread)
+        await db.flush()
 
-    result = Runner.run_streamed(starting_agent=agent, input=request.message, context=context)
-    return EventSourceResponse(handle_event_stream(result.stream_events()))
+    # add the new user message to the database
+    user_message = DBAgentChatMessage(
+        contract_id=contract.id, 
+        chat_thread_id=chat_thread.id, 
+        status=ChatMessageStatus.COMPLETED,
+        role=ChatMessageRole.USER, 
+        content=request.content
+    )
+    db.add(user_message)
+    await db.flush()
+
+    # add the new assistant message to the database 
+    # NOTE: we mark the new assistant message as pending and set it's content to a default value to be updated via the event stream handler
+    assistant_message = DBAgentChatMessage(
+        contract_id=contract.id, 
+        chat_thread_id=chat_thread.id, 
+        status=ChatMessageStatus.PENDING,
+        role=ChatMessageRole.ASSISTANT, 
+        content="",
+        parent_chat_message_id=user_message.id
+    )
+    db.add(assistant_message)
+    await db.flush()
+
+    # create the agent's runtime context and the event stream handler's context 
+    agent_context = AgentContext(db=db, contract=contract)
+    stream_context = AgentRunEventStreamContext(db=db, chat_thread_id=chat_thread.id, user_message_id=user_message.id, assistant_message_id=assistant_message.id)
+
+    # execute the agent run with the user's current input, conversation history, and dynamic agent runtime context
+    result = Runner.run_streamed(
+        starting_agent=agent, 
+        conversation_id=chat_thread.openai_conversation_id,
+        input=request.content, 
+        context=agent_context,
+        max_turns=20
+    )
+
+    # commit the initial user/assistant messages to the database and return the event stream response
+    await db.commit()
+    return EventSourceResponse(handle_event_stream(event_stream=result.stream_events(), context=stream_context))
