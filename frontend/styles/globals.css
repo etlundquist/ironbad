@@ -2328,6 +2328,49 @@ main {
   color: #1e40af;
 }
 
+.chat-message-meta .status.responding {
+  background-color: #e0e7ff;
+  color: #3730a3;
+}
+
+/* Agent Progress Panel Styles */
+.agent-progress-panel {
+  margin-top: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #374151;
+}
+
+.agent-progress-panel .progress-header {
+  transition: background-color 0.2s ease;
+}
+
+.agent-progress-panel .progress-header:hover {
+  background-color: #374151 !important;
+}
+
+.agent-progress-panel .progress-content {
+  scrollbar-width: thin;
+  scrollbar-color: #4b5563 #000000;
+}
+
+.agent-progress-panel .progress-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.agent-progress-panel .progress-content::-webkit-scrollbar-track {
+  background: #000000;
+}
+
+.agent-progress-panel .progress-content::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 3px;
+}
+
+.agent-progress-panel .progress-content::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
 .chat-message-meta .status.completed {
   background-color: #d1fae5;
   color: #065f46;
@@ -2653,12 +2696,28 @@ main {
 .page-container {
   min-height: 100vh;
   background-color: #f8fafc;
+  max-width: none;
+  width: 100vw;
+  padding: 0;
+  margin: 0;
 }
 
 .main-content {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 2rem;
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 1rem;
+}
+
+/* Full-width layout for review page */
+.review-workspace {
+  width: 100%;
+  max-width: none;
+}
+
+.workspace-content {
+  width: 100%;
+  max-width: none;
 }
 
 .dashboard-header {
@@ -3401,3 +3460,87 @@ main {
     min-width: 100%; /* Allow full width on mobile */
   }
 }
+
+/* Agent Chat Styles */
+.agent-chat-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.agent-chat-panel .tab-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.agent-chat-panel .tab-header {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.agent-chat-panel .chat-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.agent-chat-panel .chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 8px;
+  margin-bottom: 16px;
+}
+
+.agent-chat-panel .chat-input-container {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.agent-chat-panel .form-input {
+  flex: 1;
+  min-height: 40px;
+  max-height: 120px;
+  resize: none;
+}
+
+.agent-chat-panel .cta-button {
+  white-space: nowrap;
+  min-width: 60px;
+}
+
+.agent-chat-panel .typing-indicator {
+  color: #3b82f6;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Responsive adjustments for agent chat and annotations */
+@media (max-width: 1600px) {
+  .workspace-content {
+    grid-template-columns: 70% 30% !important;
+  }
+  
+  .agent-chat-panel {
+    display: none;
+  }
+}
+
+@media (max-width: 1200px) {
+  .workspace-content {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .agent-chat-panel,
+  .comments-sidebar {
+    display: none;
+  }
+}
+

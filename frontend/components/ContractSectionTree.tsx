@@ -90,6 +90,14 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
   onRevisionSelect
 }) => {
   const { showToast } = useNotificationContext()
+
+  // Function to decode HTML entities
+  const decodeHtmlEntities = (text: string): string => {
+    const textarea = document.createElement('textarea')
+    textarea.innerHTML = text
+    return textarea.value
+  }
+
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set([section.id]))
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [annotationModal, setAnnotationModal] = useState<AnnotationModal>({
@@ -848,7 +856,7 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
                   fontSize: '14px',
                   flexShrink: 0
                 }}>
-                  {node.name}
+                  {decodeHtmlEntities(node.name)}
                 </span>
               )}
               <span className="section-type" style={{
@@ -940,7 +948,7 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
                 }}
               >
                 <div>
-                  <ReactMarkdown>{node.markdown}</ReactMarkdown>
+                  <ReactMarkdown>{decodeHtmlEntities(node.markdown)}</ReactMarkdown>
                 </div>
               </div>
             )}
@@ -1162,7 +1170,7 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
                 fontStyle: 'italic',
                 border: '1px solid #e5e7eb'
               }}>
-                {annotationModal.selectedText}
+                {decodeHtmlEntities(annotationModal.selectedText)}
               </div>
             </div>
 

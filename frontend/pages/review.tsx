@@ -8,6 +8,7 @@ import { RevisionsPanel } from '../components/review/RevisionsPanel'
 import { SectionAddsPanel } from '../components/review/SectionAddsPanel'
 import { SectionRemovesPanel } from '../components/review/SectionRemovesPanel'
 import { ChangelogPanel } from '../components/review/ChangelogPanel'
+import { AgentChatTab } from '../components/contracts/AgentChatTab'
 import { ContractWithAnnotations, ContractAnnotations, CommentAnnotation, RevisionAnnotation } from '../lib/types/annotation'
 import { performContractAction, resolveAnnotation, deleteAnnotation } from '../lib/api/annotations'
 import { fetchContracts } from '../lib/api'
@@ -32,6 +33,8 @@ const ReviewPage: NextPage = () => {
   const [deletingSectionRemoveId, setDeletingSectionRemoveId] = useState<string | null>(null)
   const [resolvingSectionRemoveId, setResolvingSectionRemoveId] = useState<string | null>(null)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const [showAgentChat, setShowAgentChat] = useState(true)
+  const [showAnnotations, setShowAnnotations] = useState(true)
   const { isConnected } = useNotificationContext()
 
   useEffect(() => {
@@ -317,6 +320,18 @@ const ReviewPage: NextPage = () => {
     return `${heightPercent}%`
   }
 
+  const getGridTemplateColumns = () => {
+    if (showAgentChat && showAnnotations) {
+      return '30% 40% 30%'
+    } else if (showAgentChat && !showAnnotations) {
+      return '30% 70%'
+    } else if (!showAgentChat && showAnnotations) {
+      return '70% 30%'
+    } else {
+      return '1fr'
+    }
+  }
+
   if (loading) {
     return (
       <div className="page-container">
@@ -393,11 +408,43 @@ const ReviewPage: NextPage = () => {
                 {getStatusBadge(selectedContract.status)}
               </div>
               <div className="workspace-actions">
+                {!showAgentChat && (
+                  <button onClick={() => setShowAgentChat(true)} className="cta-button secondary" style={{ marginRight: '8px' }}>
+                    Show Agent Chat
+                  </button>
+                )}
+                {!showAnnotations && (
+                  <button onClick={() => setShowAnnotations(true)} className="cta-button secondary" style={{ marginRight: '8px' }}>
+                    Show Contract Annotations
+                  </button>
+                )}
                 <button onClick={() => setSelectedContract(null)} className="back-button">Select Different Contract</button>
               </div>
             </div>
 
-            <div ref={workspaceRef} className="workspace-content" style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1fr 350px', gap: '16px', height: 'calc(100vh - 200px)', width: '100%' }}>
+            <div ref={workspaceRef} className="workspace-content" style={{ position: 'relative', display: 'grid', gridTemplateColumns: getGridTemplateColumns(), gap: '20px', height: 'calc(100vh - 120px)', width: '100%', maxWidth: 'none' }}>
+              {showAgentChat && (
+                <div className="agent-chat-panel" style={{ width: '100%', backgroundColor: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                  <div className="panel-header" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '16px' }}>
+                    <button 
+                      onClick={() => setShowAgentChat(false)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#6b7280' }}
+                      title="Hide Agent Chat"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div style={{ flex: 1, overflow: 'hidden' }}>
+                    <AgentChatTab
+                      contract={selectedContract}
+                      contractId={selectedContract.id}
+                      isAnalyzing={false}
+                      onIngest={() => {}}
+                      navigateToPage={() => {}}
+                    />
+                  </div>
+                </div>
+              )}
               <div className="contract-viewer" style={{ flex: 1, minWidth: 0 }}>
                 {selectedContract.section_tree ? (
                   <ContractSectionTree
@@ -419,7 +466,17 @@ const ReviewPage: NextPage = () => {
                 )}
               </div>
 
-              <div className="comments-sidebar" style={{ width: '350px', backgroundColor: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
+              {showAnnotations && (
+                <div className="comments-sidebar" style={{ width: '100%', backgroundColor: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
+                  <div className="panel-header" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '16px' }}>
+                    <button 
+                      onClick={() => setShowAnnotations(false)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#6b7280' }}
+                      title="Hide Contract Annotations"
+                    >
+                      ×
+                    </button>
+                  </div>
                 <CommentsPanel
                   comments={selectedContract.annotations?.comments || []}
                   selectedComment={selectedComment}
@@ -479,7 +536,8 @@ const ReviewPage: NextPage = () => {
                   onToggleCollapse={() => toggleGroupCollapse('changelog')}
                   height={getGroupHeight('changelog')}
                 />
-              </div>
+                </div>
+              )}
 
               {connector && (
                 <svg style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>

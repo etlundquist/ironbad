@@ -20,6 +20,13 @@ export const ChangelogPanel: React.FC<ChangelogPanelProps> = ({
   onToggleCollapse,
   height
 }) => {
+  // Function to decode HTML entities
+  const decodeHtmlEntities = (text: string): string => {
+    const textarea = document.createElement('textarea')
+    textarea.innerHTML = text
+    return textarea.value
+  }
+
   // Filter for resolved annotations
   const resolvedComments = comments.filter(c => c.status === 'resolved')
   const resolvedRevisions = revisions.filter(r => ['accepted', 'rejected'].includes(r.status))
@@ -78,7 +85,7 @@ export const ChangelogPanel: React.FC<ChangelogPanelProps> = ({
       case 'revision':
         return `"${data.old_text.substring(0, 30)}..." → "${data.new_text.substring(0, 30)}..."`
       case 'section_add':
-        return data.new_node?.markdown?.split('\n')[0]?.replace(/^#+\s*/, '').substring(0, 60) || 'New Section'
+        return decodeHtmlEntities(data.new_node?.markdown?.split('\n')[0]?.replace(/^#+\s*/, '').substring(0, 60) || 'New Section')
       case 'section_remove':
         return `Section ${data.node_id}`
       default:

@@ -4,4 +4,5 @@ export * from './issues'
 export * from './chat'
 export * from './annotations'
 export * from './standard-clauses'
+export * from './agent'
 

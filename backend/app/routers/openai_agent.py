@@ -573,3 +573,69 @@ async def run_agent(request: AgentRunRequest, db: AsyncSession = Depends(get_db)
     # commit the initial user/assistant messages to the database and return the event stream response
     await db.commit()
     return EventSourceResponse(handle_event_stream(event_stream=result.stream_events(), context=stream_context))
+
+
+@router.get("/agent/threads", tags=["agent"])
+async def get_agent_threads(db: AsyncSession = Depends(get_db)) -> list[AgentChatThread]:
+    """get all agent chat threads"""
+
+    query = select(DBAgentChatThread).order_by(DBAgentChatThread.created_at.desc())
+    result = await db.execute(query)
+    chat_threads = result.scalars().all()
+    return [AgentChatThread.model_validate(thread) for thread in chat_threads]
+
+
+@router.get("/agent/threads/current", tags=["agent"])
+async def get_current_agent_thread(db: AsyncSession = Depends(get_db)) -> AgentChatThread:
+    """get the most recent agent chat thread"""
+
+    query = select(DBAgentChatThread).order_by(DBAgentChatThread.created_at.desc()).limit(1)
+    result = await db.execute(query)
+    current_thread = result.scalar_one_or_none()
+    if not current_thread:
+        raise HTTPException(status_code=404, detail="no currentagent chat thread found")
+    else:
+        return AgentChatThread.model_validate(current_thread)
+
+
+@router.get("/agent/threads/{thread_id}", tags=["agent"])
+async def get_agent_thread(thread_id: UUID, db: AsyncSession = Depends(get_db)) -> AgentChatThread:
+    """get a single agent chat thread by ID"""
+
+    query = select(DBAgentChatThread).where(DBAgentChatThread.id == thread_id)
+    result = await db.execute(query)
+    chat_thread = result.scalar_one_or_none()
+    if not chat_thread:
+        raise HTTPException(status_code=404, detail=f"agent_chat_thread_id={thread_id} not found")
+    return AgentChatThread.model_validate(chat_thread)
+
+
+@router.get("/agent/threads/{thread_id}/messages", tags=["agent"])
+async def get_agent_thread_messages(thread_id: UUID, db: AsyncSession = Depends(get_db)) -> list[AgentChatMessage]:
+    """get all messages for an agent chat thread"""
+
+    # validate that the agent chat thread exists
+    query = select(DBAgentChatThread).where(DBAgentChatThread.id == thread_id)
+    thread_result = await db.execute(query)
+    chat_thread = thread_result.scalar_one_or_none()
+    if not chat_thread:
+        raise HTTPException(status_code=404, detail=f"agent_chat_thread_id={thread_id} not found")
+
+    # get all messages for the agent chat thread
+    query = select(DBAgentChatMessage).where(DBAgentChatMessage.chat_thread_id == thread_id).order_by(DBAgentChatMessage.created_at)
+    result = await db.execute(query)
+    messages = result.scalars().all()
+    return [AgentChatMessage.model_validate(message) for message in messages]
+
+
+@router.get("/agent/threads/{thread_id}/messages/{message_id}", tags=["agent"])
+async def get_agent_chat_message(thread_id: UUID, message_id: UUID, db: AsyncSession = Depends(get_db)) -> AgentChatMessage:
+    """get a given agent chat message by ID"""
+
+    # validate that the chat message exists for the agent chat thread
+    query = select(DBAgentChatMessage).where(DBAgentChatMessage.chat_thread_id == thread_id, DBAgentChatMessage.id == message_id)
+    message_result = await db.execute(query)
+    message = message_result.scalar_one_or_none()
+    if not message:
+        raise HTTPException(status_code=404, detail=f"agent_chat_message_id={message_id} not found")
+    return AgentChatMessage.model_validate(message)
