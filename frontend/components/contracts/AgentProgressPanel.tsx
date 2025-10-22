@@ -109,7 +109,7 @@ export function AgentProgressPanel({ message, progressSteps, isExpanded, setExpa
       >
         <span>
           {progressSteps.length === 0 
-            ? 'Agent Progress (Waiting for progress...)'
+            ? 'Agent Progress'
             : `Agent Progress (${progressSteps.length} step${progressSteps.length !== 1 ? 's' : ''})`
           }
         </span>
@@ -138,7 +138,6 @@ export function AgentProgressPanel({ message, progressSteps, isExpanded, setExpa
               fontStyle: 'italic',
               textAlign: 'center'
             }}>
-              Waiting for agent to start working...
             </div>
           ) : (
             progressSteps.map((step, index) => (

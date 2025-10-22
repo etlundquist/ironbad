@@ -56,6 +56,23 @@ const ReviewPage: NextPage = () => {
     }
   }
 
+  const refreshSelectedContract = async () => {
+    if (!selectedContract) return
+    try {
+      const data = await fetchContracts()
+      const updatedContract = data.find((contract: any) => contract.id === selectedContract.id) as ContractWithAnnotations
+      if (updatedContract) {
+        setSelectedContract(updatedContract)
+        // Also update the contract in the contracts list
+        setContracts(prev => prev.map(contract => 
+          contract.id === selectedContract.id ? updatedContract : contract
+        ))
+      }
+    } catch (err) {
+      console.error('Failed to refresh contract:', err)
+    }
+  }
+
   const mergeById = <T extends { id: string }>(current: T[] = [], updates: T[] = []): T[] => {
     if (!updates || updates.length === 0) return current || []
     const map = new Map(current?.map(item => [item.id, item]))
@@ -441,6 +458,7 @@ const ReviewPage: NextPage = () => {
                       isAnalyzing={false}
                       onIngest={() => {}}
                       navigateToPage={() => {}}
+                      onRunCompleted={refreshSelectedContract}
                     />
                   </div>
                 </div>

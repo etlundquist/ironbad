@@ -59,11 +59,13 @@ class AgentContractTextMatch(ConfiguredBaseModel):
 
 
 class AgentCommentAnnotation(ConfiguredBaseModel):
+    status: Literal["applied", "rejected", "conflict"]
     section_number: str
     anchor_text: str
     comment_text: str
 
 class AgentRevisionAnnotation(ConfiguredBaseModel):
+    status: Literal["applied", "rejected", "conflict"]
     section_number: str
     old_text: str
     new_text: str
@@ -73,20 +75,29 @@ class AgentContext(ConfiguredBaseModel):
     contract: Contract
 
 
-def flatten_section_tree(node: ContractSectionNode) -> list[ContractSectionNode]:
+def flatten_section_tree(node: ContractSectionNode, max_depth: Optional[int] = None) -> list[ContractSectionNode]:
     """convert the section tree into a flat list of ordered section nodes"""
 
     flat_sections: list[ContractSectionNode] = []
-    for section in node.children:
-        flat_sections.append(section)
-        flat_sections.extend(flatten_section_tree(section))
+    if node.type != ContractSectionType.ROOT:
+        flat_sections.append(node)
+
+    def dfs(node: ContractSectionNode, current_depth: int) -> None:
+        """recursively add children in reading order"""
+        
+        for section in node.children:
+            flat_sections.append(section)
+            if max_depth is None or current_depth < max_depth - 1:
+                dfs(section, current_depth + 1)
+
+    dfs(node=node, current_depth=0)
     return flat_sections
 
 
 async def get_relevant_sections(db: AsyncSession, contract_id: UUID, search_phrase: str) -> list[DBContractSection]:
     """fetch the most relevant contract sections given a natural language search phrase"""
 
-    # convert the search phrase to an embedding
+    # convert the search phrase to an embedding vector
     search_phrase_embedding = await get_text_embedding(search_phrase)
 
     # fetch the most relevant additional contract sections based on the standalone search phrase
@@ -106,15 +117,36 @@ async def get_relevant_sections(db: AsyncSession, contract_id: UUID, search_phra
     return relevant_sections
 
 
+async def persist_contract_changes(db: AsyncSession, contract: Contract) -> None:
+    """persist contract updates made by the agent to the database"""
+
+    dbcontract = await db.get(DBContract, contract.id)
+    dbcontract.section_tree = json.loads(contract.section_tree.model_dump_json())
+    dbcontract.annotations = json.loads(contract.annotations.model_dump_json())
+    dbcontract.version = contract.version
+    await db.commit()
+
+
 @function_tool(docstring_style="sphinx", use_docstring_info=True)
-async def list_contract_sections(wrapper: RunContextWrapper[AgentContext]) -> list[AgentContractSectionPreview]:
+async def list_contract_sections(
+    wrapper: RunContextWrapper[AgentContext],
+    parent_section_number: Optional[str] = None,
+    max_depth: Optional[int] = None
+) -> str:
     """
-    Get a flat list of contract sections with a text preview for each section
+    Get a flat list of ordered contract section previews below an optional parent section (defaults to the root section to list the entire section tree)
     
+    :param parent_section_number: an optional parent section number to use to filter the section tree (defaults to the root section)
+    :param max_depth: the optional max depth of the section tree to list below the parent section (defaults to no maximum depth)
     :return: a list of section preview objects containing the section type, level, number, and text preview
     """
 
-    flat_sections = flatten_section_tree(wrapper.context.contract.section_tree)
+    if parent_section_number:
+        node = wrapper.context.contract.section_tree.get_node_by_id(node_id=parent_section_number)
+    else:
+        node = wrapper.context.contract.section_tree
+
+    flat_sections = flatten_section_tree(node=node, max_depth=max_depth)
     agent_section_previews = [
         AgentContractSectionPreview(
             type=section.type, 
@@ -123,25 +155,46 @@ async def list_contract_sections(wrapper: RunContextWrapper[AgentContext]) -> li
             section_text_preview=string_truncate(string=section.markdown, max_tokens=50)
         ) for section in flat_sections
     ]
-    return agent_section_previews
+    agent_section_previews_json = json.dumps([json.loads(section.model_dump_json()) for section in agent_section_previews], indent=2)
+    return agent_section_previews_json
 
 
 @function_tool(docstring_style="sphinx", use_docstring_info=True)
-async def get_contract_section_text(wrapper: RunContextWrapper[AgentContext], section_number: str) -> str:
+async def get_contract_section(
+    wrapper: RunContextWrapper[AgentContext], 
+    section_number: str,
+    include_children: bool = False,
+    max_depth: Optional[int] = None
+) -> str:
     """
-    Get the full text of a single contract section
+    Get the full text of a contract section and optionally include child sections up to a specified max depth
     
     :param section_number: the contract section number
-    :return: the full text of the contract section as a markdown string
-    :raises ValueError: if the provided section number is invalid or the section is not found
+    :param include_children: whether to include child sections (defaults to False)
+    :param max_depth: the max depth of child sections to include (defaults to no maximum depth)
+    :return: a list of section text objects containing the section type, level, number, and full section text
     """
 
-    section_node = wrapper.context.contract.section_tree.get_node_by_id(node_id=section_number)
-    return section_node.markdown
+    node = wrapper.context.contract.section_tree.get_node_by_id(node_id=section_number)
+    if include_children:
+        flat_sections = flatten_section_tree(node=node, max_depth=max_depth)
+    else:
+        flat_sections = [node]
+
+    agent_sections = [
+        AgentContractSection(
+            type=section.type,
+            level=section.level,
+            section_number=section.number,
+            section_text=section.markdown
+        ) for section in flat_sections
+    ]
+    agent_sections_json = json.dumps([json.loads(section.model_dump_json()) for section in agent_sections], indent=2)
+    return agent_sections_json
 
 
 @function_tool(docstring_style="sphinx", use_docstring_info=True)
-async def search_contract_sections(wrapper: RunContextWrapper[AgentContext], search_phrase: str) -> list[AgentContractSection]:
+async def search_contract_sections(wrapper: RunContextWrapper[AgentContext], search_phrase: str) -> str:
     """
     Search for relevant contract sections using a natural language search phrase
     
@@ -159,11 +212,12 @@ async def search_contract_sections(wrapper: RunContextWrapper[AgentContext], sea
             section_text=section.markdown
         ) for section in relevant_sections
     ]
-    return agent_sections
+    agent_sections_json = json.dumps([json.loads(section.model_dump_json()) for section in agent_sections], indent=2)
+    return agent_sections_json
 
 
 @function_tool(docstring_style="sphinx", use_docstring_info=True)
-async def search_contract_lines(wrapper: RunContextWrapper[AgentContext], pattern: str) -> list[AgentContractTextMatch]:
+async def search_contract_lines(wrapper: RunContextWrapper[AgentContext], pattern: str) -> str:
     """
     Search for matching contract text lines using a regular expression pattern
 
@@ -183,11 +237,12 @@ async def search_contract_lines(wrapper: RunContextWrapper[AgentContext], patter
                 match = AgentContractTextMatch(section_number=section.number, match_line=line.strip())
                 matches.append(match)
     
-    return matches
+    matches_json = json.dumps([json.loads(match.model_dump_json()) for match in matches], indent=2)
+    return matches_json
 
 
 @function_tool(docstring_style="sphinx", use_docstring_info=True)
-def make_comment(wrapper: RunContextWrapper[AgentContext], section_number: str, anchor_text: str, comment_text: str) -> AgentCommentAnnotation:
+async def make_comment(wrapper: RunContextWrapper[AgentContext], section_number: str, anchor_text: str, comment_text: str) -> str:
     """
     Make a new comment anchored to a specific contract section and text span.
 
@@ -200,7 +255,6 @@ def make_comment(wrapper: RunContextWrapper[AgentContext], section_number: str, 
     :param anchor_text: the anchor text for the comment exactly as it appears in the retrieved contract section text
     :param comment_text: the new comment text
     :return: the newly created comment annotation object
-    :raises ModelRetry: if the provided section number is invalid or the provided anchor text cannot be found in the contract section text
     """
 
     # get/validate the relevant section node
@@ -226,15 +280,14 @@ def make_comment(wrapper: RunContextWrapper[AgentContext], section_number: str, 
     )
     try:
         handle_make_comment(contract=wrapper.context.contract, request=request)
+        await persist_contract_changes(db=wrapper.context.db, contract=wrapper.context.contract)
+        return AgentCommentAnnotation(status="applied", section_number=section_number, anchor_text=anchor_text, comment_text=comment_text).model_dump_json(indent=2)
     except Exception as e:
         raise ValueError(f"failed to apply comment: {e}")
 
-    annotation = AgentCommentAnnotation(section_number=section_number, anchor_text=anchor_text, comment_text=comment_text)
-    return annotation
-
 
 @function_tool(docstring_style="sphinx", use_docstring_info=True)
-def make_revision(wrapper: RunContextWrapper[AgentContext], section_number: str, old_text: str, new_text: str) -> AgentRevisionAnnotation:
+async def make_revision(wrapper: RunContextWrapper[AgentContext], section_number: str, old_text: str, new_text: str) -> str:
     """
     Make a new suggested revision anchored to a specific contract section and text span.
 
@@ -247,7 +300,6 @@ def make_revision(wrapper: RunContextWrapper[AgentContext], section_number: str,
     :param old_text: the old text for the revision exactly as it appears in the retrieved contract section text
     :param new_text: the new text for the revision
     :return: the newly created suggested revision annotation object
-    :raises ModelRetry: if the provided section number is invalid or the provided old text cannot be found in the contract section text
     """
 
     # get/validate the relevant section node
@@ -273,11 +325,10 @@ def make_revision(wrapper: RunContextWrapper[AgentContext], section_number: str,
     )
     try:
         handle_make_revision(contract=wrapper.context.contract, request=request)
+        await persist_contract_changes(db=wrapper.context.db, contract=wrapper.context.contract)
+        return AgentRevisionAnnotation(status="applied", section_number=section_number, old_text=old_text, new_text=new_text).model_dump_json(indent=2)
     except Exception as e:
         raise ValueError(f"failed to apply revision: {e}")
-
-    annotation = AgentRevisionAnnotation(section_number=section_number, old_text=old_text, new_text=new_text)
-    return annotation
 
 # agent configuration and definition
 # ----------------------------------
@@ -293,7 +344,7 @@ agent = Agent[AgentContext](
     model="gpt-5-mini",
     instructions=PROMPT_REDLINE_AGENT,
     model_settings=model_settings,
-    tools=[list_contract_sections, get_contract_section_text, search_contract_sections, search_contract_lines, make_comment, make_revision]
+    tools=[list_contract_sections, get_contract_section, search_contract_sections, search_contract_lines, make_comment, make_revision]
 )
 
 # agent runs type definitions
@@ -472,7 +523,10 @@ async def handle_event_stream(event_stream: AsyncIterator[StreamEvent], context:
                         reasoning_id=event.item.raw_item.id, 
                         reasoning_summary="\n\n".join([summary.text for summary in event.item.raw_item.summary if summary.type == "summary_text"])
                     )
-                    yield ServerSentEvent(event=sse_event.event, data=sse_event.model_dump_json())
+                    if sse_event.reasoning_summary.strip():
+                        yield ServerSentEvent(event=sse_event.event, data=sse_event.model_dump_json())
+                    else:
+                        logger.warning(f"reasoning item={sse_event.reasoning_id} summary is empty - skipping event emission")
                 elif isinstance(event.item, MessageOutputItem):
                     # update the finalized assistant message status/content in the database for the completed run
                     assistant_message = await context.db.get(DBAgentChatMessage, context.assistant_message_id)

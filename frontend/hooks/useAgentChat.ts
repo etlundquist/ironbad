@@ -20,6 +20,7 @@ interface UseAgentChatOptions {
   onToolCall?: (toolName: string, toolCallId: string, toolCallArgs: Record<string, any>) => void
   onToolCallOutput?: (toolCallId: string, toolCallOutput: string) => void
   onReasoningSummary?: (reasoningId: string, reasoningSummary: string) => void
+  onRunCompleted?: () => void
 }
 
 export function useAgentChat(contractId: string | undefined, options?: UseAgentChatOptions) {
@@ -148,6 +149,7 @@ export function useAgentChat(contractId: string | undefined, options?: UseAgentC
         setChatMessages((prev) => sortMessagesByTime(prev.map((m) => 
           m.id === completedEvent.assistant_message.id ? completedEvent.assistant_message : m
         )))
+        options?.onRunCompleted?.()
         break
 
       case 'run_failed':

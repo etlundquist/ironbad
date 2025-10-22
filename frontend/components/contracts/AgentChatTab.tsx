@@ -12,9 +12,10 @@ interface AgentChatTabProps {
   isAnalyzing: boolean
   onIngest: () => void
   navigateToPage: (page: number) => void
+  onRunCompleted?: () => void
 }
 
-export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId, isAnalyzing, onIngest, navigateToPage }) => {
+export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId, isAnalyzing, onIngest, navigateToPage, onRunCompleted }) => {
   const { showToast } = useNotificationContext()
   const [expandedProgressPanels, setExpandedProgressPanels] = useState<Set<string>>(new Set())
   const {
@@ -39,7 +40,8 @@ export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId
     },
     onReasoningSummary: (reasoningId, reasoningSummary) => {
       console.log('Agent reasoning:', { reasoningId, reasoningSummary })
-    }
+    },
+    onRunCompleted: onRunCompleted
   })
 
   useEffect(() => {
@@ -179,7 +181,7 @@ export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId
               <input
                 type="text"
                 className="form-input"
-                placeholder={contract.status === 'Uploaded' ? 'Ingest the contract before chatting with the agent' : 'Ask the agent to analyze, redline, or help with the contract...'}
+                placeholder={contract.status === 'Uploaded' ? 'You must ingest the contract before chatting with the agent' : 'Ask the agent...'}
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 onKeyDown={(e) => {
