@@ -20,7 +20,7 @@ from agents import Agent, RawResponsesStreamEvent, RunContextWrapper, RunItemStr
 from agents.model_settings import Reasoning, ModelSettings
 from agents.items import  MessageOutputItem, ToolCallItem, ToolCallOutputItem, ReasoningItem
 
-from app.schemas import ConfiguredBaseModel, Contract, ContractSectionNode, NewCommentAnnotationRequest, NewRevisionAnnotationRequest
+from app.schemas import ConfiguredBaseModel, Contract, ContractSectionNode, NewCommentAnnotationRequest, NewRevisionAnnotationRequest, SectionAddAnnotationRequest, SectionRemoveAnnotationRequest
 from app.enums import ChatMessageRole, ChatMessageStatus, ContractSectionType
 from app.models import (
     Contract as DBContract, 
@@ -33,7 +33,7 @@ from app.database import get_db
 from app.prompts import PROMPT_REDLINE_AGENT
 from app.embeddings import get_text_embedding
 from app.utils import string_truncate
-from app.routers.contract_actions import handle_make_comment, handle_make_revision
+from app.routers.contract_actions import handle_make_comment, handle_make_revision, handle_section_add, handle_section_remove
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -69,6 +69,14 @@ class AgentRevisionAnnotation(ConfiguredBaseModel):
     section_number: str
     old_text: str
     new_text: str
+
+class AgentAddSectionResponse(ConfiguredBaseModel):
+    status: Literal["applied", "rejected", "conflict"]
+    section: Optional[AgentContractSection] = None
+
+class AgentRemoveSectionResponse(ConfiguredBaseModel):
+    status: Literal["applied", "rejected", "conflict"]
+
 
 class AgentContext(ConfiguredBaseModel):
     db: AsyncSession
@@ -330,6 +338,65 @@ async def make_revision(wrapper: RunContextWrapper[AgentContext], section_number
     except Exception as e:
         raise ValueError(f"failed to apply revision: {e}")
 
+
+@function_tool
+async def add_section(
+    wrapper: RunContextWrapper[AgentContext], 
+    parent_section_number: str,
+    insertion_index: int,
+    new_section_number: str,
+    new_section_type: ContractSectionType,
+    new_section_text: str
+) -> str:
+    """
+    Add a new section to the contract tree at a specific child index below an existing parent section.
+
+    :param parent_section_number: the number of the parent section to add the new section below
+    :param insertion_index: the index of the new section in the parent section's children list
+    :param new_section_number: the number of the new section which should conform to the existing section numbering scheme
+    :param new_section_type: the type of the new section which must be a valid contract section type
+    :param new_section_text: the text of the new section which must be a valid markdown string
+    :return: the created section annotation object
+    """
+
+    try:
+        parent_section_node = wrapper.context.contract.section_tree.get_node_by_id(node_id=parent_section_number)
+    except ValueError:
+        raise ValueError(f"{parent_section_number=} not found in the contract sections")
+
+    new_node = ContractSectionNode(
+        id=new_section_number,
+        type=new_section_type,
+        level=parent_section_node.level + 1,
+        number=new_section_number,
+        markdown=new_section_text
+    )
+    request = SectionAddAnnotationRequest(
+        target_parent_id=parent_section_number,
+        insertion_index=insertion_index,
+        new_node=new_node
+    )
+    response = handle_section_add(contract=wrapper.context.contract, request=request)
+    await persist_contract_changes(db=wrapper.context.db, contract=wrapper.context.contract)
+    new_section = AgentContractSection(type=new_node.type, level=new_node.level, section_number=new_node.number, section_text=new_node.markdown)
+    return AgentAddSectionResponse(status=response.status, section=new_section).model_dump_json(indent=2)
+
+
+@function_tool
+async def remove_section(wrapper: RunContextWrapper[AgentContext], section_number: str) -> str:
+    """
+    Remove an existing section from the contract tree.
+
+    :param section_number: the number of the section to remove
+    :return: the deleted section annotation object
+    """
+
+    request = SectionRemoveAnnotationRequest(node_id=section_number)
+    response = handle_section_remove(contract=wrapper.context.contract, request=request)
+    await persist_contract_changes(db=wrapper.context.db, contract=wrapper.context.contract)
+    return AgentRemoveSectionResponse(status=response.status).model_dump_json(indent=2)
+
+
 # agent configuration and definition
 # ----------------------------------
 
@@ -344,7 +411,7 @@ agent = Agent[AgentContext](
     model="gpt-5-mini",
     instructions=PROMPT_REDLINE_AGENT,
     model_settings=model_settings,
-    tools=[list_contract_sections, get_contract_section, search_contract_sections, search_contract_lines, make_comment, make_revision]
+    tools=[list_contract_sections, get_contract_section, search_contract_sections, search_contract_lines, make_comment, make_revision, add_section, remove_section]
 )
 
 # agent runs type definitions
