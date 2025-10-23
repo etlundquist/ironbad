@@ -20,8 +20,8 @@ from agents import Agent, RawResponsesStreamEvent, RunContextWrapper, RunItemStr
 from agents.model_settings import Reasoning, ModelSettings
 from agents.items import  MessageOutputItem, ToolCallItem, ToolCallOutputItem, ReasoningItem
 
-from app.schemas import ConfiguredBaseModel, Contract, ContractSectionNode, NewCommentAnnotationRequest, NewRevisionAnnotationRequest, SectionAddAnnotationRequest, SectionRemoveAnnotationRequest
-from app.enums import ChatMessageRole, ChatMessageStatus, ContractSectionType
+from app.schemas import ConfiguredBaseModel, CommentAnnotation, Contract, ContractSectionNode, NewCommentAnnotationRequest, NewRevisionAnnotationRequest, RevisionAnnotation, SectionAddAnnotation, SectionAddAnnotationRequest, SectionRemoveAnnotation, SectionRemoveAnnotationRequest
+from app.enums import AnnotationStatus, AnnotationType, ChatMessageRole, ChatMessageStatus, ContractSectionType
 from app.models import (
     Contract as DBContract, 
     ContractSection as DBContractSection,
@@ -59,12 +59,41 @@ class AgentContractTextMatch(ConfiguredBaseModel):
 
 
 class AgentCommentAnnotation(ConfiguredBaseModel):
-    status: Literal["applied", "rejected", "conflict"]
+    id: UUID
+    annotation_type: str = AnnotationType.COMMENT.value
     section_number: str
     anchor_text: str
     comment_text: str
 
 class AgentRevisionAnnotation(ConfiguredBaseModel):
+    id: UUID
+    annotation_type: str = AnnotationType.REVISION.value
+    section_number: str
+    old_text: str
+    new_text: str
+
+class AgentSectionAddAnnotation(ConfiguredBaseModel):
+    id: UUID
+    annotation_type: str = AnnotationType.SECTION_ADD.value
+    target_parent_section_number: str
+    insertion_index: int
+    section_number: str
+    section_type: ContractSectionType
+    section_text: str
+
+class AgentSectionRemoveAnnotation(ConfiguredBaseModel):
+    id: UUID
+    annotation_type: str = AnnotationType.SECTION_REMOVE.value
+    section_number: str
+
+
+class AgentCommentAnnotationResponse(ConfiguredBaseModel):
+    status: Literal["applied", "rejected", "conflict"]
+    section_number: str
+    anchor_text: str
+    comment_text: str
+
+class AgentRevisionAnnotationResponse(ConfiguredBaseModel):
     status: Literal["applied", "rejected", "conflict"]
     section_number: str
     old_text: str
@@ -289,7 +318,7 @@ async def make_comment(wrapper: RunContextWrapper[AgentContext], section_number:
     try:
         handle_make_comment(contract=wrapper.context.contract, request=request)
         await persist_contract_changes(db=wrapper.context.db, contract=wrapper.context.contract)
-        return AgentCommentAnnotation(status="applied", section_number=section_number, anchor_text=anchor_text, comment_text=comment_text).model_dump_json(indent=2)
+        return AgentCommentAnnotationResponse(status="applied", section_number=section_number, anchor_text=anchor_text, comment_text=comment_text).model_dump_json(indent=2)
     except Exception as e:
         raise ValueError(f"failed to apply comment: {e}")
 
@@ -334,7 +363,7 @@ async def make_revision(wrapper: RunContextWrapper[AgentContext], section_number
     try:
         handle_make_revision(contract=wrapper.context.contract, request=request)
         await persist_contract_changes(db=wrapper.context.db, contract=wrapper.context.contract)
-        return AgentRevisionAnnotation(status="applied", section_number=section_number, old_text=old_text, new_text=new_text).model_dump_json(indent=2)
+        return AgentRevisionAnnotationResponse(status="applied", section_number=section_number, old_text=old_text, new_text=new_text).model_dump_json(indent=2)
     except Exception as e:
         raise ValueError(f"failed to apply revision: {e}")
 
@@ -344,18 +373,18 @@ async def add_section(
     wrapper: RunContextWrapper[AgentContext], 
     parent_section_number: str,
     insertion_index: int,
-    new_section_number: str,
-    new_section_type: ContractSectionType,
-    new_section_text: str
+    section_number: str,
+    section_type: ContractSectionType,
+    section_text: str
 ) -> str:
     """
     Add a new section to the contract tree at a specific child index below an existing parent section.
 
     :param parent_section_number: the number of the parent section to add the new section below
     :param insertion_index: the index of the new section in the parent section's children list
-    :param new_section_number: the number of the new section which should conform to the existing section numbering scheme
-    :param new_section_type: the type of the new section which must be a valid contract section type
-    :param new_section_text: the text of the new section which must be a valid markdown string
+    :param section_number: the number of the new section which should conform to the existing section numbering scheme
+    :param section_type: the type of the new section which must be a valid contract section type
+    :param section_text: the text of the new section which must be a valid markdown string
     :return: the created section annotation object
     """
 
@@ -365,11 +394,11 @@ async def add_section(
         raise ValueError(f"{parent_section_number=} not found in the contract sections")
 
     new_node = ContractSectionNode(
-        id=new_section_number,
-        type=new_section_type,
+        id=section_number,
+        type=section_type,
         level=parent_section_node.level + 1,
-        number=new_section_number,
-        markdown=new_section_text
+        number=section_number,
+        markdown=section_text
     )
     request = SectionAddAnnotationRequest(
         target_parent_id=parent_section_number,
@@ -378,8 +407,8 @@ async def add_section(
     )
     response = handle_section_add(contract=wrapper.context.contract, request=request)
     await persist_contract_changes(db=wrapper.context.db, contract=wrapper.context.contract)
-    new_section = AgentContractSection(type=new_node.type, level=new_node.level, section_number=new_node.number, section_text=new_node.markdown)
-    return AgentAddSectionResponse(status=response.status, section=new_section).model_dump_json(indent=2)
+    section = AgentContractSection(type=new_node.type, level=new_node.level, section_number=new_node.number, section_text=new_node.markdown)
+    return AgentAddSectionResponse(status=response.status, section=section).model_dump_json(indent=2)
 
 
 @function_tool
@@ -397,6 +426,84 @@ async def remove_section(wrapper: RunContextWrapper[AgentContext], section_numbe
     return AgentRemoveSectionResponse(status=response.status).model_dump_json(indent=2)
 
 
+@function_tool
+async def get_contract_annotations(wrapper: RunContextWrapper[AgentContext], annotation_type: Optional[AnnotationType] = None, section_number: Optional[str] = None) -> str:
+    """
+    Get unresolved contract annotations optionally filtered by annotation type and section number
+
+    :param annotation_type: filter by annotation type (defaults to all annotation types)
+    :param section_number: filter by section number (defaults to all contract sections)
+    :return: a list of contract annotation objects
+    """
+
+    if not wrapper.context.contract.annotations:
+        return json.dumps([], indent=2)
+        
+    match annotation_type:
+        case AnnotationType.COMMENT:
+            annotations = wrapper.context.contract.annotations.comments
+            annotations = [AgentCommentAnnotation(id=annotation.id, section_number=annotation.node_id, anchor_text=annotation.anchor_text, comment_text=annotation.comment_text) for annotation in annotations if annotation.status == AnnotationStatus.PENDING]
+        case AnnotationType.REVISION:
+            annotations = wrapper.context.contract.annotations.revisions
+            annotations = [AgentRevisionAnnotation(id=annotation.id, section_number=annotation.node_id, old_text=annotation.old_text, new_text=annotation.new_text) for annotation in annotations if annotation.status == AnnotationStatus.PENDING]
+        case AnnotationType.SECTION_ADD:
+            annotations = wrapper.context.contract.annotations.section_adds
+            annotations = [AgentSectionAddAnnotation(id=annotation.id, target_parent_section_number=annotation.target_parent_id, insertion_index=annotation.insertion_index, section_number=annotation.new_node.number, section_type=annotation.new_node.type, section_text=annotation.new_node.markdown) for annotation in annotations if annotation.status == AnnotationStatus.PENDING]
+        case AnnotationType.SECTION_REMOVE:
+            annotations = wrapper.context.contract.annotations.section_removes
+            annotations = [AgentSectionRemoveAnnotation(id=annotation.id, section_number=annotation.node_id) for annotation in annotations if annotation.status == AnnotationStatus.PENDING]
+        case _:
+            annotations = wrapper.context.contract.annotations
+            comments = [AgentCommentAnnotation(id=annotation.id, section_number=annotation.node_id, anchor_text=annotation.anchor_text, comment_text=annotation.comment_text) for annotation in annotations.comments if annotation.status == AnnotationStatus.PENDING]
+            revisions = [AgentRevisionAnnotation(id=annotation.id, section_number=annotation.node_id, old_text=annotation.old_text, new_text=annotation.new_text) for annotation in annotations.revisions if annotation.status == AnnotationStatus.PENDING]
+            section_adds = [AgentSectionAddAnnotation(id=annotation.id, target_parent_section_number=annotation.target_parent_id, insertion_index=annotation.insertion_index, section_number=annotation.new_node.number, section_type=annotation.new_node.type, section_text=annotation.new_node.markdown) for annotation in annotations.section_adds if annotation.status == AnnotationStatus.PENDING]
+            section_removes = [AgentSectionRemoveAnnotation(id=annotation.id, section_number=annotation.node_id) for annotation in annotations.section_removes if annotation.status == AnnotationStatus.PENDING]
+            annotations = comments + revisions + section_adds + section_removes
+
+    if section_number:
+        annotations = [annotation for annotation in annotations if annotation.section_number == section_number]
+        
+    annotations_json = json.dumps([json.loads(annotation.model_dump_json()) for annotation in annotations], indent=2)
+    return annotations_json
+
+
+@function_tool(docstring_style="sphinx", use_docstring_info=True)
+async def delete_contract_annotations(wrapper: RunContextWrapper[AgentContext], annotation_ids: list[str]) -> str:
+    """
+    Delete one or more contract annotations by ID.
+
+    :param annotation_ids: a list of annotation IDs to delete
+    :return: the list of deleted annotation IDs and not found annotation IDs
+    """
+
+    deleted_annotation_ids, not_found_annotation_ids = [], []
+    for annotation_id_str in annotation_ids:
+        try:
+            annotation_id = UUID(annotation_id_str)
+            annotation = wrapper.context.contract.annotations.get_annotation_by_id(annotation_id)            
+            if isinstance(annotation, CommentAnnotation):
+                wrapper.context.contract.annotations.comments.remove(annotation)
+            elif isinstance(annotation, RevisionAnnotation):
+                wrapper.context.contract.annotations.revisions.remove(annotation)
+            elif isinstance(annotation, SectionAddAnnotation):
+                wrapper.context.contract.annotations.section_adds.remove(annotation)
+            elif isinstance(annotation, SectionRemoveAnnotation):
+                wrapper.context.contract.annotations.section_removes.remove(annotation)
+            deleted_annotation_ids.append(annotation.id)
+        except ValueError:
+            not_found_annotation_ids.append(annotation_id_str)
+
+    if deleted_annotation_ids:
+        wrapper.context.contract.version += 1
+        await persist_contract_changes(db=wrapper.context.db, contract=wrapper.context.contract)
+    
+    result = {
+        "deleted_annotation_ids": [str(id) for id in deleted_annotation_ids], 
+        "not_found_annotation_ids": [str(id) for id in not_found_annotation_ids]
+    }
+    return json.dumps(result, indent=2)
+
+
 # agent configuration and definition
 # ----------------------------------
 
@@ -411,7 +518,7 @@ agent = Agent[AgentContext](
     model="gpt-5-mini",
     instructions=PROMPT_REDLINE_AGENT,
     model_settings=model_settings,
-    tools=[list_contract_sections, get_contract_section, search_contract_sections, search_contract_lines, make_comment, make_revision, add_section, remove_section]
+    tools=[list_contract_sections, get_contract_section, search_contract_sections, search_contract_lines, get_contract_annotations, delete_contract_annotations, make_comment, make_revision, add_section, remove_section]
 )
 
 # agent runs type definitions
