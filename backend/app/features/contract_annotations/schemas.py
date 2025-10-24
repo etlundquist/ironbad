@@ -5,7 +5,7 @@ from typing import Optional, Union, Literal
 from pydantic import Field
 
 from app.common.schemas import ConfiguredBaseModel, ContractSectionNode, Contract
-from app.enums import AnnotationStatus, AnnotationType, ContractActionType, ContractAnnotationResolution
+from app.enums import AnnotationStatus, AnnotationType, ContractActionType, ContractAnnotationResolution, AnnotationAuthor
 
 
 class CommentAnnotation(ConfiguredBaseModel):
@@ -15,6 +15,7 @@ class CommentAnnotation(ConfiguredBaseModel):
     offset_end: int
     anchor_text: str
     comment_text: str
+    author: AnnotationAuthor
     status: AnnotationStatus = AnnotationStatus.PENDING
     created_at: datetime
     resolved_at: Optional[datetime] = None
@@ -26,6 +27,7 @@ class RevisionAnnotation(ConfiguredBaseModel):
     offset_end: int
     old_text: str
     new_text: str
+    author: AnnotationAuthor
     status: AnnotationStatus = AnnotationStatus.PENDING
     created_at: datetime
     resolved_at: Optional[datetime] = None
@@ -35,6 +37,7 @@ class SectionAddAnnotation(ConfiguredBaseModel):
     target_parent_id: str
     insertion_index: int
     new_node: ContractSectionNode
+    author: AnnotationAuthor
     status: AnnotationStatus = AnnotationStatus.PENDING
     created_at: datetime
     resolved_at: Optional[datetime] = None
@@ -42,6 +45,7 @@ class SectionAddAnnotation(ConfiguredBaseModel):
 class SectionRemoveAnnotation(ConfiguredBaseModel):
     id: UUID
     node_id: str
+    author: AnnotationAuthor
     status: AnnotationStatus = AnnotationStatus.PENDING
     created_at: datetime
     resolved_at: Optional[datetime] = None
@@ -70,6 +74,7 @@ class NewCommentAnnotationRequest(ConfiguredBaseModel):
     offset_end: int
     anchor_text: str
     comment_text: str
+    author: AnnotationAuthor = AnnotationAuthor.USER
 
 class EditCommentAnnotationRequest(ConfiguredBaseModel):
     annotation_id: UUID
@@ -81,6 +86,7 @@ class NewRevisionAnnotationRequest(ConfiguredBaseModel):
     offset_end: int
     old_text: str
     new_text: str
+    author: AnnotationAuthor = AnnotationAuthor.USER
 
 class EditRevisionAnnotationRequest(ConfiguredBaseModel):
     annotation_id: UUID
@@ -90,9 +96,11 @@ class SectionAddAnnotationRequest(ConfiguredBaseModel):
     target_parent_id: str
     insertion_index: int
     new_node: ContractSectionNode
+    author: AnnotationAuthor = AnnotationAuthor.USER
 
 class SectionRemoveAnnotationRequest(ConfiguredBaseModel):
     node_id: str
+    author: AnnotationAuthor = AnnotationAuthor.USER
 
 class ContractActionRequest(ConfiguredBaseModel):
     action: ContractActionType

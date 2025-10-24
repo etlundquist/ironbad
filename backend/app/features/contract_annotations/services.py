@@ -37,6 +37,7 @@ def handle_make_comment(contract: Contract, request: NewCommentAnnotationRequest
         offset_end=request.offset_end,
         anchor_text=request.anchor_text,
         comment_text=request.comment_text,
+        author=request.author,
         status=AnnotationStatus.PENDING,
         created_at=datetime.now(tz=timezone.utc),
     )
@@ -115,6 +116,7 @@ def handle_make_revision(contract: Contract, request: NewRevisionAnnotationReque
         offset_end=request.offset_end,
         old_text=request.old_text,
         new_text=request.new_text,
+        author=request.author,
         status=AnnotationStatus.PENDING,
         created_at=datetime.now(tz=timezone.utc),
     )
@@ -188,6 +190,7 @@ def handle_section_add(contract: Contract, request: SectionAddAnnotationRequest)
         target_parent_id=request.target_parent_id,
         insertion_index=request.insertion_index,
         new_node=request.new_node,
+        author=request.author,
         status=AnnotationStatus.PENDING,
         created_at=datetime.now(tz=timezone.utc),
     )
@@ -218,6 +221,7 @@ def handle_section_remove(contract: Contract, request: SectionRemoveAnnotationRe
     section_remove_annotation = SectionRemoveAnnotation(
         id=uuid4(),
         node_id=request.node_id,
+        author=request.author,
         status=AnnotationStatus.PENDING,
         created_at=datetime.now(tz=timezone.utc),
     )

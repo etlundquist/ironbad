@@ -47,7 +47,6 @@ async def get_relevant_sections(db: AsyncSession, contract_id: UUID, search_phra
         select(DBContractSection)
         .where(
             DBContractSection.contract_id == contract_id,
-            DBContractSection.type != ContractSectionType.PREAMBLE,
             DBContractSection.level == 1,
             DBContractSection.embedding.is_not(None)
         )

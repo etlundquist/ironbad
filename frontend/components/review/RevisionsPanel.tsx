@@ -66,7 +66,10 @@ export const RevisionsPanel: React.FC<RevisionsPanelProps> = ({
               <div key={rev.id} className="revision-item" data-revision-id={rev.id} style={{ padding: '12px', backgroundColor: selectedRevision?.id === rev.id ? '#dbeafe' : '#ffffff', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: 'pointer' }} onClick={(e) => { const target = e.target as HTMLElement; if (target.closest('button, textarea')) return; onRevisionSelect(selectedRevision?.id === rev.id ? null : rev) }}>
                 <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>Section {rev.node_id}</span>
-                  <span>{new Date(rev.created_at).toLocaleDateString()}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontWeight: '500', color: rev.author === 'Agent' ? '#8b5cf6' : '#3b82f6' }}>{rev.author}</span>
+                    <span>{new Date(rev.created_at).toLocaleDateString()}</span>
+                  </div>
                 </div>
                 <div style={{ fontSize: '14px', color: rev.status === 'accepted' ? '#059669' : rev.status === 'rejected' ? '#dc2626' : rev.status === 'conflict' ? '#92400e' : rev.status === 'stale' ? '#6b7280' : '#dc2626', marginBottom: '8px', textDecoration: rev.status === 'rejected' || rev.status === 'stale' ? 'line-through' : 'none' }}>
                   {rev.new_text}

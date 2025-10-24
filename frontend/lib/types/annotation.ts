@@ -5,6 +5,7 @@ export interface CommentAnnotation {
   offset_end: number
   anchor_text: string
   comment_text: string
+  author: 'User' | 'Agent'
   status: string
   created_at: string
 }
@@ -16,6 +17,7 @@ export interface RevisionAnnotation {
   offset_end: number
   old_text: string
   new_text: string
+  author: 'User' | 'Agent'
   status: string
   created_at: string
 }
@@ -25,6 +27,7 @@ export interface SectionAddAnnotation {
   target_parent_id: string
   insertion_index: number
   new_node: any
+  author: 'User' | 'Agent'
   status: string
   created_at: string
   resolved_at?: string
@@ -33,6 +36,7 @@ export interface SectionAddAnnotation {
 export interface SectionRemoveAnnotation {
   id: string
   node_id: string
+  author: 'User' | 'Agent'
   status: string
   created_at: string
   resolved_at?: string

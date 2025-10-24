@@ -59,6 +59,10 @@ class AnnotationStatus(Enum):
     CONFLICT = "conflict"
     STALE = "stale"
 
+class AnnotationAuthor(Enum):
+    USER = "User"
+    AGENT = "Agent"
+
 class AnnotationType(Enum):
     COMMENT = "comment"
     REVISION = "revision"

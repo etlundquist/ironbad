@@ -23,17 +23,11 @@ async def get_relevant_sections(db: AsyncSession, contract_id: UUID, search_phra
     # convert the search phrase to an embedding
     search_phrase_embedding = await get_text_embedding(search_phrase)
 
-    # always include the contract preamble to provide overall context
-    preamble_sections = select(ContractSection).where(ContractSection.contract_id == contract_id, ContractSection.type == ContractSectionType.PREAMBLE)
-    result = await db.execute(preamble_sections)
-    preamble_sections = result.scalars().all()
-
     # fetch the most relevant additional contract sections based on the standalone search phrase
     statement = (
         select(ContractSection)
         .where(
             ContractSection.contract_id == contract_id,
-            ContractSection.type != ContractSectionType.PREAMBLE,
             ContractSection.level == 1,
             ContractSection.embedding.is_not(None)
         )
@@ -44,7 +38,7 @@ async def get_relevant_sections(db: AsyncSession, contract_id: UUID, search_phra
     matching_sections = result.scalars().all()
 
     # serialize the combined sections into a list of XML strings for dynamic context
-    serialized_sections = [f"""<section type="{section.type.value}" number="{section.number}">\n{section.markdown}\n</section>""" for section in preamble_sections + matching_sections]
+    serialized_sections = [f"""<section type="{section.type.value}" number="{section.number}">\n{section.markdown}\n</section>""" for section in matching_sections]
 
     # truncate the serialized section list based on combined token count to prevent context overflow
     current_token_count, truncated_sections = 0, []

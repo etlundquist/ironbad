@@ -14,6 +14,7 @@ import {
 import AnnotationModal from './contracts/AnnotationModal'
 import SectionModal from './contracts/SectionModal'
 import SectionNode from './contracts/SectionNode'
+import PendingSectionAdd from './contracts/PendingSectionAdd'
 
 interface ContractSectionTreeProps {
   section: ContractSectionNode
@@ -149,6 +150,42 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
     }, 200)
     return () => clearTimeout(timer)
   }, [selectedRevision, nodeById])
+
+  // Function to expand parent nodes for a given target parent ID
+  const expandParentChain = useCallback((targetParentId: string) => {
+    setExpandedNodes((prev) => {
+      const next = new Set(prev)
+      let current: ContractSectionNode | undefined = nodeById.get(targetParentId)
+      while (current) {
+        next.add(current.id)
+        current = current.parent_id ? nodeById.get(current.parent_id) : undefined
+      }
+      return next
+    })
+  }, [nodeById])
+
+  // Listen for navigation to pending section adds/removes from sidebar
+  useEffect(() => {
+    const handleNavigation = (event: CustomEvent) => {
+      const { type, targetId } = event.detail
+      
+      if (type === 'navigate-to-section-add') {
+        // Find the section add annotation to get the target parent
+        const sectionAdd = annotations?.section_adds?.find(sa => sa.id === targetId)
+        if (sectionAdd) {
+          expandParentChain(sectionAdd.target_parent_id)
+          // Also expand the pending section add itself
+          setExpandedPendingAddIds(prev => new Set(prev).add(targetId))
+        }
+      } else if (type === 'navigate-to-section-remove') {
+        // For section removes, expand the chain to the node being removed
+        expandParentChain(targetId)
+      }
+    }
+
+    window.addEventListener('navigate-to-annotation', handleNavigation as EventListener)
+    return () => window.removeEventListener('navigate-to-annotation', handleNavigation as EventListener)
+  }, [annotations, expandParentChain])
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -652,7 +689,42 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
           minWidth: 0
         }}
       >
-        {section.children && section.children.map((child) => renderSectionNode(child, 0))}
+        {(() => {
+          // Get pending section adds for the root node
+          const rootPendingAdds = getPendingSectionAddsForParent(section.id)
+          const allChildren: Array<{ type: 'existing' | 'pending'; data: any; index: number }> = []
+
+          // Add existing children
+          if (section.children) {
+            section.children.forEach((child, index) => {
+              allChildren.push({ type: 'existing', data: child, index })
+            })
+          }
+
+          // Add pending section adds for root
+          rootPendingAdds.forEach((sectionAdd) => {
+            allChildren.push({ type: 'pending', data: sectionAdd, index: sectionAdd.insertion_index })
+          })
+
+          // Sort by index
+          allChildren.sort((a, b) => a.index - b.index)
+
+          return allChildren.map((item) => {
+            if (item.type === 'existing') {
+              return renderSectionNode(item.data, 0)
+            } else {
+              return (
+                <PendingSectionAdd
+                  key={`pending-${item.data.id}`}
+                  sectionAdd={item.data}
+                  depth={0}
+                  isExpanded={expandedPendingAddIds.has(item.data.id)}
+                  onToggleExpand={() => handleTogglePendingAdd(item.data.id)}
+                />
+              )
+            }
+          })
+        })()}
       </div>
 
       <AnnotationModal

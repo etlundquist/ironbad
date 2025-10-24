@@ -74,7 +74,10 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
                 {selectedComment?.id === comment.id && <div style={{ position: 'absolute', left: '-8px', top: '50%', transform: 'translateY(-50%)', width: '4px', height: '20px', backgroundColor: '#3b82f6', borderRadius: '2px' }} />}
                 <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>Section {comment.node_id}</span>
-                  <span>{new Date(comment.created_at).toLocaleDateString()}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontWeight: '500', color: comment.author === 'Agent' ? '#8b5cf6' : '#3b82f6' }}>{comment.author}</span>
+                    <span>{new Date(comment.created_at).toLocaleDateString()}</span>
+                  </div>
                 </div>
                 {editingComment?.id === comment.id ? (
                   <div>

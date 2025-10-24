@@ -35,10 +35,23 @@ export const SectionRemovesPanel: React.FC<SectionRemovesPanelProps> = ({
         <div className="section-removes-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', flex: 1 }}>
           {pendingSectionRemoves.length ? (
             pendingSectionRemoves.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map((sectionRemove) => (
-              <div key={sectionRemove.id} className="section-remove-item" style={{ padding: '12px', backgroundColor: sectionRemove.status === 'accepted' ? '#f0fdf4' : sectionRemove.status === 'rejected' ? '#fef2f2' : sectionRemove.status === 'conflict' ? '#fef3c7' : sectionRemove.status === 'stale' ? '#f3f4f6' : '#ffffff', border: sectionRemove.status === 'accepted' ? '1px solid #bbf7d0' : sectionRemove.status === 'rejected' ? '1px solid #fecaca' : sectionRemove.status === 'conflict' ? '1px solid #f59e0b' : sectionRemove.status === 'stale' ? '1px solid #9ca3af' : '1px solid #e5e7eb', borderRadius: '6px', opacity: sectionRemove.status === 'accepted' || sectionRemove.status === 'rejected' || sectionRemove.status === 'conflict' || sectionRemove.status === 'stale' ? 0.8 : 1, cursor: 'pointer' }} onClick={() => { const element = document.querySelector(`[data-node-id="${sectionRemove.node_id}"]`); if (element) (element as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }}>
+              <div key={sectionRemove.id} className="section-remove-item" style={{ padding: '12px', backgroundColor: sectionRemove.status === 'accepted' ? '#f0fdf4' : sectionRemove.status === 'rejected' ? '#fef2f2' : sectionRemove.status === 'conflict' ? '#fef3c7' : sectionRemove.status === 'stale' ? '#f3f4f6' : '#ffffff', border: sectionRemove.status === 'accepted' ? '1px solid #bbf7d0' : sectionRemove.status === 'rejected' ? '1px solid #fecaca' : sectionRemove.status === 'conflict' ? '1px solid #f59e0b' : sectionRemove.status === 'stale' ? '1px solid #9ca3af' : '1px solid #e5e7eb', borderRadius: '6px', opacity: sectionRemove.status === 'accepted' || sectionRemove.status === 'rejected' || sectionRemove.status === 'conflict' || sectionRemove.status === 'stale' ? 0.8 : 1, cursor: 'pointer' }} onClick={() => { 
+                // Dispatch custom event to expand parent nodes first
+                window.dispatchEvent(new CustomEvent('navigate-to-annotation', { 
+                  detail: { type: 'navigate-to-section-remove', targetId: sectionRemove.node_id } 
+                }))
+                // Then scroll to the element after a short delay to allow expansion
+                setTimeout(() => {
+                  const element = document.querySelector(`[data-node-id="${sectionRemove.node_id}"]`)
+                  if (element) (element as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+                }, 100)
+              }}>
                 <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>Section: {sectionRemove.node_id}</span>
-                  <span>{new Date(sectionRemove.created_at).toLocaleDateString()}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontWeight: '500', color: sectionRemove.author === 'Agent' ? '#8b5cf6' : '#3b82f6' }}>{sectionRemove.author}</span>
+                    <span>{new Date(sectionRemove.created_at).toLocaleDateString()}</span>
+                  </div>
                 </div>
                 <div style={{ fontSize: '14px', color: sectionRemove.status === 'accepted' ? '#059669' : sectionRemove.status === 'rejected' ? '#dc2626' : sectionRemove.status === 'conflict' ? '#92400e' : sectionRemove.status === 'stale' ? '#6b7280' : '#374151', marginBottom: '8px', textDecoration: sectionRemove.status === 'rejected' || sectionRemove.status === 'stale' ? 'line-through' : 'none' }}>
                   Section Removal

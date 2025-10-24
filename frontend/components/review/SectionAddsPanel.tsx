@@ -41,10 +41,23 @@ export const SectionAddsPanel: React.FC<SectionAddsPanelProps> = ({
         <div className="section-adds-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', flex: 1 }}>
           {pendingSectionAdds.length ? (
             pendingSectionAdds.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map((sectionAdd) => (
-              <div key={sectionAdd.id} className="section-add-item" style={{ padding: '12px', backgroundColor: sectionAdd.status === 'accepted' ? '#f0fdf4' : sectionAdd.status === 'rejected' ? '#fef2f2' : sectionAdd.status === 'conflict' ? '#fef3c7' : sectionAdd.status === 'stale' ? '#f3f4f6' : '#ffffff', border: sectionAdd.status === 'accepted' ? '1px solid #bbf7d0' : sectionAdd.status === 'rejected' ? '1px solid #fecaca' : sectionAdd.status === 'conflict' ? '1px solid #f59e0b' : sectionAdd.status === 'stale' ? '1px solid #9ca3af' : '1px solid #e5e7eb', borderRadius: '6px', opacity: sectionAdd.status === 'accepted' || sectionAdd.status === 'rejected' || sectionAdd.status === 'conflict' || sectionAdd.status === 'stale' ? 0.8 : 1, cursor: 'pointer' }} onClick={() => { const element = document.querySelector(`[data-section-add-id="${sectionAdd.id}"]`); if (element) (element as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }}>
+              <div key={sectionAdd.id} className="section-add-item" style={{ padding: '12px', backgroundColor: sectionAdd.status === 'accepted' ? '#f0fdf4' : sectionAdd.status === 'rejected' ? '#fef2f2' : sectionAdd.status === 'conflict' ? '#fef3c7' : sectionAdd.status === 'stale' ? '#f3f4f6' : '#ffffff', border: sectionAdd.status === 'accepted' ? '1px solid #bbf7d0' : sectionAdd.status === 'rejected' ? '1px solid #fecaca' : sectionAdd.status === 'conflict' ? '1px solid #f59e0b' : sectionAdd.status === 'stale' ? '1px solid #9ca3af' : '1px solid #e5e7eb', borderRadius: '6px', opacity: sectionAdd.status === 'accepted' || sectionAdd.status === 'rejected' || sectionAdd.status === 'conflict' || sectionAdd.status === 'stale' ? 0.8 : 1, cursor: 'pointer' }} onClick={() => { 
+                // Dispatch custom event to expand parent nodes first
+                window.dispatchEvent(new CustomEvent('navigate-to-annotation', { 
+                  detail: { type: 'navigate-to-section-add', targetId: sectionAdd.id } 
+                }))
+                // Then scroll to the element after a short delay to allow expansion
+                setTimeout(() => {
+                  const element = document.querySelector(`[data-section-add-id="${sectionAdd.id}"]`)
+                  if (element) (element as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+                }, 100)
+              }}>
                 <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>Section {sectionAdd.new_node?.number || 'N/A'}</span>
-                  <span>{new Date(sectionAdd.created_at).toLocaleDateString()}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontWeight: '500', color: sectionAdd.author === 'Agent' ? '#8b5cf6' : '#3b82f6' }}>{sectionAdd.author}</span>
+                    <span>{new Date(sectionAdd.created_at).toLocaleDateString()}</span>
+                  </div>
                 </div>
                 <div style={{ fontSize: '14px', color: sectionAdd.status === 'accepted' ? '#059669' : sectionAdd.status === 'rejected' ? '#dc2626' : sectionAdd.status === 'conflict' ? '#92400e' : sectionAdd.status === 'stale' ? '#6b7280' : '#374151', marginBottom: '8px', textDecoration: sectionAdd.status === 'rejected' || sectionAdd.status === 'stale' ? 'line-through' : 'none' }}>
                   {decodeHtmlEntities(sectionAdd.new_node?.markdown?.split('\n')[0]?.replace(/^#+\s*/, '') || sectionAdd.new_node?.name || 'New Section')}

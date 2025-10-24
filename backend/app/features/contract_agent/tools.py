@@ -6,7 +6,7 @@ from typing import Optional
 from agents import function_tool, RunContextWrapper
 
 
-from app.enums import AnnotationStatus, AnnotationType, ContractSectionType
+from app.enums import AnnotationStatus, AnnotationType, ContractSectionType, AnnotationAuthor
 from app.utils.common import string_truncate
 from app.common.schemas import ContractSectionNode
 
@@ -166,7 +166,8 @@ async def make_comment(wrapper: RunContextWrapper[AgentContext], section_number:
         offset_beg=offset_beg,
         offset_end=offset_end,
         anchor_text=anchor_text,
-        comment_text=comment_text
+        comment_text=comment_text,
+        author=AnnotationAuthor.AGENT
     )
     try:
         handle_make_comment(contract=wrapper.context.contract, request=request)
@@ -211,7 +212,8 @@ async def make_revision(wrapper: RunContextWrapper[AgentContext], section_number
         offset_beg=offset_beg,
         offset_end=offset_end,
         old_text=old_text,
-        new_text=new_text
+        new_text=new_text,
+        author=AnnotationAuthor.AGENT
     )
     try:
         handle_make_revision(contract=wrapper.context.contract, request=request)
@@ -256,7 +258,8 @@ async def add_section(
     request = SectionAddAnnotationRequest(
         target_parent_id=parent_section_number,
         insertion_index=insertion_index,
-        new_node=new_node
+        new_node=new_node,
+        author=AnnotationAuthor.AGENT
     )
     response = handle_section_add(contract=wrapper.context.contract, request=request)
     await persist_contract_changes(db=wrapper.context.db, contract=wrapper.context.contract)
@@ -273,7 +276,7 @@ async def remove_section(wrapper: RunContextWrapper[AgentContext], section_numbe
     :return: the deleted section annotation object
     """
 
-    request = SectionRemoveAnnotationRequest(node_id=section_number)
+    request = SectionRemoveAnnotationRequest(node_id=section_number, author=AnnotationAuthor.AGENT)
     response = handle_section_remove(contract=wrapper.context.contract, request=request)
     await persist_contract_changes(db=wrapper.context.db, contract=wrapper.context.contract)
     return AgentRemoveSectionResponse(status=response.status).model_dump_json(indent=2)
