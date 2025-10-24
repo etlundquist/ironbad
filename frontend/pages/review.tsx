@@ -184,7 +184,11 @@ const ReviewPage: NextPage = () => {
       const result = await resolveAnnotation(selectedContract.id, { annotation_id: annotationId, annotation_type: 'revision', resolution })
       setSelectedContract(prev => {
         if (!prev) return null
-        let updatedContract = { ...prev, annotations: mergeAnnotations(prev.annotations, result.updated_annotations) }
+        let annotations = mergeAnnotations(prev.annotations, result.updated_annotations)
+        if (result.rebased_annotations) {
+          annotations = mergeAnnotations(annotations, result.rebased_annotations)
+        }
+        let updatedContract = { ...prev, annotations }
         if (result.updated_nodes && result.updated_nodes.length > 0) {
           updatedContract = { ...updatedContract, section_tree: updateSectionTreeNodes(prev.section_tree, result.updated_nodes) }
         }
@@ -282,7 +286,11 @@ const ReviewPage: NextPage = () => {
       const result = await resolveAnnotation(selectedContract.id, { annotation_id: annotationId, annotation_type: 'section_remove', resolution })
       setSelectedContract(prev => {
         if (!prev) return null
-        let updatedContract = { ...prev, annotations: mergeAnnotations(prev.annotations, result.updated_annotations) }
+        let annotations = mergeAnnotations(prev.annotations, result.updated_annotations)
+        if (result.rebased_annotations) {
+          annotations = mergeAnnotations(annotations, result.rebased_annotations)
+        }
+        let updatedContract = { ...prev, annotations }
         if (result.updated_nodes && result.updated_nodes.length > 0) {
           updatedContract = { ...updatedContract, section_tree: updateSectionTreeNodes(prev.section_tree, result.updated_nodes) }
         }

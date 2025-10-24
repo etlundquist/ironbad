@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.features.contract_annotations.schemas import AnnotationDeleteResponse, AnnotationResolutionRequest, AnnotationResolutionResponse, CommentAnnotation, Contract, ContractActionRequest, ContractActionResponse, ContractAnnotations, RevisionAnnotation, SectionAddAnnotation, SectionRemoveAnnotation
+from app.features.contract_annotations.schemas import AnnotationDeleteResponse, AnnotationResolutionRequest, AnnotationResolutionResponse, CommentAnnotation, AnnotatedContract, ContractActionRequest, ContractActionResponse, ContractAnnotations, RevisionAnnotation, SectionAddAnnotation, SectionRemoveAnnotation
 from app.enums import AnnotationStatus, AnnotationType, ContractActionType
 from app.models import Contract as DBContract
 from app.api.deps import get_db
@@ -39,7 +39,7 @@ async def handle_contract_action(contract_id: UUID, request: ContractActionReque
     dbcontract = result.scalar_one_or_none()
     if not dbcontract:
         raise HTTPException(status_code=404, detail="contract not found")
-    contract = Contract.model_validate(dbcontract)
+    contract = AnnotatedContract.model_validate(dbcontract)
 
     # process the requested action updating the contract's section tree and/or annotations in-place
     match request.action:
@@ -76,7 +76,7 @@ async def resolve_contract_annotation(contract_id: UUID, request: AnnotationReso
     dbcontract = result.scalar_one_or_none()
     if not dbcontract:
         raise HTTPException(status_code=404, detail="contract not found")
-    contract = Contract.model_validate(dbcontract)
+    contract = AnnotatedContract.model_validate(dbcontract)
 
     # find/validate the target annotation
     try:
@@ -119,7 +119,7 @@ async def delete_contract_annotation(contract_id: UUID, annotation_id: UUID, db:
     dbcontract = result.scalar_one_or_none()
     if not dbcontract:
         raise HTTPException(status_code=404, detail="contract not found")
-    contract = Contract.model_validate(dbcontract)
+    contract = AnnotatedContract.model_validate(dbcontract)
 
     # find/validate the target annotation
     try:

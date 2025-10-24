@@ -1,5 +1,4 @@
 import React from 'react'
-import ReactMarkdown from 'react-markdown'
 import { ContractSectionNode, SectionRemoveAnnotation, SectionAddAnnotation } from './types'
 import PendingSectionAdd from './PendingSectionAdd'
 
@@ -145,13 +144,12 @@ const SectionNode: React.FC<SectionNodeProps> = ({
                 color: '#374151',
                 userSelect: 'text',
                 cursor: 'text',
-                padding: '0'
+                padding: '0',
+                whiteSpace: 'pre-wrap'
               }}
               onMouseUp={handleTextSelection}
             >
-              <div>
-                <ReactMarkdown>{decodeHtmlEntities(node.markdown)}</ReactMarkdown>
-              </div>
+              <div>{decodeHtmlEntities(node.markdown)}</div>
             </div>
           )}
           {!isExpanded && node.name && node.level === 1 && (

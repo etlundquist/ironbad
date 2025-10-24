@@ -378,7 +378,7 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
     const revisions = getRevisionsForNode(nodeId)
     if (!revisions || revisions.length === 0) return
 
-    const activeRevisions = revisions.filter((r) => ['pending', 'accepted', 'rejected'].includes(r.status))
+    const activeRevisions = revisions.filter((r) => ['pending', 'rejected'].includes(r.status))
     if (activeRevisions.length === 0) return
 
     const ranges = activeRevisions
@@ -431,25 +431,26 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
         const localEnd = Math.min(len, r.end - nodeStart)
         if (localStart > localPos) frag.appendChild(document.createTextNode(text.slice(localPos, localStart)))
 
+        const isFinalSliceInThisNode = r.end <= nodeEnd
+
         if (r.status === 'pending') {
-          const del = document.createElement('del')
-          del.className = 'revision-old'
-          del.style.color = '#dc2626'
-          del.setAttribute('data-revision-id', r.id)
-          del.onclick = (e) => handleRevisionClick(r.id, e)
-          del.textContent = text.slice(localStart, localEnd)
+          if (!insertedNewText.has(r.id)) {
+            const del = document.createElement('del')
+            del.className = 'revision-old'
+            del.style.color = '#dc2626'
+            del.setAttribute('data-revision-id', r.id)
+            del.onclick = (e) => handleRevisionClick(r.id, e)
+            del.textContent = r.old_text
 
-          if (r.selected) {
-            del.style.backgroundColor = '#dbeafe'
-            del.style.padding = '2px 4px'
-            del.style.borderRadius = '4px'
-            del.style.border = '2px solid #3b82f6'
-          }
+            if (r.selected) {
+              del.style.backgroundColor = '#dbeafe'
+              del.style.padding = '2px 4px'
+              del.style.borderRadius = '4px'
+              del.style.border = '2px solid #3b82f6'
+            }
 
-          frag.appendChild(del)
+            frag.appendChild(del)
 
-          const isFinalSliceInThisNode = r.end <= nodeEnd
-          if (isFinalSliceInThisNode && !insertedNewText.has(r.id)) {
             const ins = document.createElement('span')
             ins.className = 'revision-new'
             ins.style.color = '#059669'
@@ -468,25 +469,8 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
             insertedNewText.add(r.id)
           }
         } else if (r.status === 'rejected') {
-          frag.appendChild(document.createTextNode(text.slice(localStart, localEnd)))
-        } else if (r.status === 'accepted') {
-          const isFinalSliceInThisNode = r.end <= nodeEnd
-          if (isFinalSliceInThisNode && !insertedNewText.has(r.id)) {
-            const span = document.createElement('span')
-            span.className = 'revision-accepted'
-            span.style.color = '#059669'
-            span.setAttribute('data-revision-id', r.id)
-            span.onclick = (e) => handleRevisionClick(r.id, e)
-            span.textContent = r.new_text
-
-            if (r.selected) {
-              span.style.backgroundColor = '#dbeafe'
-              span.style.padding = '2px 4px'
-              span.style.borderRadius = '4px'
-              span.style.border = '2px solid #3b82f6'
-            }
-
-            frag.appendChild(span)
+          if (!insertedNewText.has(r.id)) {
+            frag.appendChild(document.createTextNode(r.old_text))
             insertedNewText.add(r.id)
           }
         }
@@ -523,6 +507,12 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
 
       const originalMarkdown = markdownInline.getAttribute('data-original-markdown') || ''
       if (!originalMarkdown) return
+
+      const cachedMarkdown = markdownInline.getAttribute('data-cached-markdown') || ''
+      if (cachedMarkdown !== originalMarkdown) {
+        markdownInline.removeAttribute('data-original-text')
+        markdownInline.setAttribute('data-cached-markdown', originalMarkdown)
+      }
 
       if (!markdownInline.hasAttribute('data-original-text')) {
         markdownInline.setAttribute('data-original-text', inner.textContent || '')
