@@ -1,3 +1,5 @@
+import { ContractSectionCitation } from './contract'
+
 export type AgentChatMessageStatus = 'pending' | 'in_progress' | 'responding' | 'completed' | 'failed' | 'cancelled'
 export type AgentChatMessageRole = 'system' | 'user' | 'assistant'
 
@@ -16,6 +18,7 @@ export interface AgentChatMessage {
   status: AgentChatMessageStatus
   role: AgentChatMessageRole
   content: string
+  citations?: ContractSectionCitation[]
   created_at: string
   updated_at: string
 }

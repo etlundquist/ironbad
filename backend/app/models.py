@@ -162,6 +162,7 @@ class AgentChatMessage(Base):
     status = Column(Enum(ChatMessageStatus), nullable=False)
     role = Column(Enum(ChatMessageRole), nullable=False)
     content = Column(String, nullable=False, default="")
+    citations = Column(JSON, nullable=True)
     parent_chat_message_id = Column(UUID(as_uuid=True), ForeignKey(column="agent_chat_messages.id"), nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())

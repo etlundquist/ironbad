@@ -7,7 +7,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import ContractSection
-from app.enums import ContractSectionType
 from app.features.contract_chat.schemas import ContractSectionCitation
 
 from app.utils.embeddings import get_text_embedding
@@ -62,17 +61,17 @@ async def extract_response_citations(db: AsyncSession, contract_id: UUID, respon
     bracket_matches = re.findall(r'\[([0-9]+(?:\.[0-9]+)*(?:\s*,\s*[0-9]+(?:\.[0-9]+)*)*)\]', response_content)
 
     # extract the set of unique section numbers from the square bracket matches
-    section_numbers = set([section.strip() for match in bracket_matches for section in match.split(',')])
+    unique_section_numbers = set([section.strip() for match in bracket_matches for section in match.split(',')])
 
     # get the matching set of contract sections from the database
-    query = select(ContractSection).where(ContractSection.contract_id == contract_id, ContractSection.number.in_(section_numbers))
+    query = select(ContractSection).where(ContractSection.contract_id == contract_id, ContractSection.number.in_(unique_section_numbers))
     result = await db.execute(query)
     contract_sections = result.scalars().all()
     contract_sections_by_number = {section.number: section for section in contract_sections}
 
-    # create a dictionary of citation objects for each response section number that references a valid contract section
+    # create a list of citation objects for each unique response section number that references a valid contract section
     response_citations: list[ContractSectionCitation] = []
-    for section_number in section_numbers:
+    for section_number in unique_section_numbers:
         if contract_section := contract_sections_by_number.get(section_number):
             response_citation = ContractSectionCitation(
                 section_id=str(contract_section.id),
@@ -85,6 +84,3 @@ async def extract_response_citations(db: AsyncSession, contract_id: UUID, respon
         else:
             logger.warning(f"cited section number: [{section_number}] not found in the contract's parsed sections")
     return response_citations
-
-
-

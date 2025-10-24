@@ -12,6 +12,7 @@ from agents.items import  MessageOutputItem, ToolCallItem, ToolCallOutputItem, R
 from app.enums import ChatMessageStatus
 from app.models import AgentChatMessage as DBAgentChatMessage, AgentChatThread as DBAgentChatThread
 from app.features.contract_agent.schemas import AgentRunEventStreamContext, AgentChatThread, AgentChatMessage, AgentRunCreatedEvent, AgentRunMessageStatusUpdateEvent, AgentRunMessageTokenDeltaEvent, AgentRunFailedEvent, AgentRunCompletedEvent, AgentRunCancelledEvent, AgentToolCallEvent, AgentToolCallOutputEvent, AgentReasoningSummaryEvent
+from app.features.contract_agent.services import extract_response_citations
 
 
 logger = logging.getLogger(__name__)
@@ -110,10 +111,13 @@ async def handle_event_stream(event_stream: AsyncIterator[StreamEvent], context:
                     else:
                         logger.warning(f"reasoning item={sse_event.reasoning_id} summary is empty - skipping event emission")
                 elif isinstance(event.item, MessageOutputItem):
-                    # update the finalized assistant message status/content in the database for the completed run
+                    # update the finalized assistant message status/content/citations in the database for the completed run
+                    response_content = "".join([message.text for message in event.item.raw_item.content if message.type == "output_text"])
+                    response_citations = await extract_response_citations(context.contract, response_content)
                     assistant_message = await context.db.get(DBAgentChatMessage, context.assistant_message_id)
                     assistant_message.status = ChatMessageStatus.COMPLETED
-                    assistant_message.content = "".join([message.text for message in event.item.raw_item.content if message.type == "output_text"])
+                    assistant_message.content = response_content
+                    assistant_message.citations = [citation.model_dump() for citation in response_citations]
                     sse_event = AgentRunCompletedEvent(assistant_message=AgentChatMessage.model_validate(assistant_message))
                     await context.db.commit()
                     yield ServerSentEvent(event=sse_event.event, data=sse_event.model_dump_json())

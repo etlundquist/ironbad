@@ -3,7 +3,7 @@ from uuid import UUID
 from datetime import datetime
 from typing import Optional, Literal, Union
 
-from app.common.schemas import ConfiguredBaseModel
+from app.common.schemas import ConfiguredBaseModel, ContractSectionCitation
 from app.enums import ChatMessageStatus, ChatMessageRole
 
 
@@ -18,14 +18,6 @@ class ChatThread(ConfiguredBaseModel):
     archived: bool
     created_at: datetime
     updated_at: datetime
-
-
-class ContractSectionCitation(ConfiguredBaseModel):
-    section_id: str
-    section_number: str
-    section_name: Optional[str] = None
-    beg_page: Optional[int] = None
-    end_page: Optional[int] = None
 
 
 class ChatMessage(ConfiguredBaseModel):

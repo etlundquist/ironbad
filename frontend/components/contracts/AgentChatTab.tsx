@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { Contract } from '../../lib/types'
+import { Contract, ContractSectionCitation } from '../../lib/types'
 import { useAgentChat } from '../../hooks/useAgentChat'
 import { Spinner } from '../common/Spinner'
 import { useNotificationContext } from '../common/NotificationProvider'
@@ -12,11 +12,12 @@ interface AgentChatTabProps {
   isAnalyzing: boolean
   onIngest: () => void
   navigateToPage: (page: number) => void
+  navigateToSection?: (sectionId: string) => void
   onRunCompleted?: () => void
   onClose?: () => void
 }
 
-export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId, isAnalyzing, onIngest, navigateToPage, onRunCompleted, onClose }) => {
+export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId, isAnalyzing, onIngest, navigateToPage, navigateToSection, onRunCompleted, onClose }) => {
   const { showToast } = useNotificationContext()
   const [expandedProgressPanels, setExpandedProgressPanels] = useState<Set<string>>(new Set())
   const {
@@ -82,9 +83,91 @@ export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId
     }
   }
 
-  const renderAssistantContent = (content: string) => {
+  const renderAssistantContent = (content: string, citations?: ContractSectionCitation[]) => {
     if (!content) return <span>{content}</span>
-    return <ReactMarkdown>{content}</ReactMarkdown>
+
+    const MarkdownWithCitations: React.FC<{ children: string }> = ({ children }) => {
+      const contentRef = useRef<HTMLDivElement>(null)
+
+      useEffect(() => {
+        if (!contentRef.current || !citations) return
+
+        const walker = document.createTreeWalker(contentRef.current, NodeFilter.SHOW_TEXT, null)
+
+        type Replacement = { text?: string; citation?: ContractSectionCitation; sectionNum?: string }
+        const nodesToReplace: Array<{ node: Text; replacements: Replacement[] }> = []
+
+        let node: Text | null
+        while ((node = walker.nextNode() as Text | null)) {
+          if (!node.textContent) continue
+          const text = node.textContent
+          const regex = /\[([0-9]+(?:\.[0-9]+)*(?:\s*,\s*[0-9]+(?:\.[0-9]+)*)*)\]/g
+          let match: RegExpExecArray | null
+          let lastIndex = 0
+          const replacements: Replacement[] = []
+          let hasCitations = false
+
+          while ((match = regex.exec(text)) !== null) {
+            hasCitations = true
+            if (match.index > lastIndex) {
+              replacements.push({ text: text.slice(lastIndex, match.index) })
+            }
+            const group = match[1]
+            const sectionNums = group.split(',').map(s => s.trim()).filter(Boolean)
+            if (sectionNums.length > 0) {
+              sectionNums.forEach((sectionNum) => {
+                const citation = citations.find((c) => c.section_number === sectionNum)
+                if (citation && citation.section_id) {
+                  replacements.push({ citation, sectionNum })
+                } else {
+                  replacements.push({ text: `[${sectionNum}]` })
+                }
+              })
+            } else {
+              replacements.push({ text: match[0] })
+            }
+            lastIndex = regex.lastIndex
+          }
+
+          if (hasCitations) {
+            if (lastIndex < text.length) {
+              replacements.push({ text: text.slice(lastIndex) })
+            }
+            nodesToReplace.push({ node, replacements })
+          }
+        }
+
+        nodesToReplace.forEach(({ node, replacements }) => {
+          const span = document.createElement('span')
+          replacements.forEach((replacement) => {
+            if (replacement.text !== undefined) {
+              span.appendChild(document.createTextNode(replacement.text))
+            } else if (replacement.citation && replacement.sectionNum) {
+              const button = document.createElement('button')
+              button.type = 'button'
+              button.className = 'section-number link inline'
+              button.textContent = `[${replacement.sectionNum}]`
+              button.title = replacement.citation.section_name || `Section ${replacement.sectionNum}`
+              button.onclick = () => {
+                if (navigateToSection && replacement.citation!.section_id) {
+                  navigateToSection(replacement.citation!.section_id)
+                }
+              }
+              span.appendChild(button)
+            }
+          })
+          node.parentNode?.replaceChild(span, node)
+        })
+      }, [children, citations])
+
+      return (
+        <div ref={contentRef}>
+          <ReactMarkdown>{children}</ReactMarkdown>
+        </div>
+      )
+    }
+
+    return <MarkdownWithCitations>{content}</MarkdownWithCitations>
   }
 
   const getStatusDisplay = (status: string) => {
@@ -172,7 +255,7 @@ export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId
                   <div className="chat-message-content">
                     {msg.role === 'assistant' ? (
                       <div className="assistant-content">
-                        {renderAssistantContent(msg.content)}
+                        {renderAssistantContent(msg.content, msg.citations)}
                         {(msg.status === 'in_progress' || msg.status === 'responding') && (
                           <span className="typing-indicator">●</span>
                         )}

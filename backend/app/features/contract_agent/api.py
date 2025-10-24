@@ -80,7 +80,7 @@ async def run_contract_agent(request: AgentRunRequest, db: AsyncSession = Depend
 
     # create the agent's runtime context and the event stream handler's context 
     agent_context = AgentContext(db=db, contract=contract)
-    stream_context = AgentRunEventStreamContext(db=db, chat_thread_id=chat_thread.id, user_message_id=user_message.id, assistant_message_id=assistant_message.id)
+    stream_context = AgentRunEventStreamContext(db=db, contract=contract, chat_thread_id=chat_thread.id, user_message_id=user_message.id, assistant_message_id=assistant_message.id)
 
     # execute the agent run with the user's current input, conversation history, and dynamic agent runtime context
     result = Runner.run_streamed(

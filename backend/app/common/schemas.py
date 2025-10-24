@@ -12,6 +12,7 @@ class ConfiguredBaseModel(BaseModel):
         from_attributes = True
         arbitrary_types_allowed = True
 
+
 class ContractStructuredMetadata(ConfiguredBaseModel):
     document_type: Literal["Master Agreement", "Statement of Work", "Purchase Order", "Other"]
     document_title: Optional[str] = None
@@ -22,6 +23,15 @@ class ContractStructuredMetadata(ConfiguredBaseModel):
 
 class ContractMetadata(ContractStructuredMetadata):
     summary: Optional[str] = None
+
+
+class ContractSectionCitation(ConfiguredBaseModel):
+    section_id: str
+    section_number: str
+    section_name: Optional[str] = None
+    beg_page: Optional[int] = None
+    end_page: Optional[int] = None
+
 
 class ContractSectionNode(ConfiguredBaseModel):
     id: str
@@ -44,6 +54,7 @@ class ContractSectionNode(ConfiguredBaseModel):
             except ValueError:
                 continue
         raise ValueError(f"node_id={node_id} not found")
+
 
 class Contract(ConfiguredBaseModel):
     id: UUID

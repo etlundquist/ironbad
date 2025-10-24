@@ -4,7 +4,7 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.common.schemas import ConfiguredBaseModel
+from app.common.schemas import ConfiguredBaseModel, ContractSectionCitation
 from app.features.contract_annotations.schemas import AnnotatedContract
 from app.enums import AnnotationType, ContractSectionType, ChatMessageStatus, ChatMessageRole
 
@@ -86,6 +86,7 @@ class AgentRunRequest(ConfiguredBaseModel):
 
 class AgentRunEventStreamContext(ConfiguredBaseModel):
     db: AsyncSession
+    contract: AnnotatedContract
     chat_thread_id: UUID
     user_message_id: UUID
     assistant_message_id: UUID
@@ -105,6 +106,7 @@ class AgentChatMessage(ConfiguredBaseModel):
     status: ChatMessageStatus
     role: ChatMessageRole
     content: str
+    citations: Optional[list[ContractSectionCitation]] = None
     created_at: datetime
     updated_at: datetime
 

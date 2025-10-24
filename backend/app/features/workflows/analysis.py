@@ -9,10 +9,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Contract, StandardClause, StandardClauseRule, ContractSection, ContractClause, ContractIssue
-from app.features.workflows.schemas import ClauseRuleEvaluation, EvaluatedClauseRule
-from app.features.contract_chat.schemas import ContractSectionCitation
 from app.enums import IssueStatus
 from app.prompts import PROMPT_RULE_COMPLIANCE_CLASSIFICATION
+from app.common.schemas import ContractSectionCitation
+from app.features.workflows.schemas import ClauseRuleEvaluation, EvaluatedClauseRule
+
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)

@@ -285,7 +285,7 @@ async def remove_section(wrapper: RunContextWrapper[AgentContext], section_numbe
 @function_tool
 async def get_contract_annotations(wrapper: RunContextWrapper[AgentContext], annotation_type: Optional[AnnotationType] = None, section_number: Optional[str] = None) -> str:
     """
-    Get unresolved contract annotations optionally filtered by annotation type and section number
+    Get contract annotations optionally filtered by annotation type and section number
 
     :param annotation_type: filter by annotation type (defaults to all annotation types)
     :param section_number: filter by section number (defaults to all contract sections)

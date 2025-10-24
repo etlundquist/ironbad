@@ -187,6 +187,45 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
     return () => window.removeEventListener('navigate-to-annotation', handleNavigation as EventListener)
   }, [annotations, expandParentChain])
 
+  // Listen for navigation to sections from agent chat citations
+  useEffect(() => {
+    const handleSectionNavigation = (event: CustomEvent) => {
+      const { sectionId } = event.detail
+      
+      if (!nodeById.has(sectionId)) return
+
+      // Expand the parent chain to make the section visible
+      setExpandedNodes((prev) => {
+        const next = new Set(prev)
+        let current: ContractSectionNode | undefined = nodeById.get(sectionId)
+        while (current) {
+          next.add(current.id)
+          current = current.parent_id ? nodeById.get(current.parent_id) : undefined
+        }
+        return next
+      })
+
+      // Scroll to the section after expansion
+      setTimeout(() => {
+        const nodeElement = document.querySelector(`[data-node-id="${sectionId}"]`)
+        if (nodeElement) {
+          (nodeElement as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' })
+          // Add a temporary highlight effect
+          const header = nodeElement.querySelector('.section-header') as HTMLElement | null
+          if (header) {
+            header.style.outline = '2px solid #3b82f6'
+            setTimeout(() => {
+              if (header) header.style.outline = 'none'
+            }, 1000)
+          }
+        }
+      }, 200)
+    }
+
+    window.addEventListener('navigate-to-section', handleSectionNavigation as EventListener)
+    return () => window.removeEventListener('navigate-to-section', handleSectionNavigation as EventListener)
+  }, [nodeById])
+
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = () => {

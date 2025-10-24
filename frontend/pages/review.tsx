@@ -330,6 +330,11 @@ const ReviewPage: NextPage = () => {
     })
   }
 
+  const navigateToSection = (sectionId: string) => {
+    // Dispatch a custom event to navigate to the section
+    window.dispatchEvent(new CustomEvent('navigate-to-section', { detail: { sectionId } }))
+  }
+
   const getGroupHeight = (groupName: string) => {
     const isCollapsed = collapsedGroups.has(groupName)
     if (isCollapsed) return 'auto'
@@ -451,6 +456,7 @@ const ReviewPage: NextPage = () => {
                     isAnalyzing={false}
                     onIngest={() => {}}
                     navigateToPage={() => {}}
+                    navigateToSection={navigateToSection}
                     onRunCompleted={refreshSelectedContract}
                     onClose={() => setShowAgentChat(false)}
                   />

@@ -25,11 +25,7 @@ def resolve_instructions(wrapper: RunContextWrapper[AgentContext], agent: Agent[
     instructions = PROMPT_REDLINE_AGENT.format(contract_summary=wrapper.context.contract.meta.summary)
     return instructions
 
-model_settings = ModelSettings(
-    reasoning=Reasoning(effort="medium", summary="detailed"), 
-    verbosity="medium", 
-    store=True
-)
+model_settings = ModelSettings(reasoning=Reasoning(effort="medium", summary="detailed"), verbosity="medium", store=True)
 
 agent = Agent[AgentContext](
     name="Contract Redline Agent",
