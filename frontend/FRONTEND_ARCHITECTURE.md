@@ -11,18 +11,18 @@ This guide helps engineers understand and navigate the Ironbad frontend codebase
 
 ```
 frontend/
-├── pages/                      # Next.js routes (~150-260 lines each)
+├── pages/                      # Next.js routes (~150-570 lines each)
 │   ├── _app.tsx               # App wrapper with NotificationProvider
 │   ├── index.tsx              # Home/dashboard
 │   ├── upload.tsx             # Contract upload
 │   ├── contracts.tsx          # Contract list
 │   ├── contracts/[id].tsx     # Contract detail (tabs: metadata, clauses, issues, chat)
-│   ├── review.tsx             # Review workspace with annotation panels
+│   ├── review.tsx             # Review workspace with annotation panels & agent
 │   └── standard-clauses.tsx   # Configuration
 │
 ├── components/
 │   ├── common/                # Shared: Header, Toast, Spinner, NotificationProvider
-│   ├── contracts/             # PDFViewer, MetadataForm, ClausesTab, IssuesTab, ChatTab, ContractList
+│   ├── contracts/             # PDFViewer, MetadataForm, ClausesTab, IssuesTab, ChatTab, AgentChatTab, AgentProgressPanel, ContractList
 │   ├── review/                # CommentsPanel, RevisionsPanel, SectionAddsPanel, SectionRemovesPanel, ChangelogPanel
 │   ├── standard-clauses/      # StandardClauseForm, StandardClauseList
 │   ├── upload/                # DropZone, UploadList
@@ -30,7 +30,8 @@ frontend/
 │
 ├── hooks/                     # Custom React hooks
 │   ├── useContract.ts         # Contract data fetching
-│   ├── useContractChat.ts     # Chat with SSE streaming
+│   ├── useContractChat.ts     # Contract Q&A chat with SSE streaming
+│   ├── useAgentChat.ts        # Agent chat with tool calls & SSE streaming
 │   ├── usePDFViewer.ts        # PDF viewer state
 │   └── useNotifications.ts    # SSE + toast system
 │
@@ -39,7 +40,8 @@ frontend/
 │   │   ├── contracts.ts       # CRUD, status, metadata
 │   │   ├── clauses.ts         # Clause operations
 │   │   ├── issues.ts          # Issue management
-│   │   ├── chat.ts            # Chat operations
+│   │   ├── chat.ts            # Contract Q&A chat operations
+│   │   ├── agent.ts           # Agent operations with tool calls
 │   │   ├── annotations.ts     # Comments, revisions, sections
 │   │   └── standard-clauses.ts
 │   │
@@ -47,7 +49,8 @@ frontend/
 │   │   ├── contract.ts
 │   │   ├── clause.ts
 │   │   ├── issue.ts
-│   │   ├── chat.ts
+│   │   ├── chat.ts            # Contract Q&A chat types
+│   │   ├── agent.ts           # Agent chat, messages, events
 │   │   ├── upload.ts
 │   │   ├── annotation.ts
 │   │   └── standard-clause.ts
@@ -178,8 +181,9 @@ showToast({ type: 'warning', title: 'Invalid', message: 'Fill required fields' }
 ### Review Page (`/review`)
 - Section tree with inline annotations
 - Sidebar panels: Comments, Revisions, Section Adds/Removes, Changelog
+- Agent chat panel for AI-assisted redlining
 - Collapsible panels with dynamic height
-- **Components:** ContractSectionTree, CommentsPanel, RevisionsPanel, etc.
+- **Components:** ContractSectionTree, AgentChatTab, AgentProgressPanel, CommentsPanel, RevisionsPanel, etc.
 
 ### Standard Clauses (`/standard-clauses`)
 - Configuration for policy rules
@@ -227,15 +231,25 @@ showToast({ type: 'warning', title: 'Invalid', message: 'Fill required fields' }
 - Search highlights via text layer
 
 ### Chat System
+- **Contract Chat:** RAG-based Q&A about contract content
+- **Agent Chat:** AI agent with tool-calling capabilities for redlining
 - SSE streaming for AI responses
 - Token-by-token updates
 - Abort controller for cancellation
+- Progress tracking for agent tool calls and reasoning
 
 ### Section Tree Annotations
 - Complex component (~1370 lines)
 - Handles comments, revisions, section operations
 - Text-based offset calculations
 - Click navigation between tree and panels
+
+### Agent System
+- **AgentChatTab:** Full-featured agent chat interface
+- **AgentProgressPanel:** Collapsible panel showing tool calls and reasoning
+- SSE event handling for run lifecycle (created, in_progress, responding, completed, failed)
+- Tool call visualization with args and icons
+- Real-time progress updates
 
 ---
 
@@ -268,22 +282,43 @@ try {
 const { contract, loading, error, refetch } = useContract(contractId)
 ```
 
+**Use agent chat hook:**
+```typescript
+const {
+  currentChatThread,
+  chatMessages,
+  isChatLoading,
+  isSendingMessage,
+  chatInput,
+  setChatInput,
+  sendMessage,
+  handleNewChat,
+  messageProgress
+} = useAgentChat(contractId, {
+  onError: (title, message) => showToast({ type: 'error', title, message }),
+  onToolCall: (toolName, toolCallId, args) => console.log('Tool call:', toolName),
+  onRunCompleted: () => refetch()
+})
+```
+
 ---
 
 ## Recommendations for Future Work
 
 **High Priority:**
 - Extract status strings to `lib/constants.ts` (avoid magic strings)
+- Add error boundaries around major components (especially agent SSE streams)
 
 **Medium Priority:**
 - Add component index exports for cleaner imports
 - Move ContractSectionTree to `components/review/` or `components/contracts/`
-- Extract repeated inline styles to constants
+- Extract repeated inline styles to constants (especially in AgentProgressPanel)
+- Consider unifying chat and agent chat hooks/components for code reuse
 
 **Low Priority:**
 - Consider CSS Modules for better style organization
 - Add React Query/SWR for data fetching
-- Add error boundaries around major components
+- Add retry logic for failed agent tool calls
 
 ---
 

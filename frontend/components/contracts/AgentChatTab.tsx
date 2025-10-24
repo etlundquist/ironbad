@@ -13,9 +13,10 @@ interface AgentChatTabProps {
   onIngest: () => void
   navigateToPage: (page: number) => void
   onRunCompleted?: () => void
+  onClose?: () => void
 }
 
-export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId, isAnalyzing, onIngest, navigateToPage, onRunCompleted }) => {
+export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId, isAnalyzing, onIngest, navigateToPage, onRunCompleted, onClose }) => {
   const { showToast } = useNotificationContext()
   const [expandedProgressPanels, setExpandedProgressPanels] = useState<Set<string>>(new Set())
   const {
@@ -117,12 +118,32 @@ export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId
     })
   }
 
+  const AIIcon = () => (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="3" y="3" width="18" height="18" rx="4" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+      <text x="12" y="15.5" fontSize="10" fontWeight="700" textAnchor="middle" fill="currentColor">AI</text>
+      <path d="M19 4L19.5 5.5L21 6L19.5 6.5L19 8L18.5 6.5L17 6L18.5 5.5L19 4Z" fill="currentColor"/>
+      <path d="M20 16L20.35 17L21.5 17.35L20.35 17.7L20 19L19.65 17.7L18.5 17.35L19.65 17L20 16Z" fill="currentColor"/>
+    </svg>
+  )
+
   return (
     <div className="tab-panel">
-      <div className="tab-header">
-        <h3>Review and Redline Assistant</h3>
+      <div className="tab-header agent-header">
+        <div className="agent-header-title">
+          <AIIcon />
+          <h3>Redline Agent</h3>
+        </div>
         <div className="tab-header-actions">
           {getIngestCTA()}
+          {onClose && (
+            <button className="close-button" onClick={onClose} title="Close Agent Chat">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 

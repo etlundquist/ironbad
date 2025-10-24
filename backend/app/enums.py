@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class ContractStatus(Enum):
     UPLOADED = "Uploaded"
     INGESTING = "Ingesting"
@@ -7,7 +8,6 @@ class ContractStatus(Enum):
     ANALYZING = "Analyzing"
     UNDER_REVIEW = "Under Review"
     REVIEW_COMPLETED = "Review Completed"
-
 
 class FileType(Enum):
     PDF = "application/pdf"
@@ -30,7 +30,6 @@ class RuleSeverity(Enum):
     WARNING = "warning"
     INFO = "info"
 
-
 class IssueStatus(Enum):
     OPEN = "open"
     RESOLVED = "resolved"
@@ -51,7 +50,6 @@ class ChatMessageRole(Enum):
     SYSTEM = "system"
     USER = "user"
     ASSISTANT = "assistant"
-
 
 class AnnotationStatus(Enum):
     PENDING = "pending"

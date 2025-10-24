@@ -97,7 +97,7 @@ const Header: React.FC = () => {
             View Contracts
           </Link>
           <Link href="/review" className={`nav-link ${isActive('/review') ? 'active' : ''}`}>
-            Review & Redline
+            Redline Agent
           </Link>
           <Link href="/upload" className={`nav-link ${isActive('/upload') ? 'active' : ''}`}>
             Upload Contracts

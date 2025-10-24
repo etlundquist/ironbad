@@ -378,11 +378,6 @@ const ReviewPage: NextPage = () => {
   return (
     <div className="page-container">
       <main className="main-content">
-        <div className="review-header">
-          <h1>Review & Redline</h1>
-          <p>Interactive contract review with comments, revisions, and section management</p>
-        </div>
-
         {!selectedContract ? (
           <div className="contract-selection">
             <h2>Select a Contract to Review</h2>
@@ -441,26 +436,16 @@ const ReviewPage: NextPage = () => {
 
             <div ref={workspaceRef} className="workspace-content" style={{ position: 'relative', display: 'grid', gridTemplateColumns: getGridTemplateColumns(), gap: '20px', height: 'calc(100vh - 120px)', width: '100%', maxWidth: 'none' }}>
               {showAgentChat && (
-                <div className="agent-chat-panel" style={{ width: '100%', backgroundColor: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                  <div className="panel-header" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '16px' }}>
-                    <button 
-                      onClick={() => setShowAgentChat(false)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#6b7280' }}
-                      title="Hide Agent Chat"
-                    >
-                      ×
-                    </button>
-                  </div>
-                  <div style={{ flex: 1, overflow: 'hidden' }}>
-                    <AgentChatTab
-                      contract={selectedContract}
-                      contractId={selectedContract.id}
-                      isAnalyzing={false}
-                      onIngest={() => {}}
-                      navigateToPage={() => {}}
-                      onRunCompleted={refreshSelectedContract}
-                    />
-                  </div>
+                <div className="agent-chat-panel" style={{ width: '100%', backgroundColor: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <AgentChatTab
+                    contract={selectedContract}
+                    contractId={selectedContract.id}
+                    isAnalyzing={false}
+                    onIngest={() => {}}
+                    navigateToPage={() => {}}
+                    onRunCompleted={refreshSelectedContract}
+                    onClose={() => setShowAgentChat(false)}
+                  />
                 </div>
               )}
               <div className="contract-viewer" style={{ flex: 1, minWidth: 0 }}>
@@ -485,14 +470,22 @@ const ReviewPage: NextPage = () => {
               </div>
 
               {showAnnotations && (
-                <div className="comments-sidebar" style={{ width: '100%', backgroundColor: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
-                  <div className="panel-header" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '16px' }}>
-                    <button 
-                      onClick={() => setShowAnnotations(false)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#6b7280' }}
-                      title="Hide Contract Annotations"
-                    >
-                      ×
+                <div className="comments-sidebar" style={{ width: '100%', backgroundColor: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div className="tab-header annotations-header">
+                    <div className="annotations-header-title">
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                        <polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                        <path d="M9 13h6M9 17h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                        <path d="M16 16l3 3l-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <h3>Contract Annotations</h3>
+                    </div>
+                    <button className="close-button" onClick={() => setShowAnnotations(false)} title="Close Annotations">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
                     </button>
                   </div>
                 <CommentsPanel

@@ -84,7 +84,7 @@ services:
   taskiq-worker:
     image: ironbad-backend:latest
     container_name: ironbad-taskiq-worker
-    command: uv run taskiq worker app.tasks:broker --reload --max-async-tasks=10 --max-prefetch=5
+    command: uv run taskiq worker app.features.workflows.tasks:broker --reload --max-async-tasks=10 --max-prefetch=5
     depends_on:
       redis:
         condition: service_started

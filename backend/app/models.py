@@ -1,15 +1,14 @@
 import uuid
 
-from opentelemetry.sdk.trace import id_generator
 from sqlalchemy import Boolean, Column, String, Integer, DateTime, Enum, JSON, ForeignKey, ARRAY
-from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import UUID, BYTEA
 from sqlalchemy.orm import DeclarativeBase, relationship
+from sqlalchemy.sql import func
+from pgvector.sqlalchemy import Vector
 
 from app.enums import ContractStatus, FileType, ContractSectionType, IssueResolution, RuleSeverity, IssueStatus, ChatMessageStatus, ChatMessageRole
-from app.constants import EMBEDDING_VECTOR_DIMENSION
+from app.core.config import settings
 
-from pgvector.sqlalchemy import Vector
 
 class Base(DeclarativeBase):
     pass
@@ -22,7 +21,7 @@ class StandardClause(Base):
     display_name = Column(String, nullable=False)
     description = Column(String, nullable=False)
     standard_text = Column(String, nullable=False)
-    embedding = Column(Vector(dim=EMBEDDING_VECTOR_DIMENSION), nullable=True)
+    embedding = Column(Vector(dim=settings.embedding_vector_dimension), nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
@@ -71,7 +70,7 @@ class ContractSection(Base):
     number = Column(String, nullable=False)
     name = Column(String, nullable=True)
     markdown = Column(String, nullable=False)
-    embedding = Column(Vector(dim=EMBEDDING_VECTOR_DIMENSION), nullable=True)
+    embedding = Column(Vector(dim=settings.embedding_vector_dimension), nullable=True)
     beg_page = Column(Integer, nullable=False)
     end_page = Column(Integer, nullable=False)
     created_at = Column(DateTime, nullable=False, server_default=func.now())

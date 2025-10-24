@@ -17,7 +17,7 @@ const Home: NextPage = () => {
             View Contracts
           </Link>
           <Link href="/review" className="secondary-button">
-            Review & Redline
+            Redline Agent
           </Link>
           <Link href="/standard-clauses" className="secondary-button">
             Manage Standard Clauses
