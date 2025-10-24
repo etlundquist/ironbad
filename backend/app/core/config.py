@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     """application settings from environment variables, local container files, or default values"""
 
     # settings configuration
-    model_config = SettingsConfigDict(case_sensitive=False, extra="ignore")
+    model_config = SettingsConfigDict(case_sensitive=False, extra="ignore", env_file=".env")
 
     # application/environment settings
     app_name: str = Field(default="Ironbad Backend")

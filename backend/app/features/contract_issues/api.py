@@ -86,6 +86,13 @@ async def get_contract_issue(contract_id: UUID, issue_id: UUID, db: AsyncSession
 async def update_contract_issue_ai_revision(contract_id: UUID, issue_id: UUID, db: AsyncSession = Depends(get_db)) -> ContractIssue:
     """update the issue's active revision with an AI suggestion"""
 
+    # fetch the contract from the database
+    query = select(DBContract).where(DBContract.id == contract_id)
+    result = await db.execute(query)
+    contract = result.scalar_one_or_none()
+    if not contract:
+        raise HTTPException(status_code=404, detail="contract not found")
+
     # fetch the contract issue from the database
     query = select(DBContractIssue).where(DBContractIssue.contract_id == contract_id, DBContractIssue.id == issue_id).options(
         selectinload(DBContractIssue.standard_clause),
@@ -108,6 +115,7 @@ async def update_contract_issue_ai_revision(contract_id: UUID, issue_id: UUID, d
         relevant_text=issue.relevant_text,
         issue_description=issue.explanation,
         policy_rules="\n".join([rule.text for rule in standard_clause.rules]),
+        contract_summary=contract.meta["summary"],
         standard_approved_language=standard_clause.standard_text
     )
     logger.info(f"resolved prompt: {resolved_prompt}")

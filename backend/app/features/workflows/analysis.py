@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import Contract, StandardClause, StandardClauseRule, ContractSection, ContractClause, ContractIssue
 from app.features.workflows.schemas import ClauseRuleEvaluation, EvaluatedClauseRule
 from app.features.contract_chat.schemas import ContractSectionCitation
-from app.enums import ContractSectionType, IssueStatus
+from app.enums import IssueStatus
 from app.prompts import PROMPT_RULE_COMPLIANCE_CLASSIFICATION
 
 logging.basicConfig(level=logging.INFO)
@@ -19,7 +19,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
-async def evaluate_clause_rule(contract_preamble: ContractSection, contract_clause: ContractClause, standard_clause: StandardClause, rule: StandardClauseRule) -> EvaluatedClauseRule:
+async def evaluate_clause_rule(contract_summary: str, contract_clause: ContractClause, standard_clause: StandardClause, rule: StandardClauseRule) -> EvaluatedClauseRule:
     """evaluate a contract clause with respect to a single rule"""
 
     openai = AsyncOpenAI()
@@ -28,7 +28,7 @@ async def evaluate_clause_rule(contract_preamble: ContractSection, contract_clau
         input=PROMPT_RULE_COMPLIANCE_CLASSIFICATION.format(
             clause_name=standard_clause.display_name,
             policy_rule=rule.text,
-            contract_preamble=contract_preamble.markdown,
+            contract_summary=contract_summary,
             contract_clause=contract_clause.raw_markdown,
         ),
         text_format=ClauseRuleEvaluation,
@@ -75,7 +75,7 @@ async def extract_violation_citations(db: AsyncSession, contract_id: UUID, viola
     return citations
 
 
-async def identify_clause_issues(db: AsyncSession, contract_preamble: ContractSection, contract_clause: ContractClause, standard_clause: StandardClause) -> list[ContractIssue]:
+async def identify_clause_issues(db: AsyncSession, contract_summary: str, contract_clause: ContractClause, standard_clause: StandardClause) -> list[ContractIssue]:
     """identify issues with a contract clause with respect to a standard clause"""
 
     # get the set of policy rules for the standard clause
@@ -84,7 +84,7 @@ async def identify_clause_issues(db: AsyncSession, contract_preamble: ContractSe
     rules = result.scalars().all()
 
     # evaluate each rule independently with respect to the contract clause and filter for violations
-    rule_evaluations = await asyncio.gather(*[evaluate_clause_rule(contract_preamble, contract_clause, standard_clause, rule) for rule in rules])
+    rule_evaluations = await asyncio.gather(*[evaluate_clause_rule(contract_summary, contract_clause, standard_clause, rule) for rule in rules])
     rule_violations = [evaluation for evaluation in rule_evaluations if evaluation.violation]
 
     # extract the citations for the rule violations mapping each citation back to the relevant contract section
@@ -111,11 +111,6 @@ async def extract_issues(db: AsyncSession, contract: Contract, standard_clauses:
     contract_issues: list[ContractIssue] = []
     for standard_clause in standard_clauses:
 
-        # fetch the contract preamble to provide additional context during rule evaluation
-        query = select(ContractSection).where(ContractSection.contract_id == contract.id, ContractSection.type == ContractSectionType.PREAMBLE)
-        result = await db.execute(query)
-        contract_preamble = result.scalar_one_or_none()
-
         # fetch the contract-specific clause for the current standard clause
         logger.info(f"extracting issues for standard clause: {standard_clause.name}")
         query = select(ContractClause).where(ContractClause.contract_id == contract.id, ContractClause.standard_clause_id == standard_clause.id)
@@ -128,7 +123,7 @@ async def extract_issues(db: AsyncSession, contract: Contract, standard_clauses:
             continue
 
         # identify all issues (policy rule violations) with respect to the current standard clause and add to the contract issues
-        clause_issues = await identify_clause_issues(db, contract_preamble, contract_clause, standard_clause)
+        clause_issues = await identify_clause_issues(db, contract.meta["summary"], contract_clause, standard_clause)
         contract_issues.extend(clause_issues)
 
     # return the full set of contract issues

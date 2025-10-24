@@ -12,13 +12,16 @@ class ConfiguredBaseModel(BaseModel):
         from_attributes = True
         arbitrary_types_allowed = True
 
-class ContractMetadata(ConfiguredBaseModel):
+class ContractStructuredMetadata(ConfiguredBaseModel):
     document_type: Literal["Master Agreement", "Statement of Work", "Purchase Order", "Other"]
     document_title: Optional[str] = None
     customer_name: Optional[str] = None
     supplier_name: Optional[str] = None
     effective_date: Optional[str] = None
     initial_term: Optional[str] = None
+
+class ContractMetadata(ContractStructuredMetadata):
+    summary: Optional[str] = None
 
 class ContractSectionNode(ConfiguredBaseModel):
     id: str

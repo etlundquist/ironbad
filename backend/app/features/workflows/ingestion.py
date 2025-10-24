@@ -12,11 +12,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Contract, StandardClause, ContractSection, ContractClause
-from app.common.schemas import ContractMetadata, ContractSectionNode
+from app.common.schemas import ContractMetadata, ContractSectionNode, ContractStructuredMetadata
 from app.features.workflows.schemas import ParsedContract, ParsedContractSection, SectionRelevanceEvaluation
 
 from app.enums import ContractSectionType
-from app.prompts import PROMPT_IDENTIFY_FIRST_NUMBERED_SECTION, PROMPT_METADATA_EXTRACTION, PROMPT_SECTION_RELEVANCE, PROMPT_CLAUSE_SUMMARY
+from app.prompts import PROMPT_IDENTIFY_FIRST_NUMBERED_SECTION, PROMPT_METADATA_EXTRACTION, PROMPT_CONTRACT_SUMMARY, PROMPT_SECTION_RELEVANCE, PROMPT_CONTRACT_CLAUSE
 from app.utils.embeddings import get_section_embeddings
 from app.utils.common import string_truncate
 
@@ -104,11 +104,11 @@ def split_contract_lines(contract_markdown: str) -> list[str]:
 def parse_leaf_sections(contract_lines: list[str], first_section_line: str, line_separator: str = " ") -> list[ParsedContractSection]:
     """parse the contract lines into lowest-level (leaf) section objects"""
 
-    # initialize the list of leaf sections to parse and the running current page to keep track of section page boundaries
+    # initialize the list of leaf sections to parse and the current page to keep track of section page boundaries
     leaf_sections: list[ParsedContractSection] = []
     current_page = 1
 
-    # initialize the current section as the "preamble" all text before the first numbered section
+    # initialize the current section as the "preamble" - all contracttext before the first numbered section
     current_section = ParsedContractSection(type=ContractSectionType.PREAMBLE, level=1, number="0", name="PREAMBLE", markdown="", beg_page=current_page, end_page=current_page)
     current_section_lines = []
     current_section_prefix = ""
@@ -248,24 +248,16 @@ def get_section_tree(leaf_sections: list[ParsedContractSection]) -> ContractSect
             node.parent_id = parent_number
             parent_node.children.append(node)
 
-    # create the root node (level=0) of the contract
-    root_node = ContractSectionNode(
-        id="root",
-        type=ContractSectionType.ROOT,
-        level=0,
-        number="",
-        name="Contract",
-        markdown="",
-        parent_id=None,
-    )
+    # create the artificial root node (level=0) of the contract
+    root_node = ContractSectionNode(id="root", type=ContractSectionType.ROOT, level=0, number="root", name="Contract", markdown="")
 
-    # add the top-level sections as children of the root node
+    # add the top-level sections as children of the artificial root node
     top_level_nodes = [node for node in nodes_by_number.values() if node.level == 1]
     for node in top_level_nodes:
         node.parent_id = "root"
         root_node.children.append(node)
 
-    # return the root node with all parent-child relationships represented
+    # return the full section tree under the artificial root node with all parent-child relationships defined
     return root_node
 
 
@@ -305,19 +297,35 @@ async def parse_contract_sections(contract_markdown: str) -> tuple[list[ParsedCo
 # CONTRACT METADATA EXTRACTION #
 ################################
 
-async def extract_contract_metadata(contract_markdown: str) -> ContractMetadata:
+async def extract_contract_structured_metadata(contract_markdown: str) -> ContractStructuredMetadata:
     """extract structured contract-level metadata from the parsed markdown text"""
 
     openai = AsyncOpenAI()
     response: ParsedResponse = await openai.responses.parse(
         model="gpt-4.1-mini",
-        input=PROMPT_METADATA_EXTRACTION.format(contract_markdown=contract_markdown),
-        text_format=ContractMetadata,
+        instructions=PROMPT_METADATA_EXTRACTION,
+        input=contract_markdown,
+        text_format=ContractStructuredMetadata,
         temperature=0.0,
         timeout=60
     )
-    result: ContractMetadata = response.output_parsed
-    logger.info(f"extracted contract metadata: {result.model_dump()}")
+    result: ContractStructuredMetadata = response.output_parsed
+    logger.info(f"extracted contract structured metadata: {result.model_dump()}")
+    return result
+
+async def extract_contract_summary(contract_markdown: str) -> str:
+    """extract a concise summary of the contract text"""
+
+    openai = AsyncOpenAI()
+    response: Response = await openai.responses.create(
+        model="gpt-4.1-mini",
+        instructions=PROMPT_CONTRACT_SUMMARY,
+        input=contract_markdown,
+        temperature=0.0,
+        timeout=60
+    )
+    result = response.output_text
+    logger.info(f"extracted contract summary: {result}")
     return result
 
 ##############################
@@ -342,7 +350,7 @@ async def get_clause_section_candidates(db: AsyncSession, clause: StandardClause
     return result.scalars().all()
 
 
-async def evaluate_clause_section_relevance(clause: StandardClause, section: ContractSection) -> SectionRelevanceEvaluation:
+async def evaluate_clause_section_relevance(contract_summary: str, clause: StandardClause, section: ContractSection) -> SectionRelevanceEvaluation:
     """evaluate the relevance of a single contract section wrt a standard clause"""
 
     openai = AsyncOpenAI()
@@ -351,21 +359,21 @@ async def evaluate_clause_section_relevance(clause: StandardClause, section: Con
 
     response: ParsedResponse = await openai.responses.parse(
         model="gpt-4.1-mini",
-        input=PROMPT_SECTION_RELEVANCE.format(standard_clause=standard_clause_text, contract_section=input_section_text),
+        input=PROMPT_SECTION_RELEVANCE.format(contract_summary=contract_summary, standard_clause=standard_clause_text, contract_section=input_section_text),
         text_format=SectionRelevanceEvaluation,
         temperature=0.0,
         timeout=60
     )
-    result: SectionRelevanceEvaluation= response.output_parsed
+    result: SectionRelevanceEvaluation = response.output_parsed
 
     logger.info(f"relevance evaluation: clause={clause.name} section={section.number} {section.name} result={result.model_dump()}")
     return result
 
 
-async def evaluate_clause_section_candidates(clause: StandardClause, sections: list[ContractSection]) -> list[ContractSection]:
+async def evaluate_clause_section_candidates(contract_summary: str, clause: StandardClause, sections: list[ContractSection]) -> list[ContractSection]:
     """determine which of the candidate sections are relevant to the standard clause using LLM classification"""
 
-    evaluation_results = await asyncio.gather(*[evaluate_clause_section_relevance(clause, section) for section in sections])
+    evaluation_results = await asyncio.gather(*[evaluate_clause_section_relevance(contract_summary, clause, section) for section in sections])
     matching_sections = [section for section, result in zip(sections, evaluation_results) if result.match]
 
     logger.info(f"{len(matching_sections)} matching sections identified for clause={clause.name}")
@@ -377,7 +385,7 @@ async def extract_contract_clause(db: AsyncSession, contract: Contract, clause: 
 
     # identify the subset of relevant sections for the clause using embedding similarity -> LLM classification
     candidate_sections = await get_clause_section_candidates(db=db, clause=clause, contract_id=contract.id)
-    matching_sections = await evaluate_clause_section_candidates(clause=clause, sections=candidate_sections)
+    matching_sections = await evaluate_clause_section_candidates(contract_summary=contract.meta["summary"], clause=clause, sections=candidate_sections)
     if not matching_sections:
         logger.warning(f"no matching input sections found for clause={clause.name} - skipping contract-specific clause extraction")
         return None
@@ -389,7 +397,7 @@ async def extract_contract_clause(db: AsyncSession, contract: Contract, clause: 
     openai = AsyncOpenAI()
     response: Response = await openai.responses.create(
         model="gpt-4.1-mini",
-        input=PROMPT_CLAUSE_SUMMARY.format(
+        input=PROMPT_CONTRACT_CLAUSE.format(
             standard_clause=f"Name: {clause.display_name}\nDescription: {clause.description}",
             contract_sections=raw_markdown
         ),
@@ -421,8 +429,12 @@ async def parse_contract(path: str) -> ParsedContract:
     logger.info("parsing contract sections as structured objects...")
     section_list, section_tree = await parse_contract_sections(contract_markdown)
 
-    logger.info("extracting contract metadata...")
-    contract_metadata = await extract_contract_metadata(contract_markdown)
+    logger.info("extracting contract metadata and summary...")
+    structured_metadata, contract_summary = await asyncio.gather(
+        extract_contract_structured_metadata(contract_markdown), 
+        extract_contract_summary(contract_markdown)
+    )
+    contract_metadata = ContractMetadata(**structured_metadata.model_dump(), summary=contract_summary)
 
     contract = ParsedContract(
         filename=os.path.basename(path),
@@ -475,5 +487,5 @@ async def main():
 
 
 if __name__ == "__main__":
-    # uv run -m app.workflows.ingestion --contract_path="../sample_contracts/contract.pdf"
+    # uv run -m app.features.workflows.ingestion --contract_path="../sample_contracts/contract.pdf"
     asyncio.run(main())

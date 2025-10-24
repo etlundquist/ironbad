@@ -70,20 +70,18 @@ async def send_chat_message(contract_id: UUID, request: ChatMessageCreate, db: A
     # logger.info(f"chat thread conversation history: {conversation_history}")
 
     # generate a standalone search phrase from the user's message and conversation history
+    instructions = PROMPT_STANDALONE_SEARCH_PHRASE.format(contract_summary=contract.meta["summary"])
     search_phrase = await openai.responses.create(
         model="gpt-4.1-mini",
-        instructions=PROMPT_STANDALONE_SEARCH_PHRASE,
+        instructions=instructions,
         input=conversation_history,
         temperature=0.0,
         timeout=60
     )
     search_phrase = search_phrase.output_text
-    # logger.info(f"generated standalone search phrase: {search_phrase}")
 
     # fetch the most relevant contract sections based on the standalone search phrase and resolve the system prompt
     contract_sections = await get_relevant_sections(db, contract_id, search_phrase)
-    system_prompt = PROMPT_CONTRACT_CHAT.format(contract_sections=contract_sections)
-    # logger.info(f"resolved system prompt: {system_prompt}")
 
     # create a chat message record in the database for the assistant message
     assistant_message = ContractChatMessage(
@@ -98,9 +96,10 @@ async def send_chat_message(contract_id: UUID, request: ChatMessageCreate, db: A
     await db.flush()
 
     # process the streaming response to yield server-sent events back to the client and update the assistant message in the database
+    instructions = PROMPT_CONTRACT_CHAT.format(contract_summary=contract.meta["summary"], contract_sections=contract_sections)
     response_stream = await openai.responses.create(
         model="gpt-4.1-mini",
-        instructions=system_prompt,
+        instructions=instructions,
         input=conversation_history,
         temperature=0.0,
         timeout=60,
