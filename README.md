@@ -1,10 +1,13 @@
 # Ironbad
 
+> 🚧 **Under Construction** 🚧  
+> This project is a work in progress. Features, documentation, and APIs are subject to change.
+
 An AI-enabled Contract Lifecycle Management (CLM) platform built with FastAPI and Next.js. This project takes inspiration from [Ironclad](https://ironcladapp.com/) and serves as a sample implementation exploring various LLM/GenAI tools and methodologies for contract analysis, Q&A, and intelligent document redlining.
 
 ## Overview
 
-Ironbad provides an end-to-end solution for contract management, leveraging AI to automate ingestion, analysis, and review workflows. The platform parses contracts into structured sections, matches input sections to standard clauses, identifies compliance issues, and offers both a simple RAG-based Q&A chat and an AI agent capable of making contract annotations and revisions as well as answering questions with rich inline citations. Users may view/edit contract sections and make/edit/resolve annotations including comments, revisions, section adds, and section removes themselves or collaboratively with an AI agent.
+Ironbad provides an end-to-end solution for contract review, leveraging AI to automate ingestion, analysis, and review workflows. The platform parses contracts into structured sections, matches input sections to standard clauses, identifies and resolves compliance issues, and offers both a simple RAG-based Q&A chat and an AI agent capable of making contract annotations and revisions as well as answering questions with rich inline citations. Users may view/edit contract sections and make/edit/resolve annotations including comments, revisions, section adds, and section removes themselves or collaboratively with an AI agent.
 
 ## Tech Stack
 
