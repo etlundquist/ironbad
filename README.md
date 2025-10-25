@@ -85,6 +85,14 @@ Ironbad provides an end-to-end solution for contract review, leveraging AI to au
 - Toast notifications in UI for user feedback
 - Event types: ingestion progress, analysis completion, errors
 
+## Future Enhancements
+
+- Saved Prompts with template variables and Precedent Documents for agent chat
+- Multi-user support including authentication and authorization
+- Document version control and version history
+- Document import/export directly to/from DOCX
+- Fine-tuned models for domain-specific extraction
+
 ## Project Structure
 
 ```
@@ -165,13 +173,6 @@ ironbad/
 For detailed architecture information, see:
 - [Backend Architecture Guide](backend/BACKEND_ARCHITECTURE.md)
 - [Frontend Architecture Guide](frontend/FRONTEND_ARCHITECTURE.md)
-
-## Future Enhancements
-
-- Multi-user support including authentication and authorization
-- Document version control
-- Document import/export directly to/from DOCX
-- Fine-tuned models for domain-specific extraction
 
 ## License
 
