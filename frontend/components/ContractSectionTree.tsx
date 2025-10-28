@@ -365,10 +365,10 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
     })
   }
 
-  const handleAttachToChat = (nodeId: string, offsetBeg: number, offsetEnd: number) => {
+  const handleAttachToChat = (nodeId: string, offsetBeg: number, offsetEnd: number, selectedText: string) => {
     // Dispatch custom event for AgentChatTab to listen to
     window.dispatchEvent(new CustomEvent('attach-text-to-chat', { 
-      detail: { nodeId, offsetBeg, offsetEnd } 
+      detail: { nodeId, offsetBeg, offsetEnd, selectedText } 
     }))
   }
 

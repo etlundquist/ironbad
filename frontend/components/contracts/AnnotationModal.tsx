@@ -5,7 +5,7 @@ interface AnnotationModalProps {
   modal: AnnotationModalState
   onClose: () => void
   onSubmit: (type: 'comment' | 'revision', content: string) => void
-  onAttachToChat?: (nodeId: string, offsetBeg: number, offsetEnd: number) => void
+  onAttachToChat?: (nodeId: string, offsetBeg: number, offsetEnd: number, selectedText: string) => void
   decodeHtmlEntities: (text: string) => string
 }
 
@@ -113,7 +113,7 @@ const AnnotationModal: React.FC<AnnotationModalProps> = ({
           {onAttachToChat && (
             <button
               onClick={() => {
-                onAttachToChat(modal.nodeId, modal.offsetBeg, modal.offsetEnd)
+                onAttachToChat(modal.nodeId, modal.offsetBeg, modal.offsetEnd, modal.selectedText)
                 onClose()
               }}
               style={{

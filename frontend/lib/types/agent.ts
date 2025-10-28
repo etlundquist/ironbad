@@ -11,7 +11,7 @@ export interface PinnedSectionAttachment {
 export interface PinnedSectionTextAttachment {
   kind: 'pinned_section_text'
   section_number: string
-  text_span: string
+  text_span: string  // The actual selected text content from the section
 }
 
 export interface PinnedPrecedentDocumentAttachment {

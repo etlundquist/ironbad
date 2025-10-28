@@ -102,12 +102,11 @@ export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId
   useEffect(() => {
     // Listen for text selection attachment events
     const handleAttachTextSelection = (event: CustomEvent) => {
-      const { nodeId, offsetBeg, offsetEnd } = event.detail
+      const { nodeId, selectedText } = event.detail
       // Find the section number from the nodeId
       const section = availableSections.find(s => s.id === nodeId)
-      if (section) {
-        const textSpan = `${offsetBeg}-${offsetEnd}`
-        addAttachment({ kind: 'pinned_section_text', section_number: section.number, text_span: textSpan })
+      if (section && selectedText) {
+        addAttachment({ kind: 'pinned_section_text', section_number: section.number, text_span: selectedText })
       }
     }
     window.addEventListener('attach-text-to-chat', handleAttachTextSelection as EventListener)
@@ -177,7 +176,8 @@ export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId
     if (attachment.kind === 'pinned_section') {
       return `§ ${attachment.section_number}`
     } else if (attachment.kind === 'pinned_section_text') {
-      return `§ ${attachment.section_number} [${attachment.text_span}]`
+      const truncatedText = attachment.text_span.length > 30 ? attachment.text_span.substring(0, 30) + '...' : attachment.text_span
+      return `§ ${attachment.section_number}: "${truncatedText}"`
     } else if (attachment.kind === 'pinned_precedent_document') {
       const contract = availableContracts.find(c => c.id === attachment.contract_id)
       return contract ? `📄 ${contract.filename}` : `📄 Document`
