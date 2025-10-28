@@ -89,7 +89,6 @@ class AgentRemoveSectionResponse(ConfiguredBaseModel):
 
 class AgentStandardClauseRule(ConfiguredBaseModel):
     severity: str
-    title: str
     text: str
 
 class AgentStandardClausePreview(ConfiguredBaseModel):

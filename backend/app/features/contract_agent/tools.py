@@ -548,6 +548,6 @@ async def get_standard_clause(wrapper: RunContextWrapper[AgentContext], clause_i
     if not db_standard_clause:
         raise ValueError(f"{clause_id=} not found in the standard clause library")
 
-    standard_clause_rules = [AgentStandardClauseRule(severity=rule.severity.value, title=rule.title, text=rule.text) for rule in db_standard_clause.rules]
+    standard_clause_rules = [AgentStandardClauseRule(severity=rule.severity.value, text=rule.text) for rule in db_standard_clause.rules]
     standard_clause = AgentStandardClause(id=db_standard_clause.name, name=db_standard_clause.display_name, description=db_standard_clause.description, standard_text=db_standard_clause.standard_text, rules=standard_clause_rules)
     return json.dumps(json.loads(standard_clause.model_dump_json()), indent=2)
