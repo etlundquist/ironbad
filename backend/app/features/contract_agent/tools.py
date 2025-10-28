@@ -369,9 +369,8 @@ async def delete_contract_annotations(wrapper: RunContextWrapper[AgentContext], 
 async def resolve_agent_instructions(wrapper: RunContextWrapper[AgentContext], agent: Agent[AgentContext]) -> str:
     """resolve the dynamic agent instructions by injecting contract-specific high-level context"""
 
-    # retrieve the contract and request from the context to build the instructions dynamically based on the request attachments
+    # retrieve the contract and request from the context to build the instructions dynamically
     contract = wrapper.context.contract 
-    request = wrapper.context.request 
 
     # retrieve the contract summary and top-level sections
     contract_summary = contract.meta.summary
@@ -385,65 +384,7 @@ async def resolve_agent_instructions(wrapper: RunContextWrapper[AgentContext], a
         ) for section in top_level_sections
     ]
     top_level_sections = json.dumps([json.loads(section.model_dump_json()) for section in top_level_sections], indent=2)
-    
-    
-    if request.attachments:
-        # retrieve any pinned sections specified in the request attachments
-        pinned_section_attachments = [attachment for attachment in request.attachments if attachment.kind == "pinned_section"]
-        if pinned_section_attachments:
-            agent_sections: list[AgentContractSection] = []
-            for section in pinned_section_attachments:
-                node = wrapper.context.contract.section_tree.get_node_by_id(node_id=section.section_number)
-                agent_section = AgentContractSection(type=node.type, level=node.level, section_number=node.number, section_text=node.markdown)
-                agent_sections.append(agent_section)
-            pinned_sections = json.dumps([json.loads(section.model_dump_json()) for section in agent_sections], indent=2)
-        else:
-            pinned_sections = None
 
-        # retrieve any pinned section text spans specified in the request attachments
-        pinned_section_text_attachments = [attachment for attachment in request.attachments if attachment.kind == "pinned_section_text"]
-        if pinned_section_text_attachments:
-            agent_section_text_spans: list[AgentContractSectionTextSpan] = []
-            for section in pinned_section_text_attachments:
-                agent_section_text_span = AgentContractSectionTextSpan(section_number=section.section_number, text_span=section.text_span)
-                agent_section_text_spans.append(agent_section_text_span)
-            pinned_section_text_spans = json.dumps([json.loads(span.model_dump_json()) for span in agent_section_text_spans], indent=2)
-        else:
-            pinned_section_text_spans = None
-
-        # retrieve any pinned precedent documents specified in the request attachments
-        pinned_precedent_document_attachments = [attachment for attachment in request.attachments if attachment.kind == "pinned_precedent_document"]
-        if pinned_precedent_document_attachments:
-            agent_precedent_documents: list[AgentPrecedentDocument] = []
-            for document in pinned_precedent_document_attachments:
-                precedent_dbcontract = await wrapper.context.db.get(DBContract, document.contract_id)
-                precedent_contract = AnnotatedContract.model_validate(precedent_dbcontract)
-                logger.info(f"precedent_contract: {precedent_contract.model_dump_json(indent=2)}")
-                precedent_top_level_sections = flatten_section_tree(precedent_contract.section_tree, max_depth=1)
-                precedent_top_level_sections = [
-                    AgentContractSectionPreview(
-                        type=section.type, 
-                        level=section.level, 
-                        section_number=section.number, 
-                        section_text_preview=string_truncate(string=section.markdown, max_tokens=50)
-                    ) for section in precedent_top_level_sections
-                ]
-                agent_precedent_document = AgentPrecedentDocument(name=precedent_contract.filename, summary=precedent_contract.meta.summary, top_level_sections=precedent_top_level_sections)
-                agent_precedent_documents.append(agent_precedent_document)
-            pinned_precedent_documents = json.dumps([json.loads(document.model_dump_json()) for document in agent_precedent_documents], indent=2)
-        else:
-            pinned_precedent_documents = None
-
-    # resolve the default agent instructions by injecting the contract-specific summary and top-level section previews
+    # resolve the agent instructions by injecting the contract-specific summary and top-level section previews
     agent_instructions = PROMPT_REDLINE_AGENT.format(contract_summary=contract_summary, top_level_sections=top_level_sections)
-
-    # add any additional attachment-based context to the instructions at the end
-    if pinned_sections:
-        agent_instructions += f"\n\n# Pinned Sections:\n{pinned_sections}"
-    if pinned_section_text_spans:
-        agent_instructions += f"\n\n# Pinned Section Text Spans:\n{pinned_section_text_spans}"
-    if pinned_precedent_documents:
-        agent_instructions += f"\n\n# Pinned Precedent Documents:\n{pinned_precedent_documents}"
-
-    # return the final resolved agent instructions
     return agent_instructions

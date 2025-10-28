@@ -2,7 +2,9 @@ import logging
 
 from uuid import UUID
 
+from agents.items import ResponseInputItemParam
 from fastapi import APIRouter, Depends, HTTPException
+from openai.types.responses import EasyInputMessageParam, ResponseInputTextParam
 from sse_starlette import EventSourceResponse
 
 from sqlalchemy import select
@@ -21,6 +23,7 @@ from app.features.contract_agent.agent import AgentContext, agent
 from app.features.contract_agent.schemas import AgentEventStreamContext, AgentChatThread, AgentChatMessage
 from app.features.contract_agent.events import handle_event_stream
 from app.features.contract_agent.schemas import AgentRunRequest
+from app.features.contract_agent.services import process_request_attachments
 
 
 router = APIRouter()
@@ -31,7 +34,7 @@ logger = logging.getLogger(__name__)
 async def run_contract_agent(request: AgentRunRequest, db: AsyncSession = Depends(get_db)) -> EventSourceResponse:
     """create and execute a new agent run"""
     
-    # fetch the relevant contract from the database and deserialize to pydantic to add to the agent's runtime context
+    # fetch the relevant contract from the database and deserialize to pydantic
     query = select(DBContract).where(DBContract.id == request.contract_id)
     result = await db.execute(query)
     dbcontract = result.scalar_one_or_none()
@@ -39,8 +42,9 @@ async def run_contract_agent(request: AgentRunRequest, db: AsyncSession = Depend
         raise HTTPException(status_code=404, detail=f"contract_id={request.contract_id} not found")
     contract = AnnotatedContract.model_validate(dbcontract)
 
-    # get/create the relevant chat thread for the agent run
-    # NOTE: conversation state/history is managed server-side via the OpenAI Conversations API
+    # get/create the relevant chat thread
+    # NOTE: the conversation history is managed server-side using the OpenAI Conversations API
+    # NOTE: this allows all input/output items (reasoning, tool calls, etc.) to be included in the conversation history
     if request.chat_thread_id:
         query = select(DBAgentChatThread).where(DBAgentChatThread.id == request.chat_thread_id)
         result = await db.execute(query)
@@ -54,7 +58,7 @@ async def run_contract_agent(request: AgentRunRequest, db: AsyncSession = Depend
         db.add(chat_thread)
         await db.flush()
 
-    # serialize the request attachments to dicts for JSONB storage
+    # serialize the request attachments to store in the database
     if request.attachments:
         attachments = [attachment.model_dump() for attachment in request.attachments]
     else:
@@ -72,8 +76,8 @@ async def run_contract_agent(request: AgentRunRequest, db: AsyncSession = Depend
     db.add(user_message)
     await db.flush()
 
-    # add the new assistant message to the database 
-    # NOTE: we mark the new assistant message as pending and set it's content to a default value to be updated via the event stream handler
+    # add the new placeholder assistant message to the database 
+    # NOTE: we add a placeholder assistant message to the database to be updated later by the event stream handler
     assistant_message = DBAgentChatMessage(
         contract_id=contract.id, 
         chat_thread_id=chat_thread.id, 
@@ -89,11 +93,20 @@ async def run_contract_agent(request: AgentRunRequest, db: AsyncSession = Depend
     agent_context = AgentContext(db=db, contract=contract, request=request)
     stream_context = AgentEventStreamContext(db=db, contract=contract, chat_thread_id=chat_thread.id, user_message_id=user_message.id, assistant_message_id=assistant_message.id)
 
-    # execute the agent run with the user's current input, conversation history, and dynamic agent runtime context
+    # prepare the user input as either a single string or list of content blocks based on the presence/absence of attachments
+    # NOTE: user message attachments are included as additional text content blocks following the main request content
+    # NOTE: this approach persists message-specific attachments in the conversation history without modifying the agent's overall instructions
+    if request.attachments:
+        attachment_blocks = await process_request_attachments(db=db, contract=contract, request=request)
+        user_input: list[ResponseInputItemParam] = [EasyInputMessageParam(role="user", content=[ResponseInputTextParam(type="input_text", text=request.content)] + attachment_blocks)]
+    else:
+        user_input: str = request.content
+
+    # execute the agent run with the user's current input, conversation history, and dynamic agent context
     result = Runner.run_streamed(
         starting_agent=agent, 
         conversation_id=chat_thread.openai_conversation_id,
-        input=request.content, 
+        input=user_input, 
         context=agent_context,
         max_turns=20
     )
