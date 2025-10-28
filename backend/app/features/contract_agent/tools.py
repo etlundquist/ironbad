@@ -4,24 +4,127 @@ import logging
 
 from uuid import UUID
 from typing import Optional
-from agents import Agent, function_tool, RunContextWrapper
+from agents import Agent, RunContextWrapper, function_tool
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
-
+from app.models import Contract as DBContract, StandardClause as DBStandardClause
 from app.enums import AnnotationStatus, AnnotationType, ContractSectionType, AnnotationAuthor
 from app.utils.common import string_truncate
 from app.common.schemas import ContractSectionNode
-from app.models import Contract as DBContract
 
 from app.features.contract_annotations.schemas import AnnotatedContract, CommentAnnotation, NewCommentAnnotationRequest, NewRevisionAnnotationRequest, RevisionAnnotation, SectionAddAnnotation, SectionAddAnnotationRequest, SectionRemoveAnnotation, SectionRemoveAnnotationRequest
 from app.features.contract_agent.agent import AgentContext
-from app.features.contract_agent.schemas import AgentContractSectionPreview, AgentContractSection, AgentContractSectionTextSpan, AgentContractTextMatch, AgentCommentAnnotation, AgentPrecedentDocument, AgentRevisionAnnotation, AgentSectionAddAnnotation, AgentSectionRemoveAnnotation, AgentCommentAnnotationResponse, AgentRevisionAnnotationResponse, AgentAddSectionResponse, AgentRemoveSectionResponse
+from app.features.contract_agent.schemas import AgentContractSectionPreview, AgentContractSection, AgentContractTextMatch, AgentCommentAnnotation, AgentRevisionAnnotation, AgentSectionAddAnnotation, AgentSectionRemoveAnnotation, AgentCommentAnnotationResponse, AgentRevisionAnnotationResponse, AgentAddSectionResponse, AgentRemoveSectionResponse, AgentStandardClause, AgentStandardClausePreview, AgentStandardClauseRule, PinnedPrecedentDocumentAttachment
 from app.features.contract_agent.services import flatten_section_tree, get_relevant_sections, persist_contract_changes
 from app.features.contract_annotations.services import handle_make_comment, handle_make_revision, handle_section_add, handle_section_remove
-from app.prompts import PROMPT_REDLINE_AGENT
 
 
 logger = logging.getLogger(__name__)
 
+
+# private helper functions that will work on any contract object 
+# --------------------------------------------------------------
+
+def _list_sections(
+    contract: AnnotatedContract, 
+    parent_section_number: Optional[str] = None, 
+    max_depth: Optional[int] = None
+) -> list[AgentContractSectionPreview]:
+    """list contract sections below a parent section with a text preview"""
+    
+    if parent_section_number:
+        node = contract.section_tree.get_node_by_id(node_id=parent_section_number)
+    else:
+        node = contract.section_tree
+
+    flat_sections = flatten_section_tree(node=node, max_depth=max_depth)
+    agent_section_previews = [
+        AgentContractSectionPreview(
+            type=section.type, 
+            level=section.level, 
+            section_number=section.number, 
+            section_text_preview=string_truncate(string=section.markdown, max_tokens=50)
+        ) for section in flat_sections
+    ]
+    agent_section_previews_json = json.dumps([json.loads(section.model_dump_json()) for section in agent_section_previews], indent=2)
+    return agent_section_previews_json
+
+
+def _get_section(
+    contract: AnnotatedContract, 
+    section_number: str, 
+    include_children: bool = False, 
+    max_depth: Optional[int] = None
+) -> str:
+    """get the full text of a contract section and optionally include child sections up to a specified max depth"""
+
+    node = contract.section_tree.get_node_by_id(node_id=section_number)
+    if include_children:
+        flat_sections = flatten_section_tree(node=node, max_depth=max_depth)
+    else:
+        flat_sections = [node]
+
+    agent_sections = [
+        AgentContractSection(
+            type=section.type,
+            level=section.level,
+            section_number=section.number,
+            section_text=section.markdown
+        ) for section in flat_sections
+    ]
+    agent_sections_json = json.dumps([json.loads(section.model_dump_json()) for section in agent_sections], indent=2)
+    return agent_sections_json
+
+
+async def _search_sections(db: AsyncSession, contract: AnnotatedContract, search_phrase: str) -> str:
+    """Core implementation for searching sections in any contract"""
+
+    relevant_sections = await get_relevant_sections(db, contract.id, search_phrase)
+    agent_sections = [
+        AgentContractSection(
+            type=section.type,
+            level=section.level,
+            section_number=section.number,
+            section_text=section.markdown
+        ) for section in relevant_sections
+    ]
+    return json.dumps([json.loads(section.model_dump_json()) for section in agent_sections], indent=2)
+
+
+def _search_lines(contract: AnnotatedContract, pattern: str) -> str:
+    """Core implementation for regex searching in any contract"""
+
+    flat_sections = flatten_section_tree(contract.section_tree)
+    compiled_pattern = re.compile(pattern, re.IGNORECASE)
+    matches: list[AgentContractTextMatch] = []
+    
+    for section in flat_sections:
+        section_lines = section.markdown.split('\n')
+        for line in section_lines:
+            if compiled_pattern.search(line):
+                match = AgentContractTextMatch(section_number=section.number, match_line=line.strip())
+                matches.append(match)
+    
+    return json.dumps([json.loads(match.model_dump_json()) for match in matches], indent=2)
+
+
+async def _get_precedent_document(db: AsyncSession, filename: str) -> AnnotatedContract:
+    """Load a precedent document by filename"""
+
+    query = select(DBContract).where(DBContract.filename == filename)
+    result = await db.execute(query)
+    db_document = result.scalar_one_or_none()
+    if not db_document:
+        raise ValueError(f"precedent document '{filename}' not found")
+
+    precedent_document = AnnotatedContract.model_validate(db_document)
+    return precedent_document
+
+
+# main contract search/retrieval tools
+# ------------------------------------
 
 @function_tool(docstring_style="sphinx", use_docstring_info=True)
 async def list_contract_sections(
@@ -37,22 +140,8 @@ async def list_contract_sections(
     :return: a list of section preview objects containing the section type, level, number, and text preview
     """
 
-    if parent_section_number:
-        node = wrapper.context.contract.section_tree.get_node_by_id(node_id=parent_section_number)
-    else:
-        node = wrapper.context.contract.section_tree
-
-    flat_sections = flatten_section_tree(node=node, max_depth=max_depth)
-    agent_section_previews = [
-        AgentContractSectionPreview(
-            type=section.type, 
-            level=section.level, 
-            section_number=section.number, 
-            section_text_preview=string_truncate(string=section.markdown, max_tokens=50)
-        ) for section in flat_sections
-    ]
-    agent_section_previews_json = json.dumps([json.loads(section.model_dump_json()) for section in agent_section_previews], indent=2)
-    return agent_section_previews_json
+    contract = wrapper.context.contract
+    return _list_sections(contract=contract, parent_section_number=parent_section_number, max_depth=max_depth)
 
 
 @function_tool(docstring_style="sphinx", use_docstring_info=True)
@@ -71,22 +160,8 @@ async def get_contract_section(
     :return: a list of section text objects containing the section type, level, number, and full section text
     """
 
-    node = wrapper.context.contract.section_tree.get_node_by_id(node_id=section_number)
-    if include_children:
-        flat_sections = flatten_section_tree(node=node, max_depth=max_depth)
-    else:
-        flat_sections = [node]
-
-    agent_sections = [
-        AgentContractSection(
-            type=section.type,
-            level=section.level,
-            section_number=section.number,
-            section_text=section.markdown
-        ) for section in flat_sections
-    ]
-    agent_sections_json = json.dumps([json.loads(section.model_dump_json()) for section in agent_sections], indent=2)
-    return agent_sections_json
+    contract = wrapper.context.contract
+    return _get_section(contract=contract, section_number=section_number, include_children=include_children, max_depth=max_depth)
 
 
 @function_tool(docstring_style="sphinx", use_docstring_info=True)
@@ -99,17 +174,8 @@ async def search_contract_sections(wrapper: RunContextWrapper[AgentContext], sea
     :raises ValueError: if the provided search phrase is empty or invalid
     """
 
-    relevant_sections = await get_relevant_sections(wrapper.context.db, wrapper.context.contract.id, search_phrase)
-    agent_sections = [
-        AgentContractSection(
-            type=section.type,
-            level=section.level,
-            section_number=section.number,
-            section_text=section.markdown
-        ) for section in relevant_sections
-    ]
-    agent_sections_json = json.dumps([json.loads(section.model_dump_json()) for section in agent_sections], indent=2)
-    return agent_sections_json
+    contract = wrapper.context.contract
+    return _search_sections(db=wrapper.context.db, contract=contract, search_phrase=search_phrase)
 
 
 @function_tool(docstring_style="sphinx", use_docstring_info=True)
@@ -122,19 +188,146 @@ async def search_contract_lines(wrapper: RunContextWrapper[AgentContext], patter
     :raises ValueError: if the provided pattern is not a valid regular expression
     """
     
-    flat_sections = flatten_section_tree(wrapper.context.contract.section_tree)
-    compiled_pattern = re.compile(pattern, re.IGNORECASE)
-    matches: list[AgentContractTextMatch] = []
+    contract = wrapper.context.contract
+    return _search_lines(contract=contract, pattern=pattern)
+
+# precedent document search/retrieval tools
+# -----------------------------------------
+
+def precedent_tools_enabled(wrapper: RunContextWrapper[AgentContext], agent: Agent[AgentContext]) -> bool:
+    """dynamically enable/disable precedent document tools based on whether the request includes a precedent document attachment"""
+
+    request = wrapper.context.request
+    if not request.attachments:
+        return False
     
-    for section in flat_sections:
-        section_lines = section.markdown.split('\n')
-        for line in section_lines:
-            if compiled_pattern.search(line):
-                match = AgentContractTextMatch(section_number=section.number, match_line=line.strip())
-                matches.append(match)
+    for attachment in request.attachments:
+        logger.info(f"tool enabled check: request attachment: {attachment.model_dump_json()}")
+        if attachment.kind == "pinned_precedent_document":
+            return True
     
-    matches_json = json.dumps([json.loads(match.model_dump_json()) for match in matches], indent=2)
-    return matches_json
+    return False
+
+
+@function_tool(docstring_style="sphinx", use_docstring_info=True, is_enabled=precedent_tools_enabled)
+async def list_precedent_sections(
+    wrapper: RunContextWrapper[AgentContext],
+    filename: str,
+    parent_section_number: Optional[str] = None,
+    max_depth: Optional[int] = None
+) -> str:
+    """
+    Get a flat list of ordered section previews from a precedent document
+    
+    :param filename: the filename of the precedent document to search
+    :param parent_section_number: an optional parent section number to filter the section tree
+    :param max_depth: the optional max depth of the section tree to list
+    :return: a list of section preview objects from the precedent document
+    """
+
+    document = await _get_precedent_document(wrapper.context.db, filename)
+    return _list_sections(contract=document, parent_section_number=parent_section_number, max_depth=max_depth)
+
+
+@function_tool(docstring_style="sphinx", use_docstring_info=True, is_enabled=precedent_tools_enabled)
+async def get_precedent_section(
+    wrapper: RunContextWrapper[AgentContext],
+    filename: str,
+    section_number: str,
+    include_children: bool = False,
+    max_depth: Optional[int] = None
+) -> str:
+    """
+    Get the full text of a section from a precedent document
+    
+    :param filename: the filename of the precedent document to search
+    :param section_number: the section number to retrieve
+    :param include_children: whether to include child sections
+    :param max_depth: the max depth of child sections to include
+    :return: a list of section text objects from the precedent document
+    """
+
+    document = await _get_precedent_document(wrapper.context.db, filename)
+    return _get_section(contract=document, section_number=section_number, include_children=include_children, max_depth=max_depth)
+
+
+@function_tool(docstring_style="sphinx", use_docstring_info=True, is_enabled=precedent_tools_enabled)
+async def search_precedent_sections(
+    wrapper: RunContextWrapper[AgentContext],
+    filename: str,
+    search_phrase: str
+) -> str:
+    """
+    Search for relevant sections in a precedent document using natural language
+    
+    :param filename: the filename of the precedent document to search
+    :param search_phrase: the natural language search phrase
+    :return: a list of matching section objects from the precedent document
+    """
+
+    document = await _get_precedent_document(wrapper.context.db, filename)
+    return await _search_sections(db=wrapper.context.db, contract=document, search_phrase=search_phrase)
+
+
+@function_tool(docstring_style="sphinx", use_docstring_info=True, is_enabled=precedent_tools_enabled)
+async def search_precedent_lines(
+    wrapper: RunContextWrapper[AgentContext],
+    filename: str,
+    pattern: str
+) -> str:
+    """
+    Search for matching text lines in a precedent document using regex
+    
+    :param filename: the filename of the precedent document to search
+    :param pattern: the regular expression pattern to match
+    :return: a list of match objects from the precedent document
+    """
+
+    document = await _get_precedent_document(wrapper.context.db, filename)
+    return _search_lines(contract=document, pattern=pattern)
+
+# contract annotation tools
+# -------------------------
+
+@function_tool
+async def get_contract_annotations(wrapper: RunContextWrapper[AgentContext], annotation_type: Optional[AnnotationType] = None, section_number: Optional[str] = None) -> str:
+    """
+    Get contract annotations optionally filtered by annotation type and section number
+
+    :param annotation_type: filter by annotation type (defaults to all annotation types)
+    :param section_number: filter by section number (defaults to all contract sections)
+    :return: a list of contract annotation objects
+    """
+
+    if not wrapper.context.contract.annotations:
+        return json.dumps([], indent=2)
+        
+    match annotation_type:
+        case AnnotationType.COMMENT:
+            annotations = wrapper.context.contract.annotations.comments
+            annotations = [AgentCommentAnnotation(id=annotation.id, section_number=annotation.node_id, anchor_text=annotation.anchor_text, comment_text=annotation.comment_text) for annotation in annotations if annotation.status == AnnotationStatus.PENDING]
+        case AnnotationType.REVISION:
+            annotations = wrapper.context.contract.annotations.revisions
+            annotations = [AgentRevisionAnnotation(id=annotation.id, section_number=annotation.node_id, old_text=annotation.old_text, new_text=annotation.new_text) for annotation in annotations if annotation.status == AnnotationStatus.PENDING]
+        case AnnotationType.SECTION_ADD:
+            annotations = wrapper.context.contract.annotations.section_adds
+            annotations = [AgentSectionAddAnnotation(id=annotation.id, target_parent_section_number=annotation.target_parent_id, insertion_index=annotation.insertion_index, section_number=annotation.new_node.number, section_type=annotation.new_node.type, section_text=annotation.new_node.markdown) for annotation in annotations if annotation.status == AnnotationStatus.PENDING]
+        case AnnotationType.SECTION_REMOVE:
+            annotations = wrapper.context.contract.annotations.section_removes
+            annotations = [AgentSectionRemoveAnnotation(id=annotation.id, section_number=annotation.node_id) for annotation in annotations if annotation.status == AnnotationStatus.PENDING]
+        case _:
+            annotations = wrapper.context.contract.annotations
+            comments = [AgentCommentAnnotation(id=annotation.id, section_number=annotation.node_id, anchor_text=annotation.anchor_text, comment_text=annotation.comment_text) for annotation in annotations.comments if annotation.status == AnnotationStatus.PENDING]
+            revisions = [AgentRevisionAnnotation(id=annotation.id, section_number=annotation.node_id, old_text=annotation.old_text, new_text=annotation.new_text) for annotation in annotations.revisions if annotation.status == AnnotationStatus.PENDING]
+            section_adds = [AgentSectionAddAnnotation(id=annotation.id, target_parent_section_number=annotation.target_parent_id, insertion_index=annotation.insertion_index, section_number=annotation.new_node.number, section_type=annotation.new_node.type, section_text=annotation.new_node.markdown) for annotation in annotations.section_adds if annotation.status == AnnotationStatus.PENDING]
+            section_removes = [AgentSectionRemoveAnnotation(id=annotation.id, section_number=annotation.node_id) for annotation in annotations.section_removes if annotation.status == AnnotationStatus.PENDING]
+            annotations = comments + revisions + section_adds + section_removes
+
+    if section_number:
+        annotations = [annotation for annotation in annotations if annotation.section_number == section_number]
+        
+    annotations_json = json.dumps([json.loads(annotation.model_dump_json()) for annotation in annotations], indent=2)
+    return annotations_json
 
 
 @function_tool(docstring_style="sphinx", use_docstring_info=True)
@@ -288,47 +481,6 @@ async def remove_section(wrapper: RunContextWrapper[AgentContext], section_numbe
     return AgentRemoveSectionResponse(status=response.status).model_dump_json(indent=2)
 
 
-@function_tool
-async def get_contract_annotations(wrapper: RunContextWrapper[AgentContext], annotation_type: Optional[AnnotationType] = None, section_number: Optional[str] = None) -> str:
-    """
-    Get contract annotations optionally filtered by annotation type and section number
-
-    :param annotation_type: filter by annotation type (defaults to all annotation types)
-    :param section_number: filter by section number (defaults to all contract sections)
-    :return: a list of contract annotation objects
-    """
-
-    if not wrapper.context.contract.annotations:
-        return json.dumps([], indent=2)
-        
-    match annotation_type:
-        case AnnotationType.COMMENT:
-            annotations = wrapper.context.contract.annotations.comments
-            annotations = [AgentCommentAnnotation(id=annotation.id, section_number=annotation.node_id, anchor_text=annotation.anchor_text, comment_text=annotation.comment_text) for annotation in annotations if annotation.status == AnnotationStatus.PENDING]
-        case AnnotationType.REVISION:
-            annotations = wrapper.context.contract.annotations.revisions
-            annotations = [AgentRevisionAnnotation(id=annotation.id, section_number=annotation.node_id, old_text=annotation.old_text, new_text=annotation.new_text) for annotation in annotations if annotation.status == AnnotationStatus.PENDING]
-        case AnnotationType.SECTION_ADD:
-            annotations = wrapper.context.contract.annotations.section_adds
-            annotations = [AgentSectionAddAnnotation(id=annotation.id, target_parent_section_number=annotation.target_parent_id, insertion_index=annotation.insertion_index, section_number=annotation.new_node.number, section_type=annotation.new_node.type, section_text=annotation.new_node.markdown) for annotation in annotations if annotation.status == AnnotationStatus.PENDING]
-        case AnnotationType.SECTION_REMOVE:
-            annotations = wrapper.context.contract.annotations.section_removes
-            annotations = [AgentSectionRemoveAnnotation(id=annotation.id, section_number=annotation.node_id) for annotation in annotations if annotation.status == AnnotationStatus.PENDING]
-        case _:
-            annotations = wrapper.context.contract.annotations
-            comments = [AgentCommentAnnotation(id=annotation.id, section_number=annotation.node_id, anchor_text=annotation.anchor_text, comment_text=annotation.comment_text) for annotation in annotations.comments if annotation.status == AnnotationStatus.PENDING]
-            revisions = [AgentRevisionAnnotation(id=annotation.id, section_number=annotation.node_id, old_text=annotation.old_text, new_text=annotation.new_text) for annotation in annotations.revisions if annotation.status == AnnotationStatus.PENDING]
-            section_adds = [AgentSectionAddAnnotation(id=annotation.id, target_parent_section_number=annotation.target_parent_id, insertion_index=annotation.insertion_index, section_number=annotation.new_node.number, section_type=annotation.new_node.type, section_text=annotation.new_node.markdown) for annotation in annotations.section_adds if annotation.status == AnnotationStatus.PENDING]
-            section_removes = [AgentSectionRemoveAnnotation(id=annotation.id, section_number=annotation.node_id) for annotation in annotations.section_removes if annotation.status == AnnotationStatus.PENDING]
-            annotations = comments + revisions + section_adds + section_removes
-
-    if section_number:
-        annotations = [annotation for annotation in annotations if annotation.section_number == section_number]
-        
-    annotations_json = json.dumps([json.loads(annotation.model_dump_json()) for annotation in annotations], indent=2)
-    return annotations_json
-
-
 @function_tool(docstring_style="sphinx", use_docstring_info=True)
 async def delete_contract_annotations(wrapper: RunContextWrapper[AgentContext], annotation_ids: list[str]) -> str:
     """
@@ -365,26 +517,37 @@ async def delete_contract_annotations(wrapper: RunContextWrapper[AgentContext], 
     }
     return json.dumps(result, indent=2)
 
+# standard clause/rules tools
+# ---------------------------
 
-async def resolve_agent_instructions(wrapper: RunContextWrapper[AgentContext], agent: Agent[AgentContext]) -> str:
-    """resolve the dynamic agent instructions by injecting contract-specific high-level context"""
+@function_tool
+async def list_standard_clauses(wrapper: RunContextWrapper[AgentContext]) -> str:
+    """
+    List the set of standard clauses in the standard clause library.
 
-    # retrieve the contract and request from the context to build the instructions dynamically
-    contract = wrapper.context.contract 
+    :return: a list of standard clauses from the standard clause library
+    """
 
-    # retrieve the contract summary and top-level sections
-    contract_summary = contract.meta.summary
-    top_level_sections = flatten_section_tree(contract.section_tree, max_depth=1)
-    top_level_sections = [
-        AgentContractSectionPreview(
-            type=section.type, 
-            level=section.level, 
-            section_number=section.number, 
-            section_text_preview=string_truncate(string=section.markdown, max_tokens=50)
-        ) for section in top_level_sections
-    ]
-    top_level_sections = json.dumps([json.loads(section.model_dump_json()) for section in top_level_sections], indent=2)
+    result = await wrapper.context.db.execute(select(DBStandardClause).order_by(DBStandardClause.name))
+    db_standard_clauses = result.scalars().all()
+    standard_clauses = [AgentStandardClausePreview(id=clause.name, name=clause.display_name, description=clause.description) for clause in db_standard_clauses]
+    return json.dumps([json.loads(clause.model_dump_json()) for clause in standard_clauses], indent=2)
 
-    # resolve the agent instructions by injecting the contract-specific summary and top-level section previews
-    agent_instructions = PROMPT_REDLINE_AGENT.format(contract_summary=contract_summary, top_level_sections=top_level_sections)
-    return agent_instructions
+
+@function_tool
+async def get_standard_clause(wrapper: RunContextWrapper[AgentContext], clause_id: str) -> str:
+    """
+    Get the full text and associated policy rules for a standard clause by ID.
+
+    :param clause_id: the ID of the standard clause to retrieve
+    :return: the standard clause text and list of associated policy rules
+    """
+
+    result = await wrapper.context.db.execute(select(DBStandardClause).where(DBStandardClause.name == clause_id).options(selectinload(DBStandardClause.rules)))
+    db_standard_clause = result.scalar_one_or_none()
+    if not db_standard_clause:
+        raise ValueError(f"{clause_id=} not found in the standard clause library")
+
+    standard_clause_rules = [AgentStandardClauseRule(severity=rule.severity.value, title=rule.title, text=rule.text) for rule in db_standard_clause.rules]
+    standard_clause = AgentStandardClause(id=db_standard_clause.name, name=db_standard_clause.display_name, description=db_standard_clause.description, standard_text=db_standard_clause.standard_text, rules=standard_clause_rules)
+    return json.dumps(json.loads(standard_clause.model_dump_json()), indent=2)

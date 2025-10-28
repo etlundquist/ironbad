@@ -11,6 +11,7 @@ from app.features.contract_issues.api import router as contract_issues_router
 
 from app.features.standard_clauses.api import router as standard_clauses_router
 from app.features.standard_clause_rules.api import router as standard_clause_rules_router
+from app.features.saved_prompts.api import router as saved_prompts_router
 
 from app.features.contract_annotations.api import router as contract_annotations_router
 from app.features.contract_chat.api import router as contract_chat_router
@@ -23,6 +24,7 @@ router.include_router(contract_router)
 router.include_router(workflows_router)
 router.include_router(standard_clauses_router)
 router.include_router(standard_clause_rules_router)
+router.include_router(saved_prompts_router)
 router.include_router(contract_clauses_router)
 router.include_router(contract_sections_router)
 router.include_router(contract_chat_router)

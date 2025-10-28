@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.schemas import ConfiguredBaseModel, ContractSectionCitation
 from app.features.contract_annotations.schemas import AnnotatedContract
-from app.enums import AnnotationType, ContractSectionType, ChatMessageStatus, ChatMessageRole
+from app.enums import AnnotationType, ContractSectionType, ChatMessageStatus, ChatMessageRole, RuleSeverity
 
 # agent tool request/response schemas
 # -----------------------------------
@@ -86,6 +86,23 @@ class AgentAddSectionResponse(ConfiguredBaseModel):
 class AgentRemoveSectionResponse(ConfiguredBaseModel):
     status: Literal["applied", "rejected", "conflict"]
 
+
+class AgentStandardClauseRule(ConfiguredBaseModel):
+    severity: str
+    title: str
+    text: str
+
+class AgentStandardClausePreview(ConfiguredBaseModel):
+    id: str
+    name: str
+    description: str
+
+class AgentStandardClause(ConfiguredBaseModel):
+    id: str
+    name: str
+    description: str
+    standard_text: str
+    rules: list[AgentStandardClauseRule]
 
 # agent chat thread/message schemas
 # ---------------------------------

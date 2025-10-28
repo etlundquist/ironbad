@@ -1,3 +1,4 @@
+import json
 import logging
 
 from uuid import UUID
@@ -60,7 +61,7 @@ async def run_contract_agent(request: AgentRunRequest, db: AsyncSession = Depend
 
     # serialize the request attachments to store in the database
     if request.attachments:
-        attachments = [attachment.model_dump() for attachment in request.attachments]
+        attachments = [json.loads(attachment.model_dump_json()) for attachment in request.attachments]
     else:
         attachments = []
 

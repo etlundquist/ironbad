@@ -2,11 +2,14 @@ import React, { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Contract, ContractSectionCitation } from '../../lib/types'
 import { ChatMessageAttachment } from '../../lib/types/agent'
+import { SavedPrompt } from '../../lib/types/saved-prompt'
 import { useAgentChat } from '../../hooks/useAgentChat'
 import { Spinner } from '../common/Spinner'
 import { useNotificationContext } from '../common/NotificationProvider'
 import { AgentProgressPanel } from './AgentProgressPanel'
+import { SavedPromptVariableModal } from './SavedPromptVariableModal'
 import { fetchContracts } from '../../lib/api'
+import { fetchSavedPrompts } from '../../lib/api/saved-prompts'
 
 interface AgentChatTabProps {
   contract: Contract
@@ -26,11 +29,15 @@ export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId
   const [attachments, setAttachments] = useState<ChatMessageAttachment[]>([])
   const [showSectionDropdown, setShowSectionDropdown] = useState(false)
   const [showContractDropdown, setShowContractDropdown] = useState(false)
+  const [showPromptDropdown, setShowPromptDropdown] = useState(false)
   const [availableSections, setAvailableSections] = useState<Array<{ id: string; number: string; name?: string }>>([])
   const [availableContracts, setAvailableContracts] = useState<Contract[]>([])
+  const [availablePrompts, setAvailablePrompts] = useState<SavedPrompt[]>([])
+  const [selectedPromptForVariables, setSelectedPromptForVariables] = useState<SavedPrompt | null>(null)
   const [isDraggingOver, setIsDraggingOver] = useState(false)
   const [showSectionTooltip, setShowSectionTooltip] = useState(false)
   const [showDocumentTooltip, setShowDocumentTooltip] = useState(false)
+  const [showPromptTooltip, setShowPromptTooltip] = useState(false)
   const attachmentAreaRef = useRef<HTMLDivElement>(null)
 
   const {
@@ -98,6 +105,19 @@ export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId
     }
     loadContracts()
   }, [contractId])
+
+  useEffect(() => {
+    // Fetch available saved prompts
+    const loadPrompts = async () => {
+      try {
+        const prompts = await fetchSavedPrompts()
+        setAvailablePrompts(prompts)
+      } catch (error) {
+        console.error('Failed to fetch saved prompts:', error)
+      }
+    }
+    loadPrompts()
+  }, [])
 
   useEffect(() => {
     // Listen for text selection attachment events
@@ -170,6 +190,22 @@ export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId
   const handleSendMessage = () => {
     sendMessage(attachments.length > 0 ? attachments : undefined)
     setAttachments([])
+  }
+
+  const handlePromptSelect = (prompt: SavedPrompt) => {
+    setShowPromptDropdown(false)
+    
+    if (prompt.variables.length === 0) {
+      // No variables, directly insert the prompt text
+      setChatInput(prompt.text)
+    } else {
+      // Has variables, show modal for variable resolution
+      setSelectedPromptForVariables(prompt)
+    }
+  }
+
+  const handlePromptVariablesSubmit = (resolvedText: string) => {
+    setChatInput(resolvedText)
   }
 
   const getAttachmentDisplay = (attachment: ChatMessageAttachment) => {
@@ -347,6 +383,14 @@ export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId
 
   return (
     <div className="tab-panel">
+      {selectedPromptForVariables && (
+        <SavedPromptVariableModal
+          prompt={selectedPromptForVariables}
+          onClose={() => setSelectedPromptForVariables(null)}
+          onSubmit={handlePromptVariablesSubmit}
+        />
+      )}
+      
       <div className="tab-header agent-header">
         <div className="agent-header-title">
           <AIIcon />
@@ -457,7 +501,121 @@ export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId
               <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
                 <div style={{ position: 'relative', flex: '1' }}>
                   <button 
-                    onClick={() => { setShowSectionDropdown(!showSectionDropdown); setShowContractDropdown(false) }} 
+                    onClick={() => { setShowPromptDropdown(!showPromptDropdown); setShowSectionDropdown(false); setShowContractDropdown(false) }} 
+                    className="pin-button"
+                    style={{ 
+                      width: '100%', 
+                      padding: '8px 14px', 
+                      fontSize: '13px', 
+                      backgroundColor: '#f0f4ff', 
+                      border: '1px solid #bfdbfe', 
+                      borderRadius: '6px', 
+                      cursor: 'pointer', 
+                      textAlign: 'left', 
+                      fontWeight: '500',
+                      color: '#1e40af',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <span>💬 Use Saved Prompt</span>
+                    <span
+                      style={{ 
+                        marginLeft: 'auto',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        flexShrink: 0,
+                        cursor: 'help',
+                        position: 'relative'
+                      }}
+                      onMouseEnter={() => setShowPromptTooltip(true)}
+                      onMouseLeave={() => setShowPromptTooltip(false)}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <svg 
+                        width="16" 
+                        height="16" 
+                        viewBox="0 0 24 24" 
+                        fill="none"
+                        style={{ display: 'block' }}
+                      >
+                        <circle cx="12" cy="12" r="10" stroke="#1e40af" strokeWidth="2" fill="none"/>
+                        <path d="M12 16v-4M12 8h.01" stroke="#1e40af" strokeWidth="2" strokeLinecap="round"/>
+                      </svg>
+                      {showPromptTooltip && (
+                        <span style={{
+                          position: 'absolute',
+                          bottom: '100%',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          marginBottom: '8px',
+                          padding: '6px 10px',
+                          backgroundColor: '#1f2937',
+                          color: '#ffffff',
+                          fontSize: '12px',
+                          borderRadius: '6px',
+                          whiteSpace: 'nowrap',
+                          zIndex: 1001,
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                          pointerEvents: 'none'
+                        }}>
+                          Insert a saved prompt template into the chat input
+                          <span style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            width: '0',
+                            height: '0',
+                            borderLeft: '6px solid transparent',
+                            borderRight: '6px solid transparent',
+                            borderTop: '6px solid #1f2937'
+                          }}></span>
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                  {showPromptDropdown && (
+                    <div style={{ position: 'absolute', bottom: '100%', left: 0, right: 0, marginBottom: '4px', maxHeight: '200px', overflowY: 'auto', backgroundColor: '#ffffff', border: '1px solid #d1d5db', borderRadius: '6px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', zIndex: 1000 }}>
+                      {availablePrompts.length === 0 ? (
+                        <div style={{ padding: '12px', fontSize: '13px', color: '#6b7280', textAlign: 'center' }}>
+                          No saved prompts found
+                        </div>
+                      ) : (
+                        availablePrompts.map((prompt) => (
+                          <button 
+                            key={prompt.id} 
+                            onClick={() => handlePromptSelect(prompt)} 
+                            style={{ 
+                              width: '100%', 
+                              padding: '8px 12px', 
+                              fontSize: '13px', 
+                              textAlign: 'left', 
+                              border: 'none', 
+                              backgroundColor: '#ffffff', 
+                              cursor: 'pointer', 
+                              borderBottom: '1px solid #e5e7eb',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }}
+                          >
+                            <span style={{ flex: 1 }}>{prompt.name}</span>
+                            {prompt.variables.length > 0 && (
+                              <span style={{ fontSize: '11px', padding: '2px 6px', backgroundColor: '#dbeafe', color: '#1e40af', borderRadius: '10px', fontWeight: '600' }}>
+                                {prompt.variables.length} {prompt.variables.length === 1 ? 'var' : 'vars'}
+                              </span>
+                            )}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div style={{ position: 'relative', flex: '1' }}>
+                  <button 
+                    onClick={() => { setShowSectionDropdown(!showSectionDropdown); setShowContractDropdown(false); setShowPromptDropdown(false) }} 
                     className="pin-button"
                     style={{ 
                       width: '100%', 
@@ -544,7 +702,7 @@ export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId
                 </div>
                 <div style={{ position: 'relative', flex: '1' }}>
                   <button 
-                    onClick={() => { setShowContractDropdown(!showContractDropdown); setShowSectionDropdown(false) }} 
+                    onClick={() => { setShowContractDropdown(!showContractDropdown); setShowSectionDropdown(false); setShowPromptDropdown(false) }} 
                     className="pin-button"
                     style={{ 
                       width: '100%', 

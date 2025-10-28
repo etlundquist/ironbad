@@ -105,6 +105,9 @@ const Header: React.FC = () => {
           <Link href="/standard-clauses" className={`nav-link ${isActive('/standard-clauses') ? 'active' : ''}`}>
             Clause Library
           </Link>
+          <Link href="/saved-prompts" className={`nav-link ${isActive('/saved-prompts') ? 'active' : ''}`}>
+            Prompt Library
+          </Link>
         </nav>
       </div>
     </header>

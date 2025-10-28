@@ -169,3 +169,13 @@ class AgentChatMessage(Base):
 
     contract = relationship("Contract")
     chat_thread = relationship("AgentChatThread")
+
+
+class SavedPrompt(Base):
+    __tablename__ = "saved_prompts"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String, nullable=False)
+    text = Column(String, nullable=False)
+    variables = Column(ARRAY(String), nullable=False, default=[])
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())

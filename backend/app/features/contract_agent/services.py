@@ -128,7 +128,6 @@ async def process_request_attachments(db: AsyncSession, contract: AnnotatedContr
         for document in pinned_precedent_document_attachments:
             precedent_dbcontract = await db.get(DBContract, document.contract_id)
             precedent_contract = AnnotatedContract.model_validate(precedent_dbcontract)
-            logger.info(f"precedent_contract: {precedent_contract.model_dump_json(indent=2)}")
             precedent_top_level_sections = flatten_section_tree(precedent_contract.section_tree, max_depth=1)
             precedent_top_level_sections = [
                 AgentContractSectionPreview(
