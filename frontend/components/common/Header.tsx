@@ -93,17 +93,17 @@ const Header: React.FC = () => {
           alignItems: 'center',
           gap: '0.5rem'
         }}>
+          <Link href="/upload" className={`nav-link ${isActive('/upload') ? 'active' : ''}`}>
+            Upload Contracts
+          </Link>
           <Link href="/contracts" className={`nav-link ${isActive('/contracts') || isActive('/') ? 'active' : ''}`}>
             View Contracts
           </Link>
           <Link href="/review" className={`nav-link ${isActive('/review') ? 'active' : ''}`}>
             Redline Agent
           </Link>
-          <Link href="/upload" className={`nav-link ${isActive('/upload') ? 'active' : ''}`}>
-            Upload Contracts
-          </Link>
           <Link href="/standard-clauses" className={`nav-link ${isActive('/standard-clauses') ? 'active' : ''}`}>
-            Configuration
+            Clause Library
           </Link>
         </nav>
       </div>

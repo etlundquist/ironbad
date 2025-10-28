@@ -71,3 +71,11 @@ export function getContractContentUrl(contractId: string): string {
   return `${getBackendUrl()}/contracts/${contractId}/contents`
 }
 
+export async function deleteContract(contractId: string): Promise<void> {
+  const response = await fetch(`${getBackendUrl()}/contracts/${contractId}`, {
+    method: 'DELETE'
+  })
+
+  if (!response.ok) throw new Error('Failed to delete contract')
+}
+

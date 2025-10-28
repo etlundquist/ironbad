@@ -238,7 +238,7 @@ export function useAgentChat(contractId: string | undefined, options?: UseAgentC
     }
   }
 
-  const sendMessage = async () => {
+  const sendMessage = async (attachments?: any[]) => {
     if (!contractId || !chatInput.trim() || isSendingMessage || Array.isArray(contractId)) return
 
     const controller = new AbortController()
@@ -249,7 +249,7 @@ export function useAgentChat(contractId: string | undefined, options?: UseAgentC
     setChatInput('')
 
     try {
-      const resp = await runAgent(contractId, userMessageContent, currentChatThread?.id, controller.signal)
+      const resp = await runAgent(contractId, userMessageContent, currentChatThread?.id, attachments, controller.signal)
       if (!resp.body) throw new Error('No response body')
       await parseAndHandleSSEStream(resp)
     } catch (e) {

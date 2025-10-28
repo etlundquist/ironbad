@@ -365,6 +365,13 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
     })
   }
 
+  const handleAttachToChat = (nodeId: string, offsetBeg: number, offsetEnd: number) => {
+    // Dispatch custom event for AgentChatTab to listen to
+    window.dispatchEvent(new CustomEvent('attach-text-to-chat', { 
+      detail: { nodeId, offsetBeg, offsetEnd } 
+    }))
+  }
+
   const getCommentsForNode = (nodeId: string): CommentAnnotation[] =>
     annotations?.comments?.filter((c) => c.node_id === nodeId) || []
   const getRevisionsForNode = (nodeId: string): RevisionAnnotation[] =>
@@ -779,6 +786,7 @@ const ContractSectionTree: React.FC<ContractSectionTreeProps> = ({
           })
         }
         onSubmit={handleAnnotationSubmit}
+        onAttachToChat={handleAttachToChat}
         decodeHtmlEntities={decodeHtmlEntities}
       />
 

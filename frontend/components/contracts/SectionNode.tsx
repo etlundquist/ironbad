@@ -117,6 +117,12 @@ const SectionNode: React.FC<SectionNodeProps> = ({
           <span
             className="section-number"
             onClick={() => onToggleNode(node.id)}
+            draggable
+            onDragStart={(e) => {
+              e.stopPropagation()
+              e.dataTransfer.setData('application/json', JSON.stringify({ type: 'section', sectionNumber: node.number }))
+              e.dataTransfer.effectAllowed = 'copy'
+            }}
             style={{
               fontWeight: '600',
               color: '#1f2937',
@@ -125,8 +131,9 @@ const SectionNode: React.FC<SectionNodeProps> = ({
               borderRadius: '4px',
               fontSize: '14px',
               flexShrink: 0,
-              cursor: 'pointer'
+              cursor: 'grab'
             }}
+            title="Drag to pin this section to agent chat"
           >
             {node.number}
           </span>

@@ -1,17 +1,16 @@
 from uuid import UUID
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional, TypeAlias, Union
 from datetime import datetime
 
+from pydantic import Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.schemas import ConfiguredBaseModel, ContractSectionCitation
 from app.features.contract_annotations.schemas import AnnotatedContract
 from app.enums import AnnotationType, ContractSectionType, ChatMessageStatus, ChatMessageRole
 
-
-class AgentContext(ConfiguredBaseModel):
-    db: AsyncSession
-    contract: AnnotatedContract
+# agent tool request/response schemas
+# -----------------------------------
 
 class AgentContractSectionPreview(ConfiguredBaseModel):
     type: ContractSectionType
@@ -28,6 +27,15 @@ class AgentContractSection(ConfiguredBaseModel):
 class AgentContractTextMatch(ConfiguredBaseModel):
     section_number: str
     match_line: str
+
+class AgentContractSectionTextSpan(ConfiguredBaseModel):    
+    section_number: str
+    text_span: str
+
+class AgentPrecedentDocument(ConfiguredBaseModel):
+    name: str
+    summary: str
+    top_level_sections: list[AgentContractSectionPreview]
 
 
 class AgentCommentAnnotation(ConfiguredBaseModel):
@@ -79,25 +87,32 @@ class AgentRemoveSectionResponse(ConfiguredBaseModel):
     status: Literal["applied", "rejected", "conflict"]
 
 
-class AgentRunRequest(ConfiguredBaseModel):
+# agent chat thread/message schemas
+# ---------------------------------
+
+class ResponseCitationsAttachment(ConfiguredBaseModel):
+    kind: Literal["response_citations"] = "response_citations"
+    citations: list[ContractSectionCitation]
+
+class PinnedSectionAttachment(ConfiguredBaseModel):
+    kind: Literal["pinned_section"] = "pinned_section"
+    section_number: str
+
+class PinnedSectionTextAttachment(ConfiguredBaseModel):
+    kind: Literal["pinned_section_text"] = "pinned_section_text"
+    section_number: str
+    text_span: str
+
+class PinnedPrecedentDocumentAttachment(ConfiguredBaseModel):
+    kind: Literal["pinned_precedent_document"] = "pinned_precedent_document"
     contract_id: UUID
-    chat_thread_id: Optional[UUID] = None
-    content: str
 
-class AgentRunEventStreamContext(ConfiguredBaseModel):
-    db: AsyncSession
-    contract: AnnotatedContract
-    chat_thread_id: UUID
-    user_message_id: UUID
-    assistant_message_id: UUID
-
-
-class AgentChatThread(ConfiguredBaseModel):
-    id: UUID
-    contract_id: UUID
-    openai_conversation_id: str
-    created_at: datetime
-    updated_at: datetime
+ChatMessageAttachment: TypeAlias = Annotated[Union[
+    ResponseCitationsAttachment, 
+    PinnedSectionAttachment, 
+    PinnedSectionTextAttachment, 
+    PinnedPrecedentDocumentAttachment
+], Field(discriminator="kind")]
 
 class AgentChatMessage(ConfiguredBaseModel):
     id: UUID
@@ -106,10 +121,25 @@ class AgentChatMessage(ConfiguredBaseModel):
     status: ChatMessageStatus
     role: ChatMessageRole
     content: str
-    citations: Optional[list[ContractSectionCitation]] = None
+    attachments: Optional[list[ChatMessageAttachment]] = None
     created_at: datetime
     updated_at: datetime
 
+class AgentChatThread(ConfiguredBaseModel):
+    id: UUID
+    contract_id: UUID
+    openai_conversation_id: str
+    created_at: datetime
+    updated_at: datetime
+
+class AgentRunRequest(ConfiguredBaseModel):
+    contract_id: UUID
+    content: str
+    chat_thread_id: Optional[UUID] = None
+    attachments: Optional[list[ChatMessageAttachment]] = None
+
+# agent run event stream schemas
+# ------------------------------
 
 class AgentRunCreatedEvent(ConfiguredBaseModel):
     event: Literal["run_created"] = "run_created"
@@ -162,3 +192,18 @@ class AgentReasoningSummaryEvent(ConfiguredBaseModel):
     chat_message_id: UUID
     reasoning_id: str
     reasoning_summary: str
+
+# agent runtime context and event stream context schemas
+# ------------------------------------------------------
+
+class AgentContext(ConfiguredBaseModel):
+    db: AsyncSession
+    contract: AnnotatedContract
+    request: AgentRunRequest
+
+class AgentEventStreamContext(ConfiguredBaseModel):
+    db: AsyncSession
+    contract: AnnotatedContract
+    chat_thread_id: UUID
+    user_message_id: UUID
+    assistant_message_id: UUID

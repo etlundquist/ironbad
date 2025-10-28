@@ -3,6 +3,29 @@ import { ContractSectionCitation } from './contract'
 export type AgentChatMessageStatus = 'pending' | 'in_progress' | 'responding' | 'completed' | 'failed' | 'cancelled'
 export type AgentChatMessageRole = 'system' | 'user' | 'assistant'
 
+export interface PinnedSectionAttachment {
+  kind: 'pinned_section'
+  section_number: string
+}
+
+export interface PinnedSectionTextAttachment {
+  kind: 'pinned_section_text'
+  section_number: string
+  text_span: string
+}
+
+export interface PinnedPrecedentDocumentAttachment {
+  kind: 'pinned_precedent_document'
+  contract_id: string
+}
+
+export interface ResponseCitationsAttachment {
+  kind: 'response_citations'
+  citations: ContractSectionCitation[]
+}
+
+export type ChatMessageAttachment = PinnedSectionAttachment | PinnedSectionTextAttachment | PinnedPrecedentDocumentAttachment | ResponseCitationsAttachment
+
 export interface AgentChatThread {
   id: string
   contract_id: string
@@ -18,7 +41,7 @@ export interface AgentChatMessage {
   status: AgentChatMessageStatus
   role: AgentChatMessageRole
   content: string
-  citations?: ContractSectionCitation[]
+  attachments?: ChatMessageAttachment[]
   created_at: string
   updated_at: string
 }

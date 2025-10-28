@@ -1,7 +1,7 @@
 import uuid
 
-from sqlalchemy import Boolean, Column, String, Integer, DateTime, Enum, JSON, ForeignKey, ARRAY
-from sqlalchemy.dialects.postgresql import UUID, BYTEA
+from sqlalchemy import Boolean, Column, String, Integer, DateTime, Enum, ForeignKey, ARRAY
+from sqlalchemy.dialects.postgresql import UUID, BYTEA, JSONB
 from sqlalchemy.orm import DeclarativeBase, relationship
 from sqlalchemy.sql import func
 from pgvector.sqlalchemy import Vector
@@ -49,11 +49,11 @@ class Contract(Base):
     filetype = Column(Enum(FileType), nullable=False)
     contents = Column(BYTEA, nullable=False)
     markdown = Column(String, nullable=True)
-    section_tree = Column(JSON, nullable=True)
-    annotations = Column(JSON, nullable=True)
+    section_tree = Column(JSONB, nullable=True)
+    annotations = Column(JSONB, nullable=True)
     version = Column(Integer, nullable=False)
-    meta = Column(JSON, nullable=True)
-    errors = Column(JSON, nullable=True)
+    meta = Column(JSONB, nullable=True)
+    errors = Column(JSONB, nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
@@ -102,7 +102,7 @@ class ContractIssue(Base):
     contract_id = Column(UUID(as_uuid=True), ForeignKey(column="contracts.id", ondelete="CASCADE"), nullable=False)
     relevant_text = Column(String, nullable=False)
     explanation = Column(String, nullable=False)
-    citations = Column(JSON, nullable=True)
+    citations = Column(JSONB, nullable=True)
     status = Column(Enum(IssueStatus), nullable=False)
     resolution = Column(Enum(IssueResolution), nullable=True)
     ai_suggested_revision = Column(String, nullable=True)
@@ -136,7 +136,7 @@ class ContractChatMessage(Base):
     status = Column(Enum(ChatMessageStatus), nullable=False)
     role = Column(Enum(ChatMessageRole), nullable=False)
     content = Column(String, nullable=False)
-    citations = Column(JSON, nullable=True)
+    citations = Column(JSONB, nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
@@ -162,7 +162,7 @@ class AgentChatMessage(Base):
     status = Column(Enum(ChatMessageStatus), nullable=False)
     role = Column(Enum(ChatMessageRole), nullable=False)
     content = Column(String, nullable=False, default="")
-    citations = Column(JSON, nullable=True)
+    attachments = Column(JSONB, nullable=True, default=[])
     parent_chat_message_id = Column(UUID(as_uuid=True), ForeignKey(column="agent_chat_messages.id"), nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())

@@ -1,6 +1,7 @@
 import { NextPage } from 'next'
 import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/router'
 import { useNotificationContext } from '../components/common/NotificationProvider'
 import ContractSectionTree from '../components/ContractSectionTree'
 import { CommentsPanel } from '../components/review/CommentsPanel'
@@ -16,6 +17,7 @@ import { getFileIcon, getStatusBadge } from '../lib/utils'
 import { Spinner } from '../components/common/Spinner'
 
 const ReviewPage: NextPage = () => {
+  const router = useRouter()
   const workspaceRef = useRef<HTMLDivElement | null>(null)
   const [connector, setConnector] = useState<{ x1: number, y1: number, x2: number, y2: number } | null>(null)
   const [contracts, setContracts] = useState<ContractWithAnnotations[]>([])
@@ -40,6 +42,16 @@ const ReviewPage: NextPage = () => {
   useEffect(() => {
     loadContracts()
   }, [])
+
+  useEffect(() => {
+    if (contracts.length > 0 && router.query.contractId && !selectedContract) {
+      const contractId = router.query.contractId as string
+      const contract = contracts.find(c => c.id === contractId)
+      if (contract) {
+        setSelectedContract(contract)
+      }
+    }
+  }, [contracts, router.query.contractId, selectedContract])
 
   const loadContracts = async () => {
     try {
@@ -459,6 +471,7 @@ const ReviewPage: NextPage = () => {
                     navigateToSection={navigateToSection}
                     onRunCompleted={refreshSelectedContract}
                     onClose={() => setShowAgentChat(false)}
+                    sectionTree={selectedContract.section_tree}
                   />
                 </div>
               )}

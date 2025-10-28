@@ -10,6 +10,7 @@ interface ContractListProps {
   ingestingContract: string | null
   onIngest: (contractId: string) => void
   onAnalyze: (contractId: string) => void
+  onDelete: (contractId: string) => void
 }
 
 export const ContractList: React.FC<ContractListProps> = ({
@@ -17,142 +18,101 @@ export const ContractList: React.FC<ContractListProps> = ({
   analyzingContract,
   ingestingContract,
   onIngest,
-  onAnalyze
+  onAnalyze,
+  onDelete
 }) => {
-  const getActionButton = (contract: Contract) => {
+  const getActionButtons = (contract: Contract) => {
     const isIngesting = ingestingContract === contract.id
     const isAnalyzing = analyzingContract === contract.id
+    const showIngest = contract.status === 'Uploaded'
+    const showAnalyze = contract.status === 'Ready for Review'
 
-    switch (contract.status) {
-      case 'Uploaded':
-        return (
+    const iconButtonStyle = {
+      padding: '0.5rem',
+      borderRadius: '6px',
+      border: 'none',
+      background: 'transparent',
+      cursor: 'pointer',
+      transition: 'all 0.2s',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative' as const
+    }
+
+    return (
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        {showIngest && (
           <button
             onClick={() => onIngest(contract.id)}
             disabled={isIngesting}
-            className="action-link primary"
-            style={{
-              background: '#2563eb',
-              color: 'white',
-              padding: '0.375rem 0.75rem',
-              borderRadius: '6px',
-              fontWeight: '500',
-              border: 'none',
-              cursor: isIngesting ? 'not-allowed' : 'pointer',
-              opacity: isIngesting ? 0.7 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
+            style={{ ...iconButtonStyle, color: isIngesting ? '#9ca3af' : '#2563eb', cursor: isIngesting ? 'not-allowed' : 'pointer' }}
+            className="icon-button"
+            title="Ingest Contract"
           >
-            {isIngesting && <Spinner size="small" />}
-            {isIngesting ? 'Ingesting...' : 'Ingest Contract'}
+            {isIngesting ? (
+              <Spinner size="small" />
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <ellipse cx="12" cy="5" rx="9" ry="3" />
+                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+              </svg>
+            )}
           </button>
-        )
+        )}
 
-      case 'Ingesting':
-        return (
-          <div
-            className="action-link"
-            style={{
-              background: '#f3f4f6',
-              color: '#6b7280',
-              padding: '0.375rem 0.75rem',
-              borderRadius: '6px',
-              fontWeight: '500',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              cursor: 'not-allowed'
-            }}
-          >
-            <Spinner size="small" />
-            Ingesting Contract
-          </div>
-        )
-
-      case 'Analyzing':
-        return (
-          <div
-            className="action-link"
-            style={{
-              background: '#f3f4f6',
-              color: '#6b7280',
-              padding: '0.375rem 0.75rem',
-              borderRadius: '6px',
-              fontWeight: '500',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              cursor: 'not-allowed'
-            }}
-          >
-            <Spinner size="small" />
-            Analyzing Contract
-          </div>
-        )
-
-      case 'Ready for Review':
-        return (
+        {showAnalyze && (
           <button
             onClick={() => onAnalyze(contract.id)}
             disabled={isAnalyzing}
-            className="action-link primary"
-            style={{
-              background: '#2563eb',
-              color: 'white',
-              padding: '0.375rem 0.75rem',
-              borderRadius: '6px',
-              fontWeight: '500',
-              border: 'none',
-              cursor: isAnalyzing ? 'not-allowed' : 'pointer',
-              opacity: isAnalyzing ? 0.7 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
+            style={{ ...iconButtonStyle, color: isAnalyzing ? '#9ca3af' : '#2563eb', cursor: isAnalyzing ? 'not-allowed' : 'pointer' }}
+            className="icon-button"
+            title="Analyze Contract"
           >
-            {isAnalyzing && <Spinner size="small" />}
-            {isAnalyzing ? 'Analyzing...' : 'Analyze Contract'}
+            {isAnalyzing ? (
+              <Spinner size="small" />
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
+              </svg>
+            )}
           </button>
-        )
+        )}
 
-      case 'Under Review':
-        return (
-          <Link href={`/contracts/${contract.id}`} className="action-link primary">
-            Review Contract
-          </Link>
-        )
+        <Link href={`/contracts/${contract.id}`} style={{ ...iconButtonStyle, color: '#10b981' }} className="icon-button" title="Review Contract">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        </Link>
 
-      case 'Review Completed':
-        return (
-          <button
-            onClick={() => {
-              // Export functionality placeholder - could show toast but leaving as no-op for now
-            }}
-            className="action-link secondary"
-            style={{
-              background: '#6b7280',
-              color: 'white',
-              padding: '0.375rem 0.75rem',
-              borderRadius: '6px',
-              fontWeight: '500',
-              border: 'none',
-              cursor: 'pointer',
-              textDecoration: 'none',
-              display: 'inline-block'
-            }}
-          >
-            Export Review Summary
-          </button>
-        )
+        <Link href={`/review?contractId=${contract.id}`} style={{ ...iconButtonStyle, color: '#f59e0b' }} className="icon-button" title="Redline Contract">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+          </svg>
+        </Link>
 
-      default:
-        return (
-          <Link href={`/contracts/${contract.id}`} className="action-link primary">
-            View
-          </Link>
-        )
-    }
+        <button
+          onClick={() => {
+            if (window.confirm(`Are you sure you want to delete "${contract.filename}"?`)) {
+              onDelete(contract.id)
+            }
+          }}
+          style={{ ...iconButtonStyle, color: '#ef4444' }}
+          className="icon-button"
+          title="Delete Contract"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            <line x1="10" y1="11" x2="10" y2="17" />
+            <line x1="14" y1="11" x2="14" y2="17" />
+          </svg>
+        </button>
+      </div>
+    )
   }
 
   return (
@@ -188,7 +148,7 @@ export const ContractList: React.FC<ContractListProps> = ({
                 {formatDate(contract.updated_at)}
               </td>
               <td className="contract-actions">
-                {getActionButton(contract)}
+                {getActionButtons(contract)}
               </td>
             </tr>
           ))}

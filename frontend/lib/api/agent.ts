@@ -1,4 +1,4 @@
-import { AgentChatThread, AgentChatMessage } from '../types'
+import { AgentChatThread, AgentChatMessage, ChatMessageAttachment } from '../types'
 
 const getBackendUrl = () => process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
 
@@ -32,9 +32,10 @@ export async function fetchAgentChatMessage(threadId: string, messageId: string)
   return response.json()
 }
 
-export async function runAgent(contractId: string, content: string, chatThreadId?: string, signal?: AbortSignal): Promise<Response> {
+export async function runAgent(contractId: string, content: string, chatThreadId?: string, attachments?: ChatMessageAttachment[], signal?: AbortSignal): Promise<Response> {
   const payload: any = { contract_id: contractId, content }
   if (chatThreadId) payload.chat_thread_id = chatThreadId
+  if (attachments && attachments.length > 0) payload.attachments = attachments
 
   const response = await fetch(`${getBackendUrl()}/agent/runs`, {
     method: 'POST',

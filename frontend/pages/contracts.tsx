@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useNotificationContext } from '../components/common/NotificationProvider'
 import { Contract } from '../lib/types'
-import { fetchContracts, ingestContracts, analyzeContracts } from '../lib/api'
+import { fetchContracts, ingestContracts, analyzeContracts, deleteContract } from '../lib/api'
 import { ContractList } from '../components/contracts/ContractList'
 import { Spinner } from '../components/common/Spinner'
 
@@ -81,6 +81,24 @@ const ContractsPage: NextPage = () => {
     }
   }
 
+  const handleDeleteContract = async (contractId: string) => {
+    try {
+      await deleteContract(contractId)
+      showToast({
+        type: 'success',
+        title: 'Contract Deleted',
+        message: 'Contract has been successfully deleted'
+      })
+      await loadContracts()
+    } catch (error) {
+      showToast({
+        type: 'error',
+        title: 'Deletion Failed',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      })
+    }
+  }
+
   if (loading) {
     return (
       <div className="page-container">
@@ -142,6 +160,7 @@ const ContractsPage: NextPage = () => {
           ingestingContract={ingestingContract}
           onIngest={handleIngestContract}
           onAnalyze={handleAnalyzeContract}
+          onDelete={handleDeleteContract}
         />
 
         {contracts.length === 0 ? (

@@ -44,3 +44,4 @@ app.include_router(router)
 if settings.logfire_enabled:
     logfire.configure()
     logfire.instrument_fastapi(app)
+    logfire.instrument_openai_agents()

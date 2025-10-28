@@ -18,7 +18,7 @@ from app.models import Contract as DBContract, AgentChatThread as DBAgentChatThr
 
 from app.api.deps import get_db
 from app.features.contract_agent.agent import AgentContext, agent
-from app.features.contract_agent.schemas import AgentRunEventStreamContext, AgentChatThread, AgentChatMessage
+from app.features.contract_agent.schemas import AgentEventStreamContext, AgentChatThread, AgentChatMessage
 from app.features.contract_agent.events import handle_event_stream
 from app.features.contract_agent.schemas import AgentRunRequest
 
@@ -54,13 +54,20 @@ async def run_contract_agent(request: AgentRunRequest, db: AsyncSession = Depend
         db.add(chat_thread)
         await db.flush()
 
+    # serialize the request attachments to dicts for JSONB storage
+    if request.attachments:
+        attachments = [attachment.model_dump() for attachment in request.attachments]
+    else:
+        attachments = []
+
     # add the new user message to the database
     user_message = DBAgentChatMessage(
         contract_id=contract.id, 
         chat_thread_id=chat_thread.id, 
         status=ChatMessageStatus.COMPLETED,
         role=ChatMessageRole.USER, 
-        content=request.content
+        content=request.content,
+        attachments=attachments
     )
     db.add(user_message)
     await db.flush()
@@ -79,8 +86,8 @@ async def run_contract_agent(request: AgentRunRequest, db: AsyncSession = Depend
     await db.flush()
 
     # create the agent's runtime context and the event stream handler's context 
-    agent_context = AgentContext(db=db, contract=contract)
-    stream_context = AgentRunEventStreamContext(db=db, contract=contract, chat_thread_id=chat_thread.id, user_message_id=user_message.id, assistant_message_id=assistant_message.id)
+    agent_context = AgentContext(db=db, contract=contract, request=request)
+    stream_context = AgentEventStreamContext(db=db, contract=contract, chat_thread_id=chat_thread.id, user_message_id=user_message.id, assistant_message_id=assistant_message.id)
 
     # execute the agent run with the user's current input, conversation history, and dynamic agent runtime context
     result = Runner.run_streamed(

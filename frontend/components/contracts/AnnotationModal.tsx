@@ -5,6 +5,7 @@ interface AnnotationModalProps {
   modal: AnnotationModalState
   onClose: () => void
   onSubmit: (type: 'comment' | 'revision', content: string) => void
+  onAttachToChat?: (nodeId: string, offsetBeg: number, offsetEnd: number) => void
   decodeHtmlEntities: (text: string) => string
 }
 
@@ -12,6 +13,7 @@ const AnnotationModal: React.FC<AnnotationModalProps> = ({
   modal,
   onClose,
   onSubmit,
+  onAttachToChat,
   decodeHtmlEntities
 }) => {
   const [annotationType, setAnnotationType] = useState<'comment' | 'revision' | null>(modal.type)
@@ -108,6 +110,28 @@ const AnnotationModal: React.FC<AnnotationModalProps> = ({
           >
             Suggest Revision
           </button>
+          {onAttachToChat && (
+            <button
+              onClick={() => {
+                onAttachToChat(modal.nodeId, modal.offsetBeg, modal.offsetEnd)
+                onClose()
+              }}
+              style={{
+                flex: 1,
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: '#ffffff',
+                color: '#374151',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              Attach to Chat
+            </button>
+          )}
         </div>
 
         {annotationType && (
