@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.schemas import ConfiguredBaseModel, ContractSectionCitation
 from app.features.contract_annotations.schemas import AnnotatedContract
-from app.enums import AnnotationType, ContractSectionType, ChatMessageStatus, ChatMessageRole, RuleSeverity
+from app.enums import AnnotationType, ContractSectionType, ChatMessageStatus, ChatMessageRole
 
 # agent tool request/response schemas
 # -----------------------------------
