@@ -16,7 +16,7 @@ from app.common.schemas import ContractSectionNode
 
 from app.features.contract_annotations.schemas import AnnotatedContract, CommentAnnotation, NewCommentAnnotationRequest, NewRevisionAnnotationRequest, RevisionAnnotation, SectionAddAnnotation, SectionAddAnnotationRequest, SectionRemoveAnnotation, SectionRemoveAnnotationRequest
 from app.features.contract_agent.agent import AgentContext
-from app.features.contract_agent.schemas import AgentContractSectionPreview, AgentContractSection, AgentContractTextMatch, AgentCommentAnnotation, AgentRevisionAnnotation, AgentSectionAddAnnotation, AgentSectionRemoveAnnotation, AgentCommentAnnotationResponse, AgentRevisionAnnotationResponse, AgentAddSectionResponse, AgentRemoveSectionResponse, AgentStandardClause, AgentStandardClausePreview, AgentStandardClauseRule, PinnedPrecedentDocumentAttachment
+from app.features.contract_agent.schemas import AgentContractSectionPreview, AgentContractSection, AgentContractTextMatch, AgentCommentAnnotation, AgentDeleteAnnotationsResponse, AgentRevisionAnnotation, AgentSectionAddAnnotation, AgentSectionRemoveAnnotation, AgentCommentAnnotationResponse, AgentRevisionAnnotationResponse, AgentAddSectionResponse, AgentRemoveSectionResponse, AgentStandardClause, AgentStandardClausePreview, AgentStandardClauseRule
 from app.features.contract_agent.services import flatten_section_tree, get_relevant_sections, persist_contract_changes
 from app.features.contract_annotations.services import handle_make_comment, handle_make_revision, handle_section_add, handle_section_remove
 
@@ -133,11 +133,14 @@ async def list_contract_sections(
     max_depth: Optional[int] = None
 ) -> str:
     """
-    Get a flat list of ordered contract section previews below an optional parent section (defaults to the root section to list the entire section tree)
-    
-    :param parent_section_number: an optional parent section number to use to filter the section tree (defaults to the root section)
-    :param max_depth: the optional max depth of the section tree to list below the parent section (defaults to no maximum depth)
-    :return: a list of section preview objects containing the section type, level, number, and text preview
+    Get a flattened list of ordered contract section previews in natural reading order.
+    You may filter the results by providing a parent section number to output only that parent section and its corresponding child sections.
+    You may limit the results by specifying a max depth to limit the depth of included child sections.
+    Use this tool to get an overview of the contract structure/contents to inform subsequent targeted section searches and/or retrievals.
+
+    :param parent_section_number: an optional parent section number to limit the output to only that parent section and its corresponding child sections (defaults to the root section if not provided)
+    :param max_depth: an optional max depth of child sections to include (defaults to no maximum depth to output all child sections under the parent section)
+    :return: a flattened list of ordered section preview objects containing section metadata (type, level, number) and a short preview of the section text
     """
 
     contract = wrapper.context.contract
@@ -148,16 +151,19 @@ async def list_contract_sections(
 async def get_contract_section(
     wrapper: RunContextWrapper[AgentContext], 
     section_number: str,
-    include_children: bool = False,
+    include_children: bool = True,
     max_depth: Optional[int] = None
 ) -> str:
     """
-    Get the full text of a contract section and optionally include child sections up to a specified max depth
-    
-    :param section_number: the contract section number
-    :param include_children: whether to include child sections (defaults to False)
-    :param max_depth: the max depth of child sections to include (defaults to no maximum depth)
-    :return: a list of section text objects containing the section type, level, number, and full section text
+    Get the full text of a contract section including its child sections (sub-sections in the original contract).
+    You may include child sections to get the full text of sub-sections nested under the specified contract section.
+    You may limit the results by specifying a max depth to limit the depth of child sections included in the results.
+    Use this tool to retrieve the full text of a specific contract section including all of its sub-sections.
+
+    :param section_number: the section number to retrieve
+    :param include_children: whether to include sub-sections (defaults to True)
+    :param max_depth: an optional max depth of child sections to include (defaults to no maximum depth)
+    :return: a flattened list of ordered section objects containing section metadata (type, level, number) and the full section text
     """
 
     contract = wrapper.context.contract
@@ -165,27 +171,35 @@ async def get_contract_section(
 
 
 @function_tool(docstring_style="sphinx", use_docstring_info=True)
-async def search_contract_sections(wrapper: RunContextWrapper[AgentContext], search_phrase: str) -> str:
+async def search_contract_sections(
+    wrapper: RunContextWrapper[AgentContext], 
+    search_phrase: str
+) -> str:
     """
-    Search for relevant contract sections using a natural language search phrase
-    
-    :param search_phrase: the natural language search phrase to use to find relevant contract sections via embedding similarity search
-    :return: a list of matching section objects containing the section type, level, number, and full section text
-    :raises ValueError: if the provided search phrase is empty or invalid
+    Search for relevant contract sections using a natural language search phrase.
+    The search is performed using embedding similarity to retrieve the most similar contract sections to the search phrase.
+    The search phrase should contain concepts, terms, and/or language relevant to the user's conceptual request.
+    The search phrase should be in conversational format and not limited to single words, prefixes, or suffixes.
+    Use this tool to search for relevant contract sections based on a conceptual request or question.
+
+    :param search_phrase: natural language search phrase to match against contract sections via embedding similarity search
+    :return: a prettified JSON array of relevant contract sections ordered by similarity to the search phrase
     """
 
     contract = wrapper.context.contract
-    return _search_sections(db=wrapper.context.db, contract=contract, search_phrase=search_phrase)
+    return await _search_sections(db=wrapper.context.db, contract=contract, search_phrase=search_phrase)
 
 
 @function_tool(docstring_style="sphinx", use_docstring_info=True)
 async def search_contract_lines(wrapper: RunContextWrapper[AgentContext], pattern: str) -> str:
     """
-    Search for matching contract text lines using a regular expression pattern
+    Search for matching contract lines using a regular expression pattern.
+    The pattern will be matched against each line of the contract text to find all matching lines. Matching is case-insensitive.
+    The pattern should be a valid regular expression containing keywords and/or exact terms.
+    Use this tool to find all occurrences of specific keywords or terms in the contract text.
 
-    :param pattern: the regular expression pattern to match against contract text lines
-    :return: a list of match objects containing the relevant section number and matching line text
-    :raises ValueError: if the provided pattern is not a valid regular expression
+    :param pattern: regular expression pattern to match against contract text lines
+    :return: a prettified JSON array of all matching lines containing the section number and line text for each match
     """
     
     contract = wrapper.context.contract
@@ -202,7 +216,6 @@ def precedent_tools_enabled(wrapper: RunContextWrapper[AgentContext], agent: Age
         return False
     
     for attachment in request.attachments:
-        logger.info(f"tool enabled check: request attachment: {attachment.model_dump_json()}")
         if attachment.kind == "pinned_precedent_document":
             return True
     
@@ -217,12 +230,15 @@ async def list_precedent_sections(
     max_depth: Optional[int] = None
 ) -> str:
     """
-    Get a flat list of ordered section previews from a precedent document
+    Get a flattened list of ordered section previews from a precedent document in natural reading order.
+    You may filter the results by providing a parent section number to output only that parent section and its corresponding child sections.
+    You may limit the results by specifying a max depth to limit the depth of included child sections.
+    Use this tool to get an overview of the precedent document structure/contents to inform subsequent targeted section searches and/or retrievals.
     
     :param filename: the filename of the precedent document to search
-    :param parent_section_number: an optional parent section number to filter the section tree
-    :param max_depth: the optional max depth of the section tree to list
-    :return: a list of section preview objects from the precedent document
+    :param parent_section_number: an optional parent section number to limit the output to only that parent section and its corresponding child sections (defaults to the root section if not provided)
+    :param max_depth: an optional max depth of child sections to include (defaults to no maximum depth to output all child sections under the parent section)
+    :return: a flattened list of ordered section preview objects containing section metadata (type, level, number) and a short preview of the section text
     """
 
     document = await _get_precedent_document(wrapper.context.db, filename)
@@ -234,17 +250,20 @@ async def get_precedent_section(
     wrapper: RunContextWrapper[AgentContext],
     filename: str,
     section_number: str,
-    include_children: bool = False,
+    include_children: bool = True,
     max_depth: Optional[int] = None
 ) -> str:
     """
-    Get the full text of a section from a precedent document
+    Get the full text of a section from a precedent document including its child sections (sub-sections in the original document).
+    You may include child sections to get the full text of sub-sections nested under the specified section.
+    You may limit the results by specifying a max depth to limit the depth of child sections included in the results.
+    Use this tool to retrieve the full text of a specific section from a precedent document including all of its sub-sections.
     
     :param filename: the filename of the precedent document to search
     :param section_number: the section number to retrieve
-    :param include_children: whether to include child sections
-    :param max_depth: the max depth of child sections to include
-    :return: a list of section text objects from the precedent document
+    :param include_children: whether to include sub-sections (defaults to True)
+    :param max_depth: an optional max depth of child sections to include (defaults to no maximum depth)
+    :return: a flattened list of ordered section objects containing section metadata (type, level, number) and the full section text
     """
 
     document = await _get_precedent_document(wrapper.context.db, filename)
@@ -258,11 +277,15 @@ async def search_precedent_sections(
     search_phrase: str
 ) -> str:
     """
-    Search for relevant sections in a precedent document using natural language
+    Search for relevant sections in a precedent document using a natural language search phrase.
+    The search is performed using embedding similarity to retrieve the most similar sections to the search phrase.
+    The search phrase should contain concepts, terms, and/or language relevant to the user's conceptual request.
+    The search phrase should be in conversational format and not limited to single words, prefixes, or suffixes.
+    Use this tool to search for relevant sections in a precedent document based on a conceptual request or question.
     
     :param filename: the filename of the precedent document to search
-    :param search_phrase: the natural language search phrase
-    :return: a list of matching section objects from the precedent document
+    :param search_phrase: natural language search phrase to match against precedent document sections via embedding similarity search
+    :return: a prettified JSON array of relevant sections ordered by similarity to the search phrase
     """
 
     document = await _get_precedent_document(wrapper.context.db, filename)
@@ -276,11 +299,14 @@ async def search_precedent_lines(
     pattern: str
 ) -> str:
     """
-    Search for matching text lines in a precedent document using regex
+    Search for matching lines in a precedent document using a regular expression pattern.
+    The pattern will be matched against each line of the precedent document text to find all matching lines. Matching is case-insensitive.
+    The pattern should be a valid regular expression containing keywords and/or exact terms.
+    Use this tool to find all occurrences of specific keywords or terms in the precedent document text.
     
     :param filename: the filename of the precedent document to search
-    :param pattern: the regular expression pattern to match
-    :return: a list of match objects from the precedent document
+    :param pattern: regular expression pattern to match against precedent document text lines
+    :return: a prettified JSON array of all matching lines containing the section number and line text for each match
     """
 
     document = await _get_precedent_document(wrapper.context.db, filename)
@@ -292,11 +318,13 @@ async def search_precedent_lines(
 @function_tool
 async def get_contract_annotations(wrapper: RunContextWrapper[AgentContext], annotation_type: Optional[AnnotationType] = None, section_number: Optional[str] = None) -> str:
     """
-    Get contract annotations optionally filtered by annotation type and section number
+    Get pending contract annotations optionally filtered by annotation type and section number.
+    You may filter the results by including a specific annotation type or section number.
+    Use this tool to review the current list of pending annotations before making new annotations or deleting existing annotations.
 
-    :param annotation_type: filter by annotation type (defaults to all annotation types)
-    :param section_number: filter by section number (defaults to all contract sections)
-    :return: a list of contract annotation objects
+    :param annotation_type: an optional annotation type to filter the results by (defaults to all annotation types)
+    :param section_number: an optional section number to filter the results by (defaults to all contract sections)
+    :return: a list of pending contract annotations with the annotation type and relevant section/text anchor information
     """
 
     if not wrapper.context.contract.annotations:
@@ -331,19 +359,24 @@ async def get_contract_annotations(wrapper: RunContextWrapper[AgentContext], ann
 
 
 @function_tool(docstring_style="sphinx", use_docstring_info=True)
-async def make_comment(wrapper: RunContextWrapper[AgentContext], section_number: str, anchor_text: str, comment_text: str) -> str:
+async def make_comment(
+    wrapper: RunContextWrapper[AgentContext], 
+    section_number: str, 
+    anchor_text: str,
+    comment_text: str
+) -> str:
     """
-    Make a new comment anchored to a specific contract section and text span.
+    Make a new comment anchored to a specific contract section and consecutive text span.
+    Comments must be anchored to a specific contract section and within-section consecutive text span.
+    The comment anchor text must be an exact, case-sensitive substring of the retrieved contract section text.
+    Comments are displayed in the application UI as highlights over the relevant anchor text with the comment text displayed in a tooltip.
+    Use this tool to attach feedback to specific contract text for human review, including risks, issues, concerns, questions, clarifications, etc.
+    Do not use this tool to suggest specific revisions to the contract text.
 
-    Comments must be anchored to a single contract section and within-section consecutive text span. 
-    The anchor text must exactly match the text as it appears in the retrieved contract section.
-    Comments are displayed in the UI as highlights over the anchor text with the comment text displayed in a tooltip.
-    Comments are stored in an annotations collection associated with the contract itself.
-
-    :param section_number: the section number of the contract to which the comment applies
-    :param anchor_text: the anchor text for the comment exactly as it appears in the retrieved contract section text
-    :param comment_text: the new comment text
-    :return: the newly created comment annotation object
+    :param section_number: the section number to which the comment applies
+    :param anchor_text: the anchor text for the comment (exact, case-sensitive substring of the retrieved section text)
+    :param comment_text: the new comment text that references the anchor text
+    :return: the newly created comment annotation object to be reviewed by the user in the application UI
     """
 
     # get/validate the relevant section node
@@ -377,19 +410,24 @@ async def make_comment(wrapper: RunContextWrapper[AgentContext], section_number:
 
 
 @function_tool(docstring_style="sphinx", use_docstring_info=True)
-async def make_revision(wrapper: RunContextWrapper[AgentContext], section_number: str, old_text: str, new_text: str) -> str:
+async def make_revision(
+    wrapper: RunContextWrapper[AgentContext], 
+    section_number: str, 
+    old_text: str, 
+    new_text: str
+) -> str:
     """
-    Make a new suggested revision anchored to a specific contract section and text span.
+    Make a new suggested revision anchored to a specific contract section and consecutive text span.
+    Suggested revisions must be anchored to a specific contract section and within-section consecutive text span.
+    The old text must be an exact, case-sensitive substring of the retrieved contract section text.
+    Suggested revisions are displayed in the application UI using strikethrough formatting for the old text and highlighting for the new text.
+    Use this tool to suggest specific revisions to a within-section consecutive text span based on the user's request.
+    Do not use this tool to make comments, ask questions, provide feedback, etc.
 
-    Suggested revisions must be anchored to a single contract section and within-section consecutive text span. 
-    The old text must exactly match the text as it appears in the retrieved contract section.
-    Suggested revisions are displayed in the UI using strikethrough formatting for the old text and highlighting for the new text.
-    Suggested revisions are stored in an annotations collection associated with the contract itself.
-
-    :param section_number: the section number of the contract to which the revision applies
-    :param old_text: the old text for the revision exactly as it appears in the retrieved contract section text
-    :param new_text: the new text for the revision
-    :return: the newly created suggested revision annotation object
+    :param section_number: the section number to which the revision applies
+    :param old_text: the old text to be replaced (exact, case-sensitive substring of the retrieved section text)
+    :param new_text: the new text to be inserted in place of the old text
+    :return: the newly created suggested revision annotation object to be reviewed by the user in the application UI
     """
 
     # get/validate the relevant section node
@@ -433,6 +471,8 @@ async def add_section(
 ) -> str:
     """
     Add a new section to the contract tree at a specific child index below an existing parent section.
+    You may add a new section below an existing parent section by providing the parent section number and insertion index.
+    Use this tool to add an entirely new clause or sub-section to the contract, as opposed to revising an existing section.
 
     :param parent_section_number: the number of the parent section to add the new section below
     :param insertion_index: the index of the new section in the parent section's children list
@@ -467,9 +507,14 @@ async def add_section(
 
 
 @function_tool
-async def remove_section(wrapper: RunContextWrapper[AgentContext], section_number: str) -> str:
+async def remove_section(
+    wrapper: RunContextWrapper[AgentContext], 
+    section_number: str
+) -> str:
     """
     Remove an existing section from the contract tree.
+    You may remove an existing section from the contract by providing the section number.
+    Use this tool to remove an entire clause or sub-section from the contract, as opposed to revising it.
 
     :param section_number: the number of the section to remove
     :return: the deleted section annotation object
@@ -484,7 +529,10 @@ async def remove_section(wrapper: RunContextWrapper[AgentContext], section_numbe
 @function_tool(docstring_style="sphinx", use_docstring_info=True)
 async def delete_contract_annotations(wrapper: RunContextWrapper[AgentContext], annotation_ids: list[str]) -> str:
     """
-    Delete one or more contract annotations by ID.
+    Delete one or more pending contract annotations by ID.
+    You may delete annotations that are no longer needed or relevant based on the user's request.
+    You may delete existing annotations to replace them with new annotations better aligned with the user's request.
+    Only pending annotations are eligible for deletion.
 
     :param annotation_ids: a list of annotation IDs to delete
     :return: the list of deleted annotation IDs and not found annotation IDs
@@ -511,11 +559,13 @@ async def delete_contract_annotations(wrapper: RunContextWrapper[AgentContext], 
         wrapper.context.contract.version += 1
         await persist_contract_changes(db=wrapper.context.db, contract=wrapper.context.contract)
     
-    result = {
-        "deleted_annotation_ids": [str(id) for id in deleted_annotation_ids], 
-        "not_found_annotation_ids": [str(id) for id in not_found_annotation_ids]
-    }
-    return json.dumps(result, indent=2)
+    result = AgentDeleteAnnotationsResponse(
+        status="applied", 
+        deleted_annotation_ids=[str(id) for id in deleted_annotation_ids], 
+        not_found_annotation_ids=[str(id) for id in not_found_annotation_ids]
+    )
+    return result.model_dump_json(indent=2)
+
 
 # standard clause/rules tools
 # ---------------------------
@@ -523,9 +573,10 @@ async def delete_contract_annotations(wrapper: RunContextWrapper[AgentContext], 
 @function_tool
 async def list_standard_clauses(wrapper: RunContextWrapper[AgentContext]) -> str:
     """
-    List the set of standard clauses in the standard clause library.
+    List the set of standard clauses from the organization's standard clause library.
+    Use this tool to get an overview of the organization's standard clauses to inform subsequent targeted clause retrievals.
 
-    :return: a list of standard clauses from the standard clause library
+    :return: a list of standard clause preview objects containing the clause ID, name, and description
     """
 
     result = await wrapper.context.db.execute(select(DBStandardClause).order_by(DBStandardClause.name))
@@ -537,10 +588,11 @@ async def list_standard_clauses(wrapper: RunContextWrapper[AgentContext]) -> str
 @function_tool
 async def get_standard_clause(wrapper: RunContextWrapper[AgentContext], clause_id: str) -> str:
     """
-    Get the full text and associated policy rules for a standard clause by ID.
+    Retrieve the full pre-approved standard clause text and associated policy rules for a specific standard clause.
+    Use this tool to retrieve a specific standard clause including the pre-approved clause text and associated policy rules.
 
     :param clause_id: the ID of the standard clause to retrieve
-    :return: the standard clause text and list of associated policy rules
+    :return: the standard clause object containing the clause ID, name, description, pre-approved clause text, and list of associated policy rules
     """
 
     result = await wrapper.context.db.execute(select(DBStandardClause).where(DBStandardClause.name == clause_id).options(selectinload(DBStandardClause.rules)))

@@ -86,6 +86,11 @@ class AgentAddSectionResponse(ConfiguredBaseModel):
 class AgentRemoveSectionResponse(ConfiguredBaseModel):
     status: Literal["applied", "rejected", "conflict"]
 
+class AgentDeleteAnnotationsResponse(ConfiguredBaseModel):
+    status: Literal["applied", "rejected", "conflict"]
+    deleted_annotation_ids: list[str]
+    not_found_annotation_ids: list[str]
+
 
 class AgentStandardClauseRule(ConfiguredBaseModel):
     severity: str

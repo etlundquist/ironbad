@@ -106,10 +106,10 @@ async def run_contract_agent(request: AgentRunRequest, db: AsyncSession = Depend
     # execute the agent run with the user's current input, conversation history, and dynamic agent context
     result = Runner.run_streamed(
         starting_agent=agent, 
-        conversation_id=chat_thread.openai_conversation_id,
         input=user_input, 
         context=agent_context,
-        max_turns=20
+        conversation_id=chat_thread.openai_conversation_id,
+        max_turns=25
     )
 
     # commit the initial user/assistant messages to the database and return the event stream response
