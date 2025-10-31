@@ -51,7 +51,8 @@ export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId
     fetchCurrentChatThreadAndMessages,
     sendMessage,
     handleNewChat,
-    messageProgress
+    messageProgress,
+    messageTodos
   } = useAgentChat(contractId, {
     onError: (title, message) => showToast({ type: 'error', title, message }),
     onToolCall: (toolName, toolCallId, toolCallArgs) => {
@@ -441,6 +442,7 @@ export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId
                         <AgentProgressPanel
                           message={msg}
                           progressSteps={messageProgress.get(msg.id) || []}
+                          todos={messageTodos.get(msg.id)}
                           isExpanded={expandedProgressPanels.has(msg.id)}
                           setExpanded={(expanded: boolean) => {
                             setExpandedProgressPanels(prev => {

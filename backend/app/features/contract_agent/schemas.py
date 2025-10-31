@@ -68,26 +68,26 @@ class AgentSectionRemoveAnnotation(ConfiguredBaseModel):
 
 
 class AgentCommentAnnotationResponse(ConfiguredBaseModel):
-    status: Literal["applied", "rejected", "conflict"]
+    status: Literal["success", "failure"]
     section_number: str
     anchor_text: str
     comment_text: str
 
 class AgentRevisionAnnotationResponse(ConfiguredBaseModel):
-    status: Literal["applied", "rejected", "conflict"]
+    status: Literal["success", "failure"]
     section_number: str
     old_text: str
     new_text: str
 
 class AgentAddSectionResponse(ConfiguredBaseModel):
-    status: Literal["applied", "rejected", "conflict"]
+    status: Literal["success", "failure"]
     section: Optional[AgentContractSection] = None
 
 class AgentRemoveSectionResponse(ConfiguredBaseModel):
-    status: Literal["applied", "rejected", "conflict"]
+    status: Literal["success", "failure"]
 
 class AgentDeleteAnnotationsResponse(ConfiguredBaseModel):
-    status: Literal["applied", "rejected", "conflict"]
+    status: Literal["success", "failure"]
     deleted_annotation_ids: list[str]
     not_found_annotation_ids: list[str]
 
@@ -214,6 +214,18 @@ class AgentReasoningSummaryEvent(ConfiguredBaseModel):
     reasoning_id: str
     reasoning_summary: str
 
+
+class AgentTodoItem(ConfiguredBaseModel):
+    id: str
+    content: str
+    status: Literal["pending", "in_progress", "completed", "cancelled"]
+
+class AgentTodoListUpdateEvent(ConfiguredBaseModel):
+    event: Literal["todo_list_update"] = "todo_list_update"
+    chat_thread_id: UUID
+    chat_message_id: UUID
+    todos: list[AgentTodoItem]
+
 # agent runtime context and event stream context schemas
 # ------------------------------------------------------
 
@@ -221,6 +233,7 @@ class AgentContext(ConfiguredBaseModel):
     db: AsyncSession
     contract: AnnotatedContract
     request: AgentRunRequest
+    todos: list[AgentTodoItem] = []
 
 class AgentEventStreamContext(ConfiguredBaseModel):
     db: AsyncSession

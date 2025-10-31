@@ -11,12 +11,12 @@ from sqlalchemy.orm import selectinload
 
 from app.models import Contract as DBContract, StandardClause as DBStandardClause
 from app.enums import AnnotationStatus, AnnotationType, ContractSectionType, AnnotationAuthor
-from app.utils.common import string_truncate
 from app.common.schemas import ContractSectionNode
+from app.utils.common import string_truncate
 
 from app.features.contract_annotations.schemas import AnnotatedContract, CommentAnnotation, NewCommentAnnotationRequest, NewRevisionAnnotationRequest, RevisionAnnotation, SectionAddAnnotation, SectionAddAnnotationRequest, SectionRemoveAnnotation, SectionRemoveAnnotationRequest
 from app.features.contract_agent.agent import AgentContext
-from app.features.contract_agent.schemas import AgentContractSectionPreview, AgentContractSection, AgentContractTextMatch, AgentCommentAnnotation, AgentDeleteAnnotationsResponse, AgentRevisionAnnotation, AgentSectionAddAnnotation, AgentSectionRemoveAnnotation, AgentCommentAnnotationResponse, AgentRevisionAnnotationResponse, AgentAddSectionResponse, AgentRemoveSectionResponse, AgentStandardClause, AgentStandardClausePreview, AgentStandardClauseRule
+from app.features.contract_agent.schemas import AgentContractSectionPreview, AgentContractSection, AgentContractTextMatch, AgentCommentAnnotation, AgentDeleteAnnotationsResponse, AgentRevisionAnnotation, AgentSectionAddAnnotation, AgentSectionRemoveAnnotation, AgentCommentAnnotationResponse, AgentRevisionAnnotationResponse, AgentAddSectionResponse, AgentRemoveSectionResponse, AgentStandardClause, AgentStandardClausePreview, AgentStandardClauseRule, AgentTodoItem
 from app.features.contract_agent.services import flatten_section_tree, get_relevant_sections, persist_contract_changes
 from app.features.contract_annotations.services import handle_make_comment, handle_make_revision, handle_section_add, handle_section_remove
 
@@ -315,7 +315,7 @@ async def search_precedent_lines(
 # contract annotation tools
 # -------------------------
 
-@function_tool
+@function_tool(docstring_style="sphinx", use_docstring_info=True)
 async def get_contract_annotations(wrapper: RunContextWrapper[AgentContext], annotation_type: Optional[AnnotationType] = None, section_number: Optional[str] = None) -> str:
     """
     Get pending contract annotations optionally filtered by annotation type and section number.
@@ -367,11 +367,8 @@ async def make_comment(
 ) -> str:
     """
     Make a new comment anchored to a specific contract section and consecutive text span.
-    Comments must be anchored to a specific contract section and within-section consecutive text span.
     The comment anchor text must be an exact, case-sensitive substring of the retrieved contract section text.
-    Comments are displayed in the application UI as highlights over the relevant anchor text with the comment text displayed in a tooltip.
-    Use this tool to attach feedback to specific contract text for human review, including risks, issues, concerns, questions, clarifications, etc.
-    Do not use this tool to suggest specific revisions to the contract text.
+    Use this tool to attach feedback to specific contract text spans for human review, including risks, issues, concerns, questions, clarifications, etc.
 
     :param section_number: the section number to which the comment applies
     :param anchor_text: the anchor text for the comment (exact, case-sensitive substring of the retrieved section text)
@@ -404,7 +401,7 @@ async def make_comment(
     try:
         handle_make_comment(contract=wrapper.context.contract, request=request)
         await persist_contract_changes(db=wrapper.context.db, contract=wrapper.context.contract)
-        return AgentCommentAnnotationResponse(status="applied", section_number=section_number, anchor_text=anchor_text, comment_text=comment_text).model_dump_json(indent=2)
+        return AgentCommentAnnotationResponse(status="success", section_number=section_number, anchor_text=anchor_text, comment_text=comment_text).model_dump_json(indent=2)
     except Exception as e:
         raise ValueError(f"failed to apply comment: {e}")
 
@@ -418,11 +415,8 @@ async def make_revision(
 ) -> str:
     """
     Make a new suggested revision anchored to a specific contract section and consecutive text span.
-    Suggested revisions must be anchored to a specific contract section and within-section consecutive text span.
     The old text must be an exact, case-sensitive substring of the retrieved contract section text.
-    Suggested revisions are displayed in the application UI using strikethrough formatting for the old text and highlighting for the new text.
-    Use this tool to suggest specific revisions to a within-section consecutive text span based on the user's request.
-    Do not use this tool to make comments, ask questions, provide feedback, etc.
+    Use this tool to edit specific contract text spans to add/remove/modify terms and conditions based on the user's request.
 
     :param section_number: the section number to which the revision applies
     :param old_text: the old text to be replaced (exact, case-sensitive substring of the retrieved section text)
@@ -455,12 +449,12 @@ async def make_revision(
     try:
         handle_make_revision(contract=wrapper.context.contract, request=request)
         await persist_contract_changes(db=wrapper.context.db, contract=wrapper.context.contract)
-        return AgentRevisionAnnotationResponse(status="applied", section_number=section_number, old_text=old_text, new_text=new_text).model_dump_json(indent=2)
+        return AgentRevisionAnnotationResponse(status="success", section_number=section_number, old_text=old_text, new_text=new_text).model_dump_json(indent=2)
     except Exception as e:
         raise ValueError(f"failed to apply revision: {e}")
 
 
-@function_tool
+@function_tool(docstring_style="sphinx", use_docstring_info=True)
 async def add_section(
     wrapper: RunContextWrapper[AgentContext], 
     parent_section_number: str,
@@ -503,10 +497,11 @@ async def add_section(
     response = handle_section_add(contract=wrapper.context.contract, request=request)
     await persist_contract_changes(db=wrapper.context.db, contract=wrapper.context.contract)
     section = AgentContractSection(type=new_node.type, level=new_node.level, section_number=new_node.number, section_text=new_node.markdown)
-    return AgentAddSectionResponse(status=response.status, section=section).model_dump_json(indent=2)
+    status = "success" if response.status == "applied" else "failure"
+    return AgentAddSectionResponse(status=status, section=section).model_dump_json(indent=2)
 
 
-@function_tool
+@function_tool(docstring_style="sphinx", use_docstring_info=True)
 async def remove_section(
     wrapper: RunContextWrapper[AgentContext], 
     section_number: str
@@ -523,7 +518,8 @@ async def remove_section(
     request = SectionRemoveAnnotationRequest(node_id=section_number, author=AnnotationAuthor.AGENT)
     response = handle_section_remove(contract=wrapper.context.contract, request=request)
     await persist_contract_changes(db=wrapper.context.db, contract=wrapper.context.contract)
-    return AgentRemoveSectionResponse(status=response.status).model_dump_json(indent=2)
+    status = "success" if response.status == "applied" else "failure"
+    return AgentRemoveSectionResponse(status=status).model_dump_json(indent=2)
 
 
 @function_tool(docstring_style="sphinx", use_docstring_info=True)
@@ -532,7 +528,6 @@ async def delete_contract_annotations(wrapper: RunContextWrapper[AgentContext], 
     Delete one or more pending contract annotations by ID.
     You may delete annotations that are no longer needed or relevant based on the user's request.
     You may delete existing annotations to replace them with new annotations better aligned with the user's request.
-    Only pending annotations are eligible for deletion.
 
     :param annotation_ids: a list of annotation IDs to delete
     :return: the list of deleted annotation IDs and not found annotation IDs
@@ -560,7 +555,7 @@ async def delete_contract_annotations(wrapper: RunContextWrapper[AgentContext], 
         await persist_contract_changes(db=wrapper.context.db, contract=wrapper.context.contract)
     
     result = AgentDeleteAnnotationsResponse(
-        status="applied", 
+        status="success", 
         deleted_annotation_ids=[str(id) for id in deleted_annotation_ids], 
         not_found_annotation_ids=[str(id) for id in not_found_annotation_ids]
     )
@@ -570,11 +565,11 @@ async def delete_contract_annotations(wrapper: RunContextWrapper[AgentContext], 
 # standard clause/rules tools
 # ---------------------------
 
-@function_tool
+@function_tool(docstring_style="sphinx", use_docstring_info=True)
 async def list_standard_clauses(wrapper: RunContextWrapper[AgentContext]) -> str:
     """
     List the set of standard clauses from the organization's standard clause library.
-    Use this tool to get an overview of the organization's standard clauses to inform subsequent targeted clause retrievals.
+    Use this tool to get an overview of the organization's standard clauses to inform subsequent targeted standard clause retrievals.
 
     :return: a list of standard clause preview objects containing the clause ID, name, and description
     """
@@ -585,7 +580,7 @@ async def list_standard_clauses(wrapper: RunContextWrapper[AgentContext]) -> str
     return json.dumps([json.loads(clause.model_dump_json()) for clause in standard_clauses], indent=2)
 
 
-@function_tool
+@function_tool(docstring_style="sphinx", use_docstring_info=True)
 async def get_standard_clause(wrapper: RunContextWrapper[AgentContext], clause_id: str) -> str:
     """
     Retrieve the full pre-approved standard clause text and associated policy rules for a specific standard clause.
@@ -603,3 +598,57 @@ async def get_standard_clause(wrapper: RunContextWrapper[AgentContext], clause_i
     standard_clause_rules = [AgentStandardClauseRule(severity=rule.severity.value, text=rule.text) for rule in db_standard_clause.rules]
     standard_clause = AgentStandardClause(id=db_standard_clause.name, name=db_standard_clause.display_name, description=db_standard_clause.description, standard_text=db_standard_clause.standard_text, rules=standard_clause_rules)
     return json.dumps(json.loads(standard_clause.model_dump_json()), indent=2)
+
+# todo list tool
+# ---------------
+
+@function_tool(docstring_style="sphinx", use_docstring_info=True)
+async def todo_write(
+    wrapper: RunContextWrapper[AgentContext],
+    merge: bool,
+    todos: list[AgentTodoItem]
+) -> str:
+    """
+    Create, update, or delete todo items to manage and track progress on complex multi-step tasks.
+    Use this tool proactively for complex tasks requiring 3+ distinct steps to organize work and demonstrate thoroughness.
+    Each todo item must include: id (unique identifier), content (task description), and status (pending/in_progress/completed/cancelled).
+    
+    When to use:
+    - complex multi-step tasks (3+ distinct steps)
+    - non-trivial tasks requiring careful planning
+    - after receiving new instructions (use merge=False to create new todos)
+    - after completing tasks (use merge=True to mark complete and add follow-ups)
+    - when starting new tasks (mark as in_progress, ideally only one at a time)
+    
+    When NOT to use:
+    - single, straightforward tasks
+    - trivial tasks completable in < 3 steps
+    - purely informational requests
+    
+    Task Management Guidelines:
+    - update status in real-time as you work
+    - mark complete IMMEDIATELY after finishing
+    - only ONE task in_progress at a time
+    - complete current tasks before starting new ones
+    
+    :param merge: if True, merge/update existing todos by id; if False, replace all todos with the new list
+    :param todos: array of todo items with id, content, and status fields
+    :return: the updated todo list in JSON format
+    """
+    
+    if len(todos) < 2:
+        raise ValueError("Todo list must contain at least 2 items for complex tasks")
+    
+    # Convert input items to internal AgentTodoItem format
+    new_todos = [AgentTodoItem(id=todo.id, content=todo.content, status=todo.status) for todo in todos]
+    
+    if merge:
+        existing_todos_dict = {todo.id: todo for todo in wrapper.context.todos}
+        for new_todo in new_todos:
+            existing_todos_dict[new_todo.id] = new_todo
+        wrapper.context.todos = list(existing_todos_dict.values())
+    else:
+        wrapper.context.todos = new_todos
+    
+    return json.dumps([json.loads(todo.model_dump_json()) for todo in wrapper.context.todos], indent=2)
+    

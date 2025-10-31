@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { AgentChatMessage, AgentChatMessageStatus } from '../../lib/types/agent'
+import { AgentChatMessage, AgentChatMessageStatus, AgentTodoItem } from '../../lib/types/agent'
 
 interface ProgressStep {
   type: 'tool_call' | 'reasoning'
@@ -10,11 +10,12 @@ interface ProgressStep {
 interface AgentProgressPanelProps {
   message: AgentChatMessage
   progressSteps: ProgressStep[]
+  todos?: AgentTodoItem[]
   isExpanded: boolean
   setExpanded: (expanded: boolean) => void
 }
 
-export function AgentProgressPanel({ message, progressSteps, isExpanded, setExpanded }: AgentProgressPanelProps) {
+export function AgentProgressPanel({ message, progressSteps, todos, isExpanded, setExpanded }: AgentProgressPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
   const userInteractedRef = useRef(false)
   const isInProgress = message.status === 'in_progress' || message.status === 'responding'
@@ -89,6 +90,26 @@ export function AgentProgressPanel({ message, progressSteps, isExpanded, setExpa
     return toolIcons[toolName] || '🔧'
   }
 
+  const getTodoIcon = (status: AgentTodoItem['status']): string => {
+    switch (status) {
+      case 'completed': return '✅'
+      case 'in_progress': return '🔄'
+      case 'cancelled': return '❌'
+      case 'pending': return '⏳'
+      default: return '◻️'
+    }
+  }
+
+  const getTodoColor = (status: AgentTodoItem['status']): string => {
+    switch (status) {
+      case 'completed': return '#10b981'
+      case 'in_progress': return '#3b82f6'
+      case 'cancelled': return '#6b7280'
+      case 'pending': return '#fbbf24'
+      default: return '#9ca3af'
+    }
+  }
+
   return (
     <div className="agent-progress-panel" ref={panelRef}>
       <div 
@@ -131,7 +152,52 @@ export function AgentProgressPanel({ message, progressSteps, isExpanded, setExpa
             overflowY: 'auto'
           }}
         >
-          {progressSteps.length === 0 ? (
+          {/* Todo List at the top */}
+          {todos && todos.length > 0 && (
+            <div style={{
+              padding: '12px',
+              borderBottom: '2px solid #374151',
+              backgroundColor: '#0f172a'
+            }}>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                marginBottom: '8px',
+                color: '#a78bfa',
+                fontWeight: 'bold'
+              }}>
+                <span style={{ marginRight: '6px' }}>📋</span>
+                <span>Task Plan</span>
+              </div>
+              {todos.map((todo, index) => (
+                <div 
+                  key={todo.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    marginBottom: index < todos.length - 1 ? '6px' : '0',
+                    paddingLeft: '20px',
+                    color: getTodoColor(todo.status),
+                    fontSize: '11px'
+                  }}
+                >
+                  <span style={{ marginRight: '6px', minWidth: '16px' }}>
+                    {getTodoIcon(todo.status)}
+                  </span>
+                  <span style={{ 
+                    flex: 1,
+                    textDecoration: todo.status === 'completed' ? 'line-through' : 'none',
+                    opacity: todo.status === 'cancelled' ? 0.5 : 1
+                  }}>
+                    {todo.content}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Progress Steps (chronological order - most recent at bottom) */}
+          {progressSteps.length === 0 && (!todos || todos.length === 0) ? (
             <div style={{
               padding: '12px',
               color: '#9ca3af',

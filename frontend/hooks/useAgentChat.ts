@@ -11,7 +11,9 @@ import {
   AgentRunMessageTokenDeltaEvent,
   AgentToolCallEvent,
   AgentToolCallOutputEvent,
-  AgentReasoningSummaryEvent
+  AgentReasoningSummaryEvent,
+  AgentTodoListUpdateEvent,
+  AgentTodoItem
 } from '../lib/types'
 import { fetchCurrentAgentThread, fetchAgentThreadMessages, runAgent } from '../lib/api'
 
@@ -30,6 +32,7 @@ export function useAgentChat(contractId: string | undefined, options?: UseAgentC
   const [isSendingMessage, setIsSendingMessage] = useState(false)
   const [chatInput, setChatInput] = useState('')
   const [messageProgress, setMessageProgress] = useState<Map<string, Array<{type: 'tool_call' | 'reasoning', data: any, timestamp: number}>>>(new Map())
+  const [messageTodos, setMessageTodos] = useState<Map<string, AgentTodoItem[]>>(new Map())
   const chatAbortControllerRef = useRef<AbortController | null>(null)
   const chatEndRef = useRef<HTMLDivElement | null>(null)
 
@@ -142,6 +145,15 @@ export function useAgentChat(contractId: string | undefined, options?: UseAgentC
           return newMap
         })
         options?.onReasoningSummary?.(reasoningEvent.reasoning_id, reasoningEvent.reasoning_summary)
+        break
+
+      case 'todo_list_update':
+        const todoEvent = event as AgentTodoListUpdateEvent
+        setMessageTodos(prev => {
+          const newMap = new Map(prev)
+          newMap.set(todoEvent.chat_message_id, todoEvent.todos)
+          return newMap
+        })
         break
 
       case 'run_completed':
@@ -283,6 +295,7 @@ export function useAgentChat(contractId: string | undefined, options?: UseAgentC
     fetchCurrentChatThreadAndMessages,
     sendMessage,
     handleNewChat,
-    messageProgress
+    messageProgress,
+    messageTodos
   }
 }

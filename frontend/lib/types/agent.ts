@@ -108,6 +108,19 @@ export interface AgentReasoningSummaryEvent {
   reasoning_summary: string
 }
 
+export interface AgentTodoItem {
+  id: string
+  content: string
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled'
+}
+
+export interface AgentTodoListUpdateEvent {
+  event: 'todo_list_update'
+  chat_thread_id: string
+  chat_message_id: string
+  todos: AgentTodoItem[]
+}
+
 export type AgentRunEvent = 
   | AgentRunCreatedEvent
   | AgentRunCompletedEvent
@@ -118,3 +131,4 @@ export type AgentRunEvent =
   | AgentToolCallEvent
   | AgentToolCallOutputEvent
   | AgentReasoningSummaryEvent
+  | AgentTodoListUpdateEvent

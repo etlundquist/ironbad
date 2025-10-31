@@ -11,7 +11,7 @@ from agents.items import  MessageOutputItem, ToolCallItem, ToolCallOutputItem, R
 
 from app.enums import ChatMessageStatus
 from app.models import AgentChatMessage as DBAgentChatMessage, AgentChatThread as DBAgentChatThread
-from app.features.contract_agent.schemas import AgentEventStreamContext, AgentChatThread, AgentChatMessage, AgentRunCreatedEvent, AgentRunMessageStatusUpdateEvent, AgentRunMessageTokenDeltaEvent, AgentRunFailedEvent, AgentRunCompletedEvent, AgentRunCancelledEvent, AgentToolCallEvent, AgentToolCallOutputEvent, AgentReasoningSummaryEvent, ResponseCitationsAttachment
+from app.features.contract_agent.schemas import AgentEventStreamContext, AgentChatThread, AgentChatMessage, AgentRunCreatedEvent, AgentRunMessageStatusUpdateEvent, AgentRunMessageTokenDeltaEvent, AgentRunFailedEvent, AgentRunCompletedEvent, AgentRunCancelledEvent, AgentToolCallEvent, AgentToolCallOutputEvent, AgentReasoningSummaryEvent, AgentTodoListUpdateEvent, AgentTodoItem, ResponseCitationsAttachment
 from app.features.contract_agent.services import extract_response_citations
 
 
@@ -31,6 +31,9 @@ async def handle_event_stream(event_stream: AsyncIterator[StreamEvent], context:
         assistant_message=AgentChatMessage.model_validate(assistant_message)
     )
     yield ServerSentEvent(event=run_created_event.event, data=run_created_event.model_dump_json())
+
+    # track tool names by call_id to identify todo_write outputs
+    tool_call_names: dict[str, str] = {}
 
     try:
 
@@ -80,24 +83,43 @@ async def handle_event_stream(event_stream: AsyncIterator[StreamEvent], context:
             # handle the (high-level) agent run item stream events
             elif isinstance(event, RunItemStreamEvent):
                 if isinstance(event.item, ToolCallItem):
+                    # track the tool name for this call_id
+                    tool_call_id = event.item.raw_item.call_id
+                    tool_name = event.item.raw_item.name
+                    tool_call_names[tool_call_id] = tool_name
                     # send a tool call event to the client with the tool name and call id/args
                     sse_event = AgentToolCallEvent(
                         chat_thread_id=context.chat_thread_id,
                         chat_message_id=context.assistant_message_id,
-                        tool_name=event.item.raw_item.name, 
-                        tool_call_id=event.item.raw_item.call_id, 
+                        tool_name=tool_name, 
+                        tool_call_id=tool_call_id, 
                         tool_call_args=json.loads(event.item.raw_item.arguments)
                     )
                     yield ServerSentEvent(event=sse_event.event, data=sse_event.model_dump_json())
                 elif isinstance(event.item, ToolCallOutputItem):
+                    tool_call_id = event.item.raw_item["call_id"]
+                    tool_call_output = str(event.item.raw_item["output"])
                     # send a tool call output event to the client with the tool call id and tool call output
                     sse_event = AgentToolCallOutputEvent(
                         chat_thread_id=context.chat_thread_id,
                         chat_message_id=context.assistant_message_id,
-                        tool_call_id=event.item.raw_item["call_id"], 
-                        tool_call_output=str(event.item.raw_item["output"])
+                        tool_call_id=tool_call_id, 
+                        tool_call_output=tool_call_output
                     )
                     yield ServerSentEvent(event=sse_event.event, data=sse_event.model_dump_json())
+                    # if this is a todo_write output, parse and send todo list update event
+                    if tool_call_names.get(tool_call_id) == "todo_write":
+                        try:
+                            todos_json = json.loads(tool_call_output)
+                            todos = [AgentTodoItem.model_validate(todo) for todo in todos_json]
+                            todo_event = AgentTodoListUpdateEvent(
+                                chat_thread_id=context.chat_thread_id,
+                                chat_message_id=context.assistant_message_id,
+                                todos=todos
+                            )
+                            yield ServerSentEvent(event=todo_event.event, data=todo_event.model_dump_json())
+                        except (json.JSONDecodeError, ValueError) as e:
+                            logger.warning(f"Failed to parse todo_write output: {e}")
                 elif isinstance(event.item, ReasoningItem):
                     # send a reasoning summary event to the client with the reasoning id and summary
                     sse_event = AgentReasoningSummaryEvent(

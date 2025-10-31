@@ -2,9 +2,11 @@ import json
 
 from agents import Agent, RunContextWrapper
 from agents.model_settings import Reasoning, ModelSettings
+from sqlalchemy import select
 
 from app.core.config import settings
-from app.features.contract_agent.schemas import AgentContext, AgentContractSectionPreview
+from app.models import StandardClause as DBStandardClause
+from app.features.contract_agent.schemas import AgentContext, AgentContractSectionPreview, AgentStandardClausePreview
 from app.features.contract_agent.services import flatten_section_tree
 from app.utils.common import string_truncate
 
@@ -23,8 +25,8 @@ from app.features.contract_agent.tools import (
     make_revision, 
     add_section, 
     remove_section,
-    list_standard_clauses,
-    get_standard_clause
+    get_standard_clause,
+    todo_write
 )
 from app.prompts import PROMPT_REDLINE_AGENT
 
@@ -48,8 +50,21 @@ async def resolve_agent_instructions(wrapper: RunContextWrapper[AgentContext], a
     ]
     top_level_sections = json.dumps([json.loads(section.model_dump_json()) for section in top_level_sections], indent=2)
 
-    # resolve the agent instructions by injecting the contract-specific summary and top-level section previews
-    agent_instructions = PROMPT_REDLINE_AGENT.format(contract_summary=contract_summary, top_level_sections=top_level_sections)
+    # retrieve the standard clause previews (id, name, description only)
+    result = await wrapper.context.db.execute(select(DBStandardClause).order_by(DBStandardClause.name))
+    db_standard_clauses = result.scalars().all()
+    standard_clauses = [
+        AgentStandardClausePreview(
+            id=clause.name, 
+            name=clause.display_name, 
+            description=clause.description
+        ) 
+        for clause in db_standard_clauses
+    ]
+    standard_clauses = json.dumps([json.loads(clause.model_dump_json()) for clause in standard_clauses], indent=2)  
+
+    # resolve the agent instructions by injecting the contract-specific summary, top-level section previews, and standard clause list
+    agent_instructions = PROMPT_REDLINE_AGENT.format(contract_summary=contract_summary, top_level_sections=top_level_sections, standard_clauses=standard_clauses)
     return agent_instructions
 
 
@@ -62,6 +77,7 @@ agent = Agent[AgentContext](
     instructions=resolve_agent_instructions,
     model_settings=model_settings,
     tools=[
+        todo_write,
         list_contract_sections, 
         get_contract_section, 
         search_contract_sections, 
@@ -76,7 +92,6 @@ agent = Agent[AgentContext](
         make_revision, 
         add_section,
         remove_section,
-        list_standard_clauses,
         get_standard_clause
     ]
 )
