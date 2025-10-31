@@ -1,0 +1,108 @@
+standard_clauses:
+
+  - name: liability_limits
+    display_name: Limitation of Liability
+    description: Aggregate liability cap with uncapped carve-outs for IP infringement, confidentiality, data privacy/security, gross negligence or willful misconduct, and indemnification.
+    standard_text: |
+      EXCEPT AS OTHERWISE PROVIDED HEREIN, SUPPLIER'S AGGREGATE LIABILITY ARISING OUT OF OR RELATED TO THIS AGREEMENT, WHETHER IN CONTRACT, TORT, OR UNDER ANY OTHER THEORY OF LIABILITY, SHALL NOT EXCEED THE GREATER OF (I) THE TOTAL FEES PAID BY CUSTOMER HEREUNDER DURING THE TWELVE (12) MONTH PERIOD IMMEDIATELY PRECEDING THE EVENT GIVING RISE TO SUCH LIABILITY, OR (II) FIVE HUNDRED THOUSAND DOLLARS ($500,000).
+      THE FOREGOING LIMITATION SHALL NOT APPLY TO AND SUPPLIER SHALL HAVE UNLIMITED LIABILITY FOR: (A) BREACHES OF CONFIDENTIALITY OBLIGATIONS SET FORTH IN THIS AGREEMENT; (B) INFRINGEMENT OR MISAPPROPRIATION OF INTELLECTUAL PROPERTY RIGHTS; (C) VIOLATIONS OF DATA PRIVACY OR SECURITY OBLIGATIONS; (D) ACTS OF GROSS NEGLIGENCE OR WILLFUL MISCONDUCT; AND (E) INDEMNIFICATION OBLIGATIONS HEREUNDER.
+      EXCEPT WITH RESPECT TO THE EXCLUDED CLAIMS SET FORTH ABOVE, NEITHER PARTY SHALL BE LIABLE TO THE OTHER FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING WITHOUT LIMITATION LOSS OF PROFITS, REVENUE, DATA, OR BUSINESS OPPORTUNITIES, EVEN IF SUCH PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+  - name: indemnification
+    display_name: Indemnification
+    description: Supplier's obligation to defend, indemnify, and hold harmless Customer for third-party claims (IP infringement, data/privacy breaches, gross negligence/willful misconduct).
+    standard_text: |
+      Supplier shall indemnify, defend, and hold harmless Customer and its officers, directors, employees, and agents from and against any and all third-party claims, suits, proceedings, damages, losses, liabilities, costs, and expenses (including reasonable attorneys' fees) arising out of or relating to: (a) any actual or alleged infringement or misappropriation of any intellectual property right by the Software or Services provided hereunder; (b) Supplier's breach of its data security, privacy, or confidentiality obligations under this Agreement; (c) Supplier's gross negligence, willful misconduct, or violation of applicable law; and (d) any claim that Supplier's performance of its obligations hereunder violates any third party's rights.
+      Customer shall indemnify, defend, and hold harmless Supplier from and against claims arising solely from Customer's use of the Software in a manner that violates the express terms of this Agreement or applicable law, provided that such use was not caused by Supplier's breach or any defect in the Software.
+      The indemnification obligations set forth in this Section shall not be subject to or limited by any limitation of liability provisions contained elsewhere in this Agreement.
+
+  - name: termination
+    display_name: Termination
+    description: Grounds and process for termination (for cause and for convenience), refunds, and data return.
+    standard_text: |
+      Customer may terminate this Agreement for convenience at any time upon thirty (30) days' prior written notice to Supplier. 
+      In the event of such termination for convenience, Supplier shall refund to Customer, within thirty (30) days of the effective date of termination, a pro-rata portion of any prepaid fees corresponding to the unused portion of the then-current Subscription Term.
+      Either party may terminate this Agreement immediately upon written notice to the other party if the other party materially breaches any provision of this Agreement and fails to cure such breach within thirty (30) days after receipt of written notice specifying the breach.
+      Upon termination or expiration of this Agreement for any reason, Supplier shall: (i) promptly return to Customer or, at Customer's election, destroy all Customer Data in Supplier's possession or control; and (ii) provide Customer with a complete copy of all Customer Data in a mutually agreed standard, machine-readable format at no additional charge. 
+      Customer shall have the right to access and retrieve Customer Data for a period of thirty (30) days following the effective date of termination.
+
+  - name: service_levels
+    display_name: Service Levels
+    description: Uptime commitments, support response times, service credits, and breach consequences.
+    standard_text: |
+      Supplier shall use commercially reasonable efforts to make the Software available with an uptime percentage of at least ninety-nine and five-tenths percent (99.5%) during each calendar month, measured from Supplier's monitoring systems, excluding scheduled maintenance windows (for which Supplier shall provide at least seven (7) days' prior notice).
+      In the event that the uptime percentage falls below 99.5% in any calendar month, Customer shall be entitled to receive service credits equal to ten percent (10%) of the monthly subscription fees for each full percentage point below the 99.5% threshold, up to a maximum credit of one hundred percent (100%) of the monthly fees for such month.
+      Supplier shall provide technical support with the following maximum initial response times: Severity 1 (Critical) issues: one (1) hour; Severity 2 (High) issues: four (4) hours; Severity 3 (Normal) issues: one (1) business day. 
+      "Response time" shall mean the time from Customer's submission of a support request until Supplier's initial acknowledgment and assignment to qualified technical personnel.
+      Service credits shall be automatically applied to Customer's next invoice. 
+      The service credit remedy shall be Customer's sole and exclusive remedy for Supplier's failure to meet the service levels set forth herein, except that repeated or prolonged failures to meet service levels may constitute a material breach entitling Customer to terminate this Agreement.
+
+  - name: data_privacy
+    display_name: Data Protection and Security
+    description: Data ownership, processing instructions, privacy law compliance, security safeguards, and breach notification.
+    standard_text: |
+      As between the parties, Customer retains all right, title, and interest in and to all Customer Data. 
+      Supplier shall process Customer Data solely for the purpose of providing the Services in accordance with this Agreement and Customer's documented instructions, and shall not use, disclose, or access Customer Data for any other purpose.
+      Supplier shall comply with all applicable data protection and privacy laws, statutes, and regulations, including without limitation the General Data Protection Regulation (GDPR), the California Consumer Privacy Act (CCPA), and any other data protection laws applicable to Customer's business or Customer Data. 
+      Supplier shall execute any data processing addenda or business associate agreements reasonably required by Customer to comply with such laws.
+      Supplier shall implement and maintain administrative, physical, and technical safeguards designed to protect Customer Data against unauthorized or unlawful processing, accidental loss, destruction, or damage. 
+      Such safeguards shall be consistent with industry standards and shall be no less rigorous than those Supplier uses to protect its own confidential information.
+      In the event of any unauthorized access, use, or disclosure of Customer Data, or any other breach of security affecting Customer Data (each, a "Security Incident"), Supplier shall: (i) notify Customer without undue delay and in no event later than twenty-four (24) hours after becoming aware of such Security Incident; (ii) provide Customer with sufficient information to allow Customer to meet any reporting obligations it may have under applicable law; (iii) take all reasonable steps to mitigate the effects of the Security Incident and prevent further unauthorized access; and (iv) cooperate with Customer in investigating and remediating the Security Incident, at Supplier's sole cost and expense.
+
+  - name: warranties
+    display_name: Representations and Warranties
+    description: Supplier representations and software warranties; compliance and non-infringement; disclaimer scope; remedies.
+    standard_text: |
+      Supplier represents and warrants that: (a) the Software will perform materially in accordance with the Documentation provided by Supplier and will be free from material defects, viruses, malicious code, or other harmful components; (b) Supplier has all necessary rights, title, and authority to grant the licenses and rights set forth in this Agreement; (c) the Software and the provision of Services hereunder do not and will not infringe, misappropriate, or otherwise violate any intellectual property rights or other proprietary rights of any third party; (d) the Software and Services will comply in all material respects with all applicable federal, state, and local laws, rules, and regulations; and (e) Supplier will perform the Services in a professional and workmanlike manner consistent with industry standards.
+      In the event the Software or Services fail to conform to the foregoing warranties, Supplier shall, as Customer's sole and exclusive remedy, use commercially reasonable efforts to correct the non-conformity within thirty (30) days of receiving written notice thereof. 
+      If Supplier is unable to correct such non-conformity within such thirty (30) day period, Customer may, at its option, terminate this Agreement and receive a full refund of all fees paid to Supplier during the twelve (12) month period preceding the date of termination.
+      THE EXPRESS WARRANTIES SET FORTH IN THIS SECTION ARE IN LIEU OF, AND SUPPLIER DISCLAIMS, ALL OTHER WARRANTIES, WHETHER EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE, INCLUDING WITHOUT LIMITATION ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT.
+
+  - name: ip_license
+    display_name: License
+    description: Scope of license, permitted users (employees, contractors, affiliates), restrictions, integrations/backups, and wind-down access.
+    standard_text: |
+      Subject to the terms and conditions of this Agreement and Customer's payment of all applicable fees, Supplier hereby grants to Customer a non-exclusive, non-transferable, worldwide license to use the Software solely for Customer's internal business purposes. 
+      For perpetual licenses, such license shall continue in perpetuity; for subscription licenses, such license shall continue for the Subscription Term.
+      Customer may permit the Software to be accessed and used by its employees, contractors, and affiliates without restriction as to the number of users, installations, or geographic locations, provided that all such use remains within the scope of Customer's internal business purposes and subject to any usage-based fees set forth in the applicable Order Form.
+      Customer shall have the right to: (i) make reasonable copies of the Software for backup, archival, and disaster recovery purposes; (ii) customize user interfaces and workflows to meet Customer's business requirements; and (iii) integrate the Software with Customer's other systems and third-party applications. 
+      No additional licenses or fees shall be required for such activities.
+      In the case of subscription licenses, upon expiration or termination of this Agreement, Customer shall retain a limited wind-down license to access and use the Software in read-only mode for a period of ninety (90) days solely for the purpose of extracting Customer Data and transitioning to alternative solutions.
+
+  - name: payment_terms
+    display_name: Fees and Payment
+    description: Invoicing, payment timing, dispute rights, and limits on fee increases.
+    standard_text: |
+      Customer shall pay all undisputed fees within thirty (30) days of the date of invoice. 
+      Supplier shall issue invoices to Customer no less than thirty (30) days prior to the date on which payment is due. 
+      All invoices shall include sufficient detail to allow Customer to verify the accuracy of the charges.
+      Customer shall have the right to dispute any invoice, in good faith, by providing written notice to Supplier within thirty (30) days of receipt of such invoice, specifying in reasonable detail the basis for the dispute. Supplier shall not suspend or terminate the Services, or charge late fees or interest, during the pendency of any good faith dispute. 
+      The parties shall work together in good faith to resolve any disputed charges within thirty (30) days.
+      All fees set forth in the applicable Order Form are fixed and shall not be increased during the Initial Term. 
+      Upon any renewal of this Agreement, Supplier may increase the then-current fees by no more than five percent (5%) per year, provided that Supplier provides Customer with written notice of any such increase at least ninety (90) days prior to the commencement of the applicable renewal term.
+      All fees set forth in this Agreement are exclusive of any applicable sales, use, or other transactional taxes. 
+      Customer shall be responsible for all such taxes (excluding taxes based on Supplier's net income), if any. 
+      Supplier shall include any applicable taxes as separate line items on its invoices to Customer.
+
+  - name: term
+    display_name: Term
+    description: Initial term, renewal conditions, opt-out and notice requirements.
+    standard_text: |
+      This agreement is effective as of the Effective Date and will remain in effect until terminated in accordance with its terms.
+      Upon expiration of the Initial Term, this Agreement shall automatically renew for successive one (1) year periods (each, a "Renewal Term," and together with the Initial Term, the "Term"), unless either party provides written notice of non-renewal to the other party at least ninety (90) days prior to the expiration of the then-current Term.
+      Supplier shall provide Customer with written notice of the upcoming renewal at least one hundred twenty (120) days prior to the expiration of the then-current Term. 
+      Such notice shall clearly state the renewal terms, including any changes to fees, and the deadline by which Customer must provide notice of non-renewal.
+
+  - name: assignment
+    display_name: Assignment and Change of Control
+    description: Parties' rights to assign, including affiliate transfers, change of control, competitor restrictions, and successor binding.
+    standard_text: |
+      Neither party may assign or transfer this Agreement, in whole or in part, whether voluntarily, by operation of law, change of control, or otherwise, without the other party's prior written consent, except that: (a) either party may assign this Agreement, without such consent, to an Affiliate or in connection with a merger, acquisition, corporate reorganization, or sale of all or substantially all of its assets or business, provided that the assignee agrees in writing to be bound by this Agreement; and (b) Supplier shall not assign this Agreement to any entity that is a direct competitor of Customer without Customer's prior written consent. 
+      This Agreement is binding upon and inures to the benefit of the parties and their permitted successors and assigns.
+
+  - name: governing_law
+    display_name: Governing Law
+    description: Governing Law and Dispute Resolution
+    standard_text: |
+      For Customers located in the United States, this Agreement shall be governed by and construed in accordance with the laws of the State of Delaware, U.S.A., without regard to its conflict-of-laws rules and excluding the United Nations Convention on Contracts for the International Sale of Goods (CISG), and the parties consent to the exclusive jurisdiction and venue of the state and federal courts located in Delaware.
+      For Customers located in the European Union, this Agreement shall be governed by and construed in accordance with the laws of Ireland, without regard to its conflict-of-laws rules and excluding the CISG, and the parties consent to the exclusive jurisdiction and venue of the courts located in Dublin, Ireland.

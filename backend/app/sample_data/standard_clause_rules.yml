@@ -1,0 +1,136 @@
+standard_clause_rules:
+
+  - standard_clause_name: liability_limits
+    rules:
+      - severity: critical
+        title: Missing Exceptions to Liability Cap
+        text: The liability cap must include exceptions that allow unlimited liability for breaches of confidentiality, intellectual property infringement, data privacy or security violations, gross negligence, and indemnification obligations.
+      - severity: warning
+        title: Supplier's Liability Limits Below Threshold
+        text: Supplier's liability limits must not be less than the greater of twelve (12) months of fees paid or $500,000.
+
+  - standard_clause_name: indemnification
+    rules:
+      - severity: critical
+        title: No IP Infringement Indemnification
+        text: Supplier must indemnify Customer for third-party claims of intellectual property infringement by the Software or Services.
+      - severity: critical
+        title: No Data Breach Indemnification
+        text: Supplier must indemnify Customer for third-party claims arising from Supplier's breach of data security, privacy, or confidentiality obligations.
+      - severity: critical
+        title: Indemnification Subject to Liability Cap
+        text: Supplier's indemnification obligations must not be subject to or limited by the general limitation of liability provisions.
+      - severity: critical
+        title: No Duty to Defend in Indemnity
+        text: Indemnification must include Supplier's duty to defend and cover defense costs for third-party claims.
+
+  - standard_clause_name: termination
+    rules:
+      - severity: critical
+        title: Customer Cannot Terminate for Convenience
+        text: Customer must have the right to terminate this Agreement for convenience upon no more than thirty (30) days' prior written notice.
+      - severity: critical
+        title: No Refund on Termination for Convenience
+        text: Upon Customer's termination for convenience, Supplier must refund a pro-rata portion of any prepaid fees for the unused portion of the term within thirty (30) days of the effective date of termination.
+      - severity: critical
+        title: No Data Return Upon Termination
+        text: Upon termination, Supplier must return or destroy all Customer Data and provide Customer with a complete export of all data in a standard format at no additional charge.
+      - severity: warning
+        title: Supplier May Terminate for Convenience
+        text: Supplier must not have the right to terminate this Agreement for convenience without cause.
+
+  - standard_clause_name: service_levels
+    rules:
+      - severity: critical
+        title: No Uptime Guarantee Specified
+        text: Supplier must commit to a minimum uptime percentage of at least 99.5% per calendar month.
+      - severity: warning
+        title: No Support Response Time Commitments
+        text: Supplier must provide defined maximum response times for different severity levels of support issues.
+      - severity: warning
+        title: SLA Failures Excluded from Material Breach
+        text: Repeated or prolonged failures to meet service levels must be able to constitute a material breach entitling Customer to terminate the Agreement.
+
+  - standard_clause_name: data_privacy
+    rules:
+      - severity: critical
+        title: Security Incident Notice Exceeds 72 Hours
+        text: The agreement must require Supplier to notify Customer of any security incident affecting Customer Data within no more than seventy-two (72) hours of becoming aware or without undue delay and in no case later than seventy-two (72) hours.
+      - severity: critical
+        title: Customer Data Ownership Not Retained
+        text: Customer must retain all right, title, and interest in and to Customer Data, and Supplier must process Customer Data solely in accordance with Customer's instructions.
+      - severity: critical
+        title: No GDPR/CCPA Compliance Commitment
+        text: Supplier must comply with all applicable data protection and privacy laws including GDPR, CCPA, and other regulations applicable to Customer's business.
+      - severity: warning
+        title: No Data Processing Addendum Commitment
+        text: Supplier must agree to execute a data processing addendum or equivalent upon Customer's request.
+
+  - standard_clause_name: warranties
+    rules:
+      - severity: critical
+        title: No Performance Warranty
+        text: Supplier must warrant that the Software will perform materially in accordance with the Documentation and will be free from material defects, viruses, and malicious code.
+      - severity: critical
+        title: No IP Non-Infringement Warranty
+        text: Supplier must warrant that the Software does not and will not infringe any third-party intellectual property rights.
+      - severity: warning
+        title: No Legal Compliance Warranty
+        text: Supplier must warrant that the Software and Services will comply with all applicable laws and regulations.
+      - severity: warning
+        title: No Remedy for Warranty Breach
+        text: If the Software fails to conform to warranties, Supplier must correct the deficiency or Customer must have the right to terminate and receive a refund.
+
+  - standard_clause_name: ip_license
+    rules:
+      - severity: critical
+        title: License Scope Too Restrictive
+        text: Customer must be granted a non-exclusive, worldwide license to use the Software for Customer's internal business purposes.
+      - severity: warning
+        title: Access by Affiliates or Contractors Prohibited
+        text: The license must permit access and use by Customer's employees, contractors, and affiliates for Customer's internal business purposes; prohibitions on affiliates or contractors are not acceptable.
+      - severity: warning
+        title: Unreasonable Geographic or Site Restrictions
+        text: The license must not restrict usage to specific physical sites or geographies; seat- or usage-based pricing is acceptable.
+      - severity: warning
+        title: Backup and Integration Prohibited
+        text: Customer must have the right to make backup copies, customize interfaces, and integrate the Software with other systems without additional fees.
+
+  - standard_clause_name: payment_terms
+    rules:
+      - severity: warning
+        title: Payment Terms Less Than 30 Days
+        text: Customer must have at least thirty (30) days from the date of invoice to pay undisputed fees.
+      - severity: critical
+        title: No Invoice Dispute Rights
+        text: Customer must have the right to dispute invoices in good faith, and Supplier must not suspend Services during the dispute resolution period.
+      - severity: warning
+        title: Excessive Fee Increases
+        text: For renewal terms, Supplier's fee increases must not exceed five percent (5%) per year, with at least ninety (90) days' prior written notice.
+      - severity: warning
+        title: Fees May Increase During Initial Term
+        text: Fees must be fixed during the Initial Term with no increases permitted before renewal.
+
+  - standard_clause_name: term
+    rules:
+      - severity: critical
+        title: No Fixed Initial Term
+        text: The agreement must specify an initial term that is not indefinite or open-ended.
+      - severity: warning
+        title: Auto-Renewal Cannot Be Opted Out
+        text: If the Agreement includes automatic renewal, Customer must be able to opt out of auto-renewal at any time without penalty or fee.
+      - severity: warning
+        title: Excessive Non-Renewal Notice Required
+        text: Customer must not be required to provide notice of non-renewal more than ninety (90) days prior to the expiration of the then-current term.
+
+  - standard_clause_name: assignment
+    rules:
+      - severity: critical
+        title: Customer Assignment Rights Restricted
+        text: The agreement must permit Customer to assign this Agreement, without Supplier consent, to an Affiliate or in connection with a merger, acquisition, corporate reorganization, or sale of substantially all assets.
+
+  - standard_clause_name: governing_law
+    rules:
+      - severity: critical
+        title: Governing Law Not Delaware (US) or Ireland (EU)
+        text: For U.S. Customers, the agreement must specify Delaware law; for EU Customers, the agreement must specify Irish law.
