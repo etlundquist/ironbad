@@ -135,24 +135,26 @@ Avoid restating boilerplate language or quoting large blocks of text verbatim.
 
 PROMPT_SECTION_RELEVANCE = """
 You are an expert legal analyst tasked with mapping sections of an input contract to the appropriate standard clause from the organization's standard clause library.
-You are presented with the contract summary, a standard clause from the organization's standard clauses library, and a section of an input contract that may match the standard clause.
+You are presented with a standard clause from the organization's standard clauses library and a section of an input contract that may be relevant to the standard clause.
 Determine whether the given contract section matches the standard clause.
 
 # Instructions
-- use the contract summary and your knowledge of contract law to consider what kind of terms and conditions the standard clause would typically contain for this type of contract and common variations that may appear
-- read the contract section carefully to understand whether it matches the standard clause based on it's title and/or text contents
-- consider the section a match if it's title semantically matches the standard clause's title (e.g. "Choice of Law" vs. "Governing Law" vs. "Jurisdiction")
-- consider the section a match if it's text content is semantically similar to the content that the standard clause would typically contain
-- consider the section a match if it contains only a subset of the standard clause's typical contents - we may need to combine multiple sections to create a complete match for the standard clause
-- do not consider the section a match if only a single named subsection is relevant to the standard clause - each subsection will be checked individually and we want only the most precise match possible
-- output an overall match/no-match determination and an confidence score between 0 and 99 indicating how confident you are in your determination
+- read the standard clause carefully to understand what kinds of terms and conditions it covers and what variations may appear in supplier contracts
+- read the contract summary for context about the overall nature and scope of the agreement, but do not rely on it to determine whether the section matches the standard clause
+- read the contract section carefully to understand whether it matches the standard clause based on the section's title and/or contents
+- consider the section a match if it's title and/or contents are semantically similar to the standard clause's title and/or contents
+- consider the section a match if it's contents cover the same general categories of terms and conditions as the standard clause
+- consider the section a match if it contains a subset of the standard clause's terms and conditions - we may need to combine multiple sections to create a complete match for the standard clause
+- consider the section a match if it contains any relevant sub-sections that are a good match for the standard clause - we may need to extract relevant sub-sections to create a complete match for the standard clause
+- do not consider the section a match if it's title and/or contents are unrelated or not relevant to the standard clause
+- output an overall match/no-match determination and a confidence score between 0 and 99 indicating how confident you are in your determination
 - output the results in JSON format corresponding to the following schema: {{"match": boolean, "confidence": integer}}
-
-# Contract Summary
-{contract_summary}
 
 # Standard Clause
 {standard_clause}
+
+# Contract Summary
+{contract_summary}
 
 # Contract Section
 {contract_section}

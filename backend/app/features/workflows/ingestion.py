@@ -1,5 +1,6 @@
 import os
 import re
+import html
 import logging
 import asyncio
 
@@ -39,6 +40,9 @@ def clean_contract_markdown(contract_markdown: str) -> str:
     contract_markdown = re.sub(r'\{\{[^}]*\}\}', '', contract_markdown)
     contract_markdown = re.sub(r'GLYPH<[^>]*>', '', contract_markdown)
     contract_markdown = re.sub(r'GLYPH&lt;[^&]*&gt;', '', contract_markdown)
+
+    # decode HTML entities (e.g., &amp;, &lt;, &gt;)
+    contract_markdown = html.unescape(contract_markdown)
 
     # remove all non-ASCII characters
     contract_markdown = re.sub(r'[^\x00-\x7F]+', '', contract_markdown)
@@ -354,12 +358,12 @@ async def evaluate_clause_section_relevance(contract_summary: str, clause: Stand
     """evaluate the relevance of a single contract section wrt a standard clause"""
 
     openai = AsyncOpenAI()
-    standard_clause_text = f"Name: {clause.display_name}\nDescription: {clause.description}"
+    standard_clause_text = f"Name: {clause.display_name}\nDescription: {clause.description}\nStandard Text: {clause.standard_text}"
     input_section_text = section.markdown
 
     response: ParsedResponse = await openai.responses.parse(
         model="gpt-4.1-mini",
-        input=PROMPT_SECTION_RELEVANCE.format(contract_summary=contract_summary, standard_clause=standard_clause_text, contract_section=input_section_text),
+        input=PROMPT_SECTION_RELEVANCE.format(standard_clause=standard_clause_text, contract_summary=contract_summary, contract_section=input_section_text),
         text_format=SectionRelevanceEvaluation,
         temperature=0.0,
         timeout=60
@@ -385,7 +389,8 @@ async def extract_contract_clause(db: AsyncSession, contract: Contract, clause: 
 
     # identify the subset of relevant sections for the clause using embedding similarity -> LLM classification
     candidate_sections = await get_clause_section_candidates(db=db, clause=clause, contract_id=contract.id)
-    matching_sections = await evaluate_clause_section_candidates(contract_summary=contract.meta["summary"], clause=clause, sections=candidate_sections)
+    contract_summary = contract.meta.get("summary", "")
+    matching_sections = await evaluate_clause_section_candidates(contract_summary=contract_summary, clause=clause, sections=candidate_sections)
     if not matching_sections:
         logger.warning(f"no matching input sections found for clause={clause.name} - skipping contract-specific clause extraction")
         return None
