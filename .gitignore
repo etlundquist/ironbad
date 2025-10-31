@@ -58,6 +58,3 @@ coverage.xml
 **/sandbox.py
 sample_contracts/
 sample_output/
-
-# local sample/seed data
-**/sample_data/

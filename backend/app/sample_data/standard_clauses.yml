@@ -86,19 +86,12 @@ standard_clauses:
 
   - name: term
     display_name: Term
-    description: Initial term, renewal conditions, opt-out and notice requirements.
+    description: Initial contract term and renewal conditions
     standard_text: |
       This agreement is effective as of the Effective Date and will remain in effect until terminated in accordance with its terms.
-      Upon expiration of the Initial Term, this Agreement shall automatically renew for successive one (1) year periods (each, a "Renewal Term," and together with the Initial Term, the "Term"), unless either party provides written notice of non-renewal to the other party at least ninety (90) days prior to the expiration of the then-current Term.
-      Supplier shall provide Customer with written notice of the upcoming renewal at least one hundred twenty (120) days prior to the expiration of the then-current Term. 
+      Upon expiration of the Initial Term, this Agreement shall automatically renew for successive one (1) year periods unless either party provides written notice of non-renewal to the other party at least thirty (30) days prior to the expiration of the then-current Term.
+      Supplier shall provide Customer with written notice of the upcoming renewal at least ninety (90) days prior to the expiration of the then-current Term. 
       Such notice shall clearly state the renewal terms, including any changes to fees, and the deadline by which Customer must provide notice of non-renewal.
-
-  - name: assignment
-    display_name: Assignment and Change of Control
-    description: Parties' rights to assign, including affiliate transfers, change of control, competitor restrictions, and successor binding.
-    standard_text: |
-      Neither party may assign or transfer this Agreement, in whole or in part, whether voluntarily, by operation of law, change of control, or otherwise, without the other party's prior written consent, except that: (a) either party may assign this Agreement, without such consent, to an Affiliate or in connection with a merger, acquisition, corporate reorganization, or sale of all or substantially all of its assets or business, provided that the assignee agrees in writing to be bound by this Agreement; and (b) Supplier shall not assign this Agreement to any entity that is a direct competitor of Customer without Customer's prior written consent. 
-      This Agreement is binding upon and inures to the benefit of the parties and their permitted successors and assigns.
 
   - name: governing_law
     display_name: Governing Law
