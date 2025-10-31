@@ -120,35 +120,34 @@ Extract the following metadata attributes from the contract text provided below 
 PROMPT_CONTRACT_SUMMARY = """
 You are an expert legal assistant tasked with summarizing a contract text.
 Your summary will be used to provide global context for downstream tasks that analyze specific contract sections to identify issues, answer questions, and propose revisions.
-Produce a concise summary of at most 200 words that gives a clear, high-level understanding of the contract and provides valuable global context for downstream tasks.
+Produce a concise summary of at most 200 words that gives a clear, high-level understanding of the contract and provides valuable global context to better understand the text of individual contract sections.
 
 Include the following information in your summary when available:
 - the contract type (e.g. software license, master service agreement, purchase order, etc.) and the high-level purpose or scope of the agreement
-- the parties' full names (if available) and contract roles (e.g. customer, supplier, licensee, licensor, etc.)
+- the parties' full names (if available) and roles (e.g. customer, supplier, licensee, licensor, etc.) that describe how each party is referenced in the contract
 - any references to related documents, attachments, or schedules that are referenced in the agreement but not provided in the contract text
 
 Write your summary in a single paragraph of plain, compact prose.
-Optimize your summary for high-level context that will be used by downstream LLM reasoning tasks that will have access to the full text of specific contract sections.
 Avoid restating boilerplate language or quoting large blocks of text verbatim.
 """.strip()
 
 
 PROMPT_SECTION_RELEVANCE = """
 You are an expert legal analyst tasked with mapping sections of an input contract to the appropriate standard clause from the organization's standard clause library.
-You are presented with a standard clause from the organization's standard clauses library and a section of an input contract that may be relevant to the standard clause.
-Determine whether the given contract section matches the standard clause.
+You are presented with a standard clause, the contract summary, and the full text of a contract section that may be relevant to the standard clause.
+Determine whether the contract section is relevant to the standard clause.
 
 # Instructions
-- read the standard clause carefully to understand what kinds of terms and conditions it covers and what variations may appear in supplier contracts
-- read the contract summary for context about the overall nature and scope of the agreement, but do not rely on it to determine whether the section matches the standard clause
-- read the contract section carefully to understand whether it matches the standard clause based on the section's title and/or contents
-- consider the section a match if it's title and/or contents are semantically similar to the standard clause's title and/or contents
-- consider the section a match if it's contents cover the same general categories of terms and conditions as the standard clause
-- consider the section a match if it contains a subset of the standard clause's terms and conditions - we may need to combine multiple sections to create a complete match for the standard clause
-- consider the section a match if it contains any relevant sub-sections that are a good match for the standard clause - we may need to extract relevant sub-sections to create a complete match for the standard clause
-- do not consider the section a match if it's title and/or contents are unrelated or not relevant to the standard clause
-- output an overall match/no-match determination and a confidence score between 0 and 99 indicating how confident you are in your determination
-- output the results in JSON format corresponding to the following schema: {{"match": boolean, "confidence": integer}}
+- read the standard clause carefully to understand what kinds of terms and conditions it covers and what variations may appear in supplier/vendor contracts
+- read the contract summary for context about the overall nature and scope of the agreement, but do not rely on it to determine whether the section is relevant
+- read the contract section carefully to understand whether it is relevant to the standard clause based on the section's title and/or text
+- consider the section relevant if it's title is semantically similar to the standard clause's title
+- consider the section relevant if it's text covers the same generalcategories of terms and conditions as the standard clause
+- consider the section relevant if it contains a subset of the standard clause's terms and conditions
+- consider the section relevant if it contains any relevant numbered or bulleted sub-sections
+- do not consider the section relevant if it's title and/or text are unrelated or not relevant to the standard clause
+- output an overall relevant/not-relevant determination and a confidence score between 0 and 99 indicating how confident you are in your determination
+- output the results in JSON format corresponding to the following schema: {{"relevant": boolean, "confidence": integer}}
 
 # Standard Clause
 {standard_clause}
@@ -162,8 +161,8 @@ Determine whether the given contract section matches the standard clause.
 
 
 PROMPT_CONTRACT_CLAUSE = """
-You are an expert legal analyst tasked with synthesizing a standard clause from potentially relevant sections of an input contract.
-You are presented with a standard clause from the organization's standard clauses library and several sections of an input contract that may match the standard clause.
+You are an expert legal analyst tasked with synthesizing a standard clause from potentially relevant sections of a contract.
+You are presented with a standard clause from the organization's standard clauses library and several sections of an input contract that may be relevant to the standard clause.
 Synthesize a version of the standard clause using only the relevant terms and conditions from the input contract sections.
 
 # Instructions
@@ -185,13 +184,14 @@ Synthesize a version of the standard clause using only the relevant terms and co
 
 PROMPT_RULE_COMPLIANCE_CLASSIFICATION = """
 You are an expert legal analyst tasked with determining whether a contract clause violates a clause-specific policy rule.
+You represent the organization's procurement team and must evaluate potential supplier/vendor contracts from the buyer's perspective.
 You are presented with a policy rule and an input contract including the contract summary and the relevant contract clause.
 Determine whether the contract clause violates the policy rule.
 Output your response in JSON format corresponding to the Example Output provided below.
 
 # Instructions
 - read the contract summary carefully to understand the overall context of the agreement including: the high-level scope and purpose of the agreement, the named parties and their associated roles
-- read the policy rule carefully to understand to which contract parties and to what terms and conditions it applies
+- read the policy rule text carefully to understand to which contract parties and to what terms and conditions the rule applies
 - carefully evaluate whether the terms and conditions in the contract clause violate the policy rule for the relevant party or parties
 - output an overall true/false `violation` classification for all responses
 - for violations, additionally provide the `relevant_text` from the contract clause that violates the policy rule

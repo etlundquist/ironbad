@@ -30,7 +30,7 @@ class JobStatusUpdate(ConfiguredBaseModel):
 
 
 class SectionRelevanceEvaluation(ConfiguredBaseModel):
-    match: bool
+    relevant: bool
     confidence: int
 
 class ParsedContractSection(ConfiguredBaseModel):

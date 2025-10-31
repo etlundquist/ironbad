@@ -378,7 +378,7 @@ async def evaluate_clause_section_candidates(contract_summary: str, clause: Stan
     """determine which of the candidate sections are relevant to the standard clause using LLM classification"""
 
     evaluation_results = await asyncio.gather(*[evaluate_clause_section_relevance(contract_summary, clause, section) for section in sections])
-    matching_sections = [section for section, result in zip(sections, evaluation_results) if result.match]
+    matching_sections = [section for section, result in zip(sections, evaluation_results) if result.relevant]
 
     logger.info(f"{len(matching_sections)} matching sections identified for clause={clause.name}")
     return matching_sections
