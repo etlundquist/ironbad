@@ -25,5 +25,6 @@ dependencies = [
     "pydantic-ai>=1.1.0",
     "logfire[asyncpg,fastapi]>=4.13.2",
     "openai-agents>=0.4",
+    "gitpython>=3.1.45",
 ]
 requires-python = ">=3.11"

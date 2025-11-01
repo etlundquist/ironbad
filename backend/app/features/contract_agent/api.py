@@ -2,6 +2,7 @@ import json
 import logging
 
 from uuid import UUID
+from dataclasses import asdict
 
 from agents.items import ResponseInputItemParam
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from openai import AsyncOpenAI
 
-from agents import Runner
+from agents import RunResult, Runner
 
 from app.features.contract_annotations.schemas import AnnotatedContract
 from app.enums import ChatMessageRole, ChatMessageStatus
@@ -21,7 +22,7 @@ from app.models import Contract as DBContract, AgentChatThread as DBAgentChatThr
 
 from app.api.deps import get_db
 from app.features.contract_agent.agent import AgentContext, agent
-from app.features.contract_agent.schemas import AgentEventStreamContext, AgentChatThread, AgentChatMessage
+from app.features.contract_agent.schemas import AgentEventStreamContext, AgentChatThread, AgentChatMessage, AgentRunResponse
 from app.features.contract_agent.events import handle_event_stream
 from app.features.contract_agent.schemas import AgentRunRequest
 from app.features.contract_agent.services import process_request_attachments
@@ -115,6 +116,39 @@ async def run_contract_agent(request: AgentRunRequest, db: AsyncSession = Depend
     # commit the initial user/assistant messages to the database and return the event stream response
     await db.commit()
     return EventSourceResponse(handle_event_stream(event_stream=result.stream_events(), context=stream_context))
+
+
+@router.post("/agent/runs/sync", tags=["contract_agent"])
+async def run_contract_agent_sync(request: AgentRunRequest, db: AsyncSession = Depends(get_db)) -> AgentRunResponse:
+    """create and execute a new agent run synchronously returning a RunResult object with the input and all output items"""
+
+    query = select(DBContract).where(DBContract.id == request.contract_id)
+    result = await db.execute(query)
+    dbcontract = result.scalar_one_or_none()
+    if not dbcontract:
+        raise HTTPException(status_code=404, detail=f"contract_id={request.contract_id} not found")
+    contract = AnnotatedContract.model_validate(dbcontract)
+
+    agent_context = AgentContext(db=db, contract=contract, request=request)
+    if request.attachments:
+        attachment_blocks = await process_request_attachments(db=db, contract=contract, request=request)
+        user_input: list[ResponseInputItemParam] = [EasyInputMessageParam(role="user", content=[ResponseInputTextParam(type="input_text", text=request.content)] + attachment_blocks)]
+    else:
+        user_input: str = request.content
+
+    try:
+        result = await Runner.run(
+            starting_agent=agent, 
+            input=user_input, 
+            context=agent_context,
+            max_turns=25
+        )
+        # FIXME: map the list of input/output items to raw OpenAI SDK pydantic types so they can be serialized/deserialized correctly
+        # FIXME: include the full list of output items: [reasoning summaries, tool calls, tool outputs, output messages]
+        return AgentRunResponse(status="success", input=user_input, output=[asdict(item) for item in result.new_items])
+    except Exception:
+        logger.error("agent run failed!", exc_info=True)
+        return AgentRunResponse(status="failure", input=user_input, output=[])
 
 
 @router.get("/agent/threads", tags=["contract_agent"])

@@ -2,6 +2,8 @@ from uuid import UUID
 from typing import Annotated, Literal, Optional, TypeAlias, Union
 from datetime import datetime
 
+from agents import RunItem
+from openai.types.responses import ResponseInputItemParam
 from pydantic import Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -158,6 +160,11 @@ class AgentRunRequest(ConfiguredBaseModel):
     content: str
     chat_thread_id: Optional[UUID] = None
     attachments: Optional[list[ChatMessageAttachment]] = None
+
+class AgentRunResponse(ConfiguredBaseModel):
+    status: Literal["success", "failure"]
+    input: str | list[dict]
+    output: list[dict]
 
 # agent run event stream schemas
 # ------------------------------
