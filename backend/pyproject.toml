@@ -26,5 +26,6 @@ dependencies = [
     "logfire[asyncpg,fastapi]>=4.13.2",
     "openai-agents>=0.4",
     "gitpython>=3.1.45",
+    "jupyterlab>=4.4.10",
 ]
 requires-python = ">=3.11"

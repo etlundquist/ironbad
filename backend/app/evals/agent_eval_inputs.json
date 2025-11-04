@@ -1,0 +1,22 @@
+[
+    {
+        "id": 1, 
+        "contract_filename": "thomson-reuters-eula.pdf", 
+        "task_category": "question_answering", 
+        "task_criteria": [
+            "a concise summary of the contract's termination conditions",
+            "citations to the relevant contract sections that cover the contract's termination conditions correctly formatted in square brackets"
+        ],
+        "user_message": "Please summarize the contract's termination conditions."
+    },
+    {
+        "id": 2, 
+        "contract_filename": "thomson-reuters-eula.pdf", 
+        "task_category": "question_answering", 
+        "task_criteria": [
+            "An overall answer of no, the contract does not allow the customer to terminate for convenience",
+            "citations to the relevant contract sections that support the answer correctly formatted in square brackets"
+        ],
+        "user_message": "Does the contract allow the customer to terminate for convenience?"
+    }
+]

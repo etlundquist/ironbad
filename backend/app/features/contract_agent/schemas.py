@@ -2,8 +2,7 @@ from uuid import UUID
 from typing import Annotated, Literal, Optional, TypeAlias, Union
 from datetime import datetime
 
-from agents import RunItem
-from openai.types.responses import ResponseInputItemParam
+from openai.types.responses import ResponseInputItem, ResponseItem
 from pydantic import Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -161,11 +160,6 @@ class AgentRunRequest(ConfiguredBaseModel):
     chat_thread_id: Optional[UUID] = None
     attachments: Optional[list[ChatMessageAttachment]] = None
 
-class AgentRunResponse(ConfiguredBaseModel):
-    status: Literal["success", "failure"]
-    input: str | list[dict]
-    output: list[dict]
-
 # agent run event stream schemas
 # ------------------------------
 
@@ -248,3 +242,43 @@ class AgentEventStreamContext(ConfiguredBaseModel):
     chat_thread_id: UUID
     user_message_id: UUID
     assistant_message_id: UUID
+
+# agent evaluation schemas
+# ------------------------
+
+class AgentEvalInputCase(ConfiguredBaseModel):
+    id: int
+    contract_filename: str
+    task_category: str
+    task_criteria: list[str]
+    user_message: str 
+    user_message_attachments: list[ChatMessageAttachment] = []
+
+class AgentEvalInputDataset(ConfiguredBaseModel):
+    name: str 
+    cases: list[AgentEvalInputCase]
+    metadata: Optional[dict] = None
+
+
+class AgentEvalTaskInput(ConfiguredBaseModel):
+    contract_filename: str 
+    user_message: str
+    user_message_attachments: list[ChatMessageAttachment] = []
+
+class AgentEvalTaskOutput(ConfiguredBaseModel):
+    status: Literal["success", "failure"]
+    assistant_message: str
+    input_items: list[ResponseInputItem]
+    output_items: list[ResponseInputItem]
+
+
+class AgentEvalOutputCase(AgentEvalInputCase, AgentEvalTaskOutput):
+    pass
+
+class AgentEvalRunResponse(ConfiguredBaseModel):
+    eval_id: str 
+    run_id: str 
+    run_name: str
+    created_at: datetime
+    report_url: str 
+    status: str
