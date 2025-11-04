@@ -15,6 +15,12 @@ const PendingSectionAdd: React.FC<PendingSectionAddProps> = ({
   onToggleExpand
 }) => {
   const indentStyle = { marginLeft: `${depth * 20}px` }
+  
+  const decodeHtmlEntities = (text: string): string => {
+    const textarea = document.createElement('textarea')
+    textarea.innerHTML = text
+    return textarea.value
+  }
 
   return (
     <div
@@ -78,18 +84,31 @@ const PendingSectionAdd: React.FC<PendingSectionAddProps> = ({
 
         {/* Right side: Section content */}
         <div className="pending-section-info" style={{ flex: 1, minWidth: 0 }}>
-          {isExpanded && (
+          {isExpanded && sectionAdd.new_node?.markdown && (
             <div
+              className="pending-section-markdown-inline"
               style={{
                 fontSize: '14px',
-                color: '#059669',
-                lineHeight: '1.6'
+                lineHeight: '1.6',
+                color: '#374151',
+                userSelect: 'text',
+                cursor: 'text',
+                padding: '0',
+                whiteSpace: 'pre-wrap'
               }}
             >
-              {sectionAdd.new_node?.markdown?.split('\n')[0]?.replace(/^#+\s*/, '') ||
-                sectionAdd.new_node?.name ||
-                'New Section'}
+              <div>{decodeHtmlEntities(sectionAdd.new_node.markdown)}</div>
             </div>
+          )}
+          {!isExpanded && sectionAdd.new_node?.name && (
+            <span className="pending-section-name" style={{ color: '#059669', fontSize: '14px' }}>
+              {decodeHtmlEntities(sectionAdd.new_node.name)}
+            </span>
+          )}
+          {!isExpanded && !sectionAdd.new_node?.name && sectionAdd.new_node?.markdown && (
+            <span className="pending-section-name" style={{ color: '#059669', fontSize: '14px' }}>
+              {decodeHtmlEntities(sectionAdd.new_node.markdown.split('\n')[0]?.replace(/^#+\s*/, '') || 'New Section')}
+            </span>
           )}
         </div>
       </div>

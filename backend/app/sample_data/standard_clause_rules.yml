@@ -118,7 +118,7 @@ standard_clause_rules:
         text: The agreement must specify an initial term that is not indefinite or open-ended.
       - severity: warning
         title: Auto-Renewal Cannot Be Opted Out
-        text: If the Agreement includes automatic renewal, Customer must be able to opt out of auto-renewal at any time without penalty or fee.
+        text: If the Agreement includes automatic renewal, Customer must be able to opt out of auto-renewal without penalty or fee.
       - severity: warning
         title: Excessive Non-Renewal Notice Required
         text: Customer must not be required to provide notice of non-renewal more than ninety (90) days prior to the expiration of the then-current term.

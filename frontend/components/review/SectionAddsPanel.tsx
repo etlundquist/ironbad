@@ -59,9 +59,26 @@ export const SectionAddsPanel: React.FC<SectionAddsPanelProps> = ({
                     <span>{new Date(sectionAdd.created_at).toLocaleDateString()}</span>
                   </div>
                 </div>
-                <div style={{ fontSize: '14px', color: sectionAdd.status === 'accepted' ? '#059669' : sectionAdd.status === 'rejected' ? '#dc2626' : sectionAdd.status === 'conflict' ? '#92400e' : sectionAdd.status === 'stale' ? '#6b7280' : '#374151', marginBottom: '8px', textDecoration: sectionAdd.status === 'rejected' || sectionAdd.status === 'stale' ? 'line-through' : 'none' }}>
-                  {decodeHtmlEntities(sectionAdd.new_node?.markdown?.split('\n')[0]?.replace(/^#+\s*/, '') || sectionAdd.new_node?.name || 'New Section')}
-                </div>
+                {sectionAdd.new_node?.markdown && (
+                  <div
+                    style={{
+                      fontSize: '14px',
+                      lineHeight: '1.6',
+                      color: sectionAdd.status === 'accepted' ? '#059669' : sectionAdd.status === 'rejected' ? '#dc2626' : sectionAdd.status === 'conflict' ? '#92400e' : sectionAdd.status === 'stale' ? '#6b7280' : '#374151',
+                      marginBottom: '8px',
+                      textDecoration: sectionAdd.status === 'rejected' || sectionAdd.status === 'stale' ? 'line-through' : 'none',
+                      whiteSpace: 'pre-wrap',
+                      userSelect: 'text'
+                    }}
+                  >
+                    {decodeHtmlEntities(sectionAdd.new_node.markdown)}
+                  </div>
+                )}
+                {!sectionAdd.new_node?.markdown && (
+                  <div style={{ fontSize: '14px', color: sectionAdd.status === 'accepted' ? '#059669' : sectionAdd.status === 'rejected' ? '#dc2626' : sectionAdd.status === 'conflict' ? '#92400e' : sectionAdd.status === 'stale' ? '#6b7280' : '#374151', marginBottom: '8px', textDecoration: sectionAdd.status === 'rejected' || sectionAdd.status === 'stale' ? 'line-through' : 'none' }}>
+                    {decodeHtmlEntities(sectionAdd.new_node?.name || 'New Section')}
+                  </div>
+                )}
                 {sectionAdd.status === 'accepted' ? (
                   <div style={{ fontSize: '12px', color: '#059669', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '4px' }}><span>✓</span> Accepted</div>
                 ) : sectionAdd.status === 'rejected' ? (
