@@ -4,8 +4,8 @@
         "contract_filename": "thomson-reuters-eula.pdf", 
         "task_category": "question_answering", 
         "task_criteria": [
-            "a concise summary of the contract's termination conditions",
-            "citations to the relevant contract sections that cover the contract's termination conditions correctly formatted in square brackets"
+            "Answer must provide a concise summary of the contract's termination conditions",
+            "Answer must include citations to the relevant contract sections that cover the contract's termination conditions correctly formatted in square brackets"
         ],
         "user_message": "Please summarize the contract's termination conditions."
     },
@@ -14,9 +14,210 @@
         "contract_filename": "thomson-reuters-eula.pdf", 
         "task_category": "question_answering", 
         "task_criteria": [
-            "An overall answer of no, the contract does not allow the customer to terminate for convenience",
-            "citations to the relevant contract sections that support the answer correctly formatted in square brackets"
+            "Answer must provide an overall answer of no, the contract does not allow the customer to terminate for convenience",
+            "Answer must include citations to the relevant contract sections that support the answer correctly formatted in square brackets"
         ],
         "user_message": "Does the contract allow the customer to terminate for convenience?"
+    },
+    {
+        "id": 3,
+        "contract_filename": "thomson-reuters-eula.pdf",
+        "task_category": "question_answering",
+        "task_criteria": [
+            "Answer must confirm that supplier liability is capped at the prior-12-month fees (or 12x monthly average if within first year)",
+            "Answer must explicitly note that the cap does not apply to six carve-outs: fraud/fraudulent misrepresentation/willful misconduct, death/personal injury, IP infringement, violation of use restrictions, indemnification obligations, and unpaid charges",
+            "Answer must include citations to the relevant contract sections that support the answer correctly formatted in square brackets"
+        ],
+        "user_message": "Is the supplier's total liability capped under this agreement, and if so, how is the cap calculated? Are there any carve-outs or exclusions to the cap?"
+    },
+    {
+        "id": 4,
+        "contract_filename": "thomson-reuters-eula.pdf",
+        "task_category": "question_answering",
+        "task_criteria": [
+            "Answer must state that Services will materially conform to the accompanying documentation for the duration of the term",
+            "Answer must state that Installed Software will materially conform to the documentation for 90 days after delivery and that if an error reported by you cannot be corrected within a reasonable time, you may terminate the affected ordering document by written notice, and the licenses will immediately terminate",
+            "Answer must state that Professional Services will be provided using reasonable skill and care",
+            "Answer must state that for Services (excluding Installed Software and Professional Services), the remedy is repair or replacement at no charge",
+            "Answer must state that for Installed Software, if errors cannot be corrected within a reasonable time, you may terminate the order and receive a refund of charges",
+            "Answer must state that for Professional Services, the warranty is that services will be performed with reasonable skill and care, but no specific remedy is detailed beyond this warranty",
+            "Answer must include citations to the relevant contract sections that support the answer correctly formatted in square brackets"
+        ],
+        "user_message": "What warranties does the supplier provide for its software and services, and what remedies are available if they fail?"
+    },
+    {
+        "id": 5,
+        "contract_filename": "thomson-reuters-eula.pdf",
+        "task_category": "question_answering",
+        "task_criteria": [
+            "Answer must specify that either party may terminate for material breach that remains uncured 30 days after written notice",
+            "Answer must specify that failure to pay any amount when due under the agreement or misrepresentation counts as material breach",
+            "Answer must include citations to the relevant contract sections that support the answer correctly formatted in square brackets"
+        ],
+        "user_message": "Under what circumstances can either party terminate this agreement for material breach?"
+    },
+    {
+        "id": 6,
+        "contract_filename": "thomson-reuters-eula.pdf",
+        "task_category": "question_answering",
+        "task_criteria": [
+            "Answer must note that unless otherwise stated, the Agreement renews annually by default",
+            "Answer must state that either party may prevent renewal with at least 30 days written notice before term end",
+            "Answer must include citations to the relevant contract sections that support the answer correctly formatted in square brackets"
+        ],
+        "user_message": "How does the agreement handle automatic renewal and notice requirements for non-renewal?"
+    },
+    {
+        "id": 7,
+        "contract_filename": "thomson-reuters-eula.pdf",
+        "task_category": "question_answering",
+        "task_criteria": [
+            "Answer must state governing law is the State of New York",
+            "Answer must state that disputes must be brought exclusively in federal or state courts located in New York County, NY",
+            "Answer must include citations to the relevant contract sections that support the answer correctly formatted in square brackets"
+        ],
+        "user_message": "What law governs this agreement, and where must disputes be resolved?"
+    },
+    {
+        "id": 8,
+        "contract_filename": "thomson-reuters-eula.pdf",
+        "task_category": "question_answering",
+        "task_criteria": [
+            "Answer must note that the agreement incorporates a Data Processing Addendum (DPA) that applies when Thomson Reuters processes Customer Personal Data",
+            "Answer must state that both parties must use industry-standard organizational, administrative, physical, and technical safeguards to protect each other's data and that specific technical and organizational measures are detailed in a separate Data Security Addendum",
+            "Answer must include citations to the relevant contract sections that support the answer correctly formatted in square brackets"
+        ],
+        "user_message": "What obligations does the supplier have regarding data protection and breach notification?"
+    },
+
+    {
+        "id": 9,
+        "contract_filename": "thomson-reuters-eula.pdf",
+        "task_category": "compliance_analysis",
+        "task_criteria": [
+            "Answer must provide an overall answer of no, the contract does not include all of our required unlimited liability exceptions",
+            "Answer must state that the contract does provide exceptions for IP infringement and indemnification obligations",
+            "Answer must state that the contract does not explicitlyprovide an exception for breaches of confidentiality or data privacy or security violations"
+        ],
+        "user_message": "Does the contract include our required unlimited liability exceptions?"
+    },
+    {
+        "id": 10,
+        "contract_filename": "thomson-reuters-eula.pdf",
+        "task_category": "compliance_analysis",
+        "task_criteria": [
+            "Answer must provide an overall answer of no, the contract does not explicitly meet our required minimum threshold amount",
+            "Answer must state that the contract satisfies the part of the rule requiring the liability cap to be at least twelve (12) months of fees paid",
+            "Answer must state that the contract does not specify a minimum dollar amount (e.g., $500,000) as a floor for the liability cap",
+            "Answer must state that if the fees paid in 12 months are less than $500,000, the supplier's liability limit could be less than $500,000, which does not meet the stated rule"
+        ],
+        "user_message": "Do the supplier's liability limits meet our minimum threshold requirements?"
+    },
+    {
+        "id": 11,
+        "contract_filename": "thomson-reuters-eula.pdf",
+        "task_category": "compliance_analysis",
+        "task_criteria": [
+            "Answer must provide an overall answer of no, the contract does not have the required governing law",
+            "Answer must state that the contract specifies governing law as New York, which violates the standard policy requirement for Delaware"
+        ],
+        "user_message": "Does the contract have the required governing law for U.S. customers specified by our policy requirements?"
+    },
+    {
+        "id": 12,
+        "contract_filename": "thomson-reuters-eula.pdf",
+        "task_category": "compliance_analysis",
+        "task_criteria": [
+            "Answer must provide an overall answer of yes, the contract conforms with our required term and renewal policy",
+            "Answer must state that the initial term is defined in the Ordering Document, and the contract allows either party to prevent auto-renewal by giving at least 30 days' written notice before the end of the then-current term"
+        ],
+        "user_message": "Does the contract conform with our required term and renewal policy?"
+    },
+
+    {
+        "id": 13,
+        "contract_filename": "thomson-reuters-eula.pdf",
+        "task_category": "contract_annotations",
+        "task_criteria": [
+            "Agent must add a comment explaining that the contract does not include all of our required unlimited liability exceptions",
+            "Comment must be anchored to a relevant contract text span within section 8 (Liability)",
+            "Comment anchor text must provide sufficient context/evidence to support the comment text",
+            "Comment text must explicitly list the missing exceptions"
+        ],
+        "user_message": "Add a comment explaining that the contract does not include all of our required unlimited liability exceptions."
+    },
+    {
+        "id": 14,
+        "contract_filename": "thomson-reuters-eula.pdf",
+        "task_category": "contract_annotations",
+        "task_criteria": [
+            "Agent must add a comment noting that Section 2(e) grants Thomson Reuters a broad license to use 'Your Data' for AI training or service improvement",
+            "Comment must explain that this violates our policy requirements that supplier process data only under customer's instructions and does not retain ownership rights",
+            "Comment must be anchored to a relevant contract text span within Section 2 (IP Ownership and License)",
+            "Comment anchor text must provide sufficient context/evidence to support the comment text"
+        ],
+        "user_message": "Add a comment explaining why the supplier's limited license use of customer data might be an issue, referencing the relevant policy rule(s)."
+    },
+    {
+        "id": 15,
+        "contract_filename": "thomson-reuters-eula.pdf",
+        "task_category": "contract_annotations",
+        "task_criteria": [
+            "Agent must add a revision that modifies Section 8 (Liability) to ensure supplier indemnifies and defends customer for both IP infringement and data privacy/confidentiality breaches",
+            "Revision must include an explicit 'duty to defend' and coverage for related defense costs"
+        ],
+        "user_message": "Revise the indemnification clause to ensure it includes the supplier's explicit duty to defend (with defense costs) and indemnify for IP infringement and data breach claims."
+    },
+    {
+        "id": 16,
+        "contract_filename": "thomson-reuters-eula.pdf",
+        "task_category": "contract_annotations",
+        "task_criteria": [
+            "Agent must add a revision that modifies Section 8 (Liability) to ensure the threshold amount is always at least $500,000 in accordance with our policy requirements",
+            "Revision should not modify existing carve-outs or exceptions to the liability cap",
+            "Revision should still allow for the threshold to be set based on the amount payable in the previous 12 months"
+        ],
+        "user_message": "Revise the liability limits to ensure the threshold amount is always at least $500,000 in accordance with our policy requirements."
+    },
+    {
+        "id": 17,
+        "contract_filename": "thomson-reuters-eula.pdf",
+        "task_category": "contract_annotations",
+        "task_criteria": [
+            "Agent must add a revision that modifies Section 9 (Termination) to include a mutual termination for convenience provision upon 30 days' written notice with a pro-rata refund of prepaid fees for unused services",
+            "Revision should not modify existing termination for cause or other reasons provisions",
+            "Revision should add this mutual termination right without removing any provisions regarding discontinuation of a Service"
+        ],
+        "user_message": "Revise the termination clause to include a mutual termination for convenience provision upon 30 days' written notice with pro-rata refund of fees"
+    },
+    {
+        "id": 18,
+        "contract_filename": "thomson-reuters-eula.pdf",
+        "task_category": "contract_annotations",
+        "task_criteria": [
+            "Agent must add a revision that modifies the governing law clause to specify Delaware law for U.S. customers and Irish law for EU customers",
+            "Revision should only modify the governing law clause and not any other clauses"
+        ],
+        "user_message": "Revise the governing law clause to comply with our governing law policy requirements."
+    },
+    {
+        "id": 19,
+        "contract_filename": "thomson-reuters-eula.pdf",
+        "task_category": "contract_annotations",
+        "task_criteria": [
+            "Agent must add a new section under Section 3 (Data Privacy) or 5 (Security) requiring the supplier to notify the customer of any security incident or data breach affecting customer data within no more than 72 hours of becoming aware.",
+            "Added section number must conform to the existing section numbering scheme and not be already in use",
+            "Section should be added logically above/below related existing sections and sub-sections"
+        ],
+        "user_message": "Add a new clause requiring that the supplier notify the customer of any security incident affecting customer data within no more than 72 hours."
+    },
+    {
+        "id": 20,
+        "contract_filename": "thomson-reuters-eula.pdf",
+        "task_category": "contract_annotations",
+        "task_criteria": [
+            "Agent must remove the existing Excess Use clause from the contract"
+        ],
+        "user_message": "Remove the Excess Use clause from the contract."
     }
 ]

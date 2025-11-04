@@ -4,7 +4,7 @@ standard_clause_rules:
     rules:
       - severity: critical
         title: Missing Exceptions to Liability Cap
-        text: The liability cap must include exceptions that allow unlimited liability for breaches of confidentiality, intellectual property infringement, data privacy or security violations, gross negligence, and indemnification obligations.
+        text: The liability cap must include exceptions that allow unlimited liability for breaches of confidentiality, intellectual property infringement, data privacy or security violations, and indemnification obligations.
       - severity: warning
         title: Supplier's Liability Limits Below Threshold
         text: Supplier's liability limits must not be less than the greater of twelve (12) months of fees paid or $500,000.

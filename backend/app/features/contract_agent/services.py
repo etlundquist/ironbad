@@ -110,7 +110,7 @@ async def process_request_attachments(db: AsyncSession, contract: AnnotatedContr
     else:
         pinned_sections = None
 
-    # retrieve any pinned section text spans specified in the request attachments
+    # retrieve any pinned section text spans specified in the request attachments and provide the section number and text span
     pinned_section_text_attachments = [attachment for attachment in request.attachments if attachment.kind == "pinned_section_text"]
     if pinned_section_text_attachments:
         agent_section_text_spans: list[AgentContractSectionTextSpan] = []
@@ -121,7 +121,7 @@ async def process_request_attachments(db: AsyncSession, contract: AnnotatedContr
     else:
         pinned_section_text_spans = None
 
-    # retrieve any pinned precedent documents specified in the request attachments
+    # retrieve any pinned precedent documents specified in the request attachments and provide the contract summary and top-level section previews
     pinned_precedent_document_attachments = [attachment for attachment in request.attachments if attachment.kind == "pinned_precedent_document"]
     if pinned_precedent_document_attachments:
         agent_precedent_documents: list[AgentPrecedentDocument] = []

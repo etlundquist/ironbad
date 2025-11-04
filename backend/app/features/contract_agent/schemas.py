@@ -274,6 +274,11 @@ class AgentEvalTaskOutput(ConfiguredBaseModel):
 class AgentEvalOutputCase(AgentEvalInputCase, AgentEvalTaskOutput):
     pass
 
+class AgentEvalRunRequest(ConfiguredBaseModel):
+    eval_id: str
+    run_name: str
+    dataset: AgentEvalInputDataset
+
 class AgentEvalRunResponse(ConfiguredBaseModel):
     eval_id: str 
     eval_name: str 

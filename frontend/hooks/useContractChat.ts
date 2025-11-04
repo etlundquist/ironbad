@@ -97,7 +97,10 @@ export function useContractChat(contractId: string | undefined, contract: any, o
               let dataStr = ''
               for (const line of lines) {
                 if (line.startsWith('event:')) eventName = line.slice(6).trim()
-                if (line.startsWith('data:')) dataStr += line.slice(5).trim()
+                if (line.startsWith('data:')) {
+                  if (dataStr) dataStr += '\n'  // SSE spec: multiple data lines joined with newline
+                  dataStr += line.slice(5)  // Don't trim - preserve whitespace including newlines
+                }
               }
               if (eventName && dataStr) {
                 try {
@@ -127,7 +130,10 @@ export function useContractChat(contractId: string | undefined, contract: any, o
           let dataStr = ''
           for (const line of lines) {
             if (line.startsWith('event:')) eventName = line.slice(6).trim()
-            if (line.startsWith('data:')) dataStr += line.slice(5).trim()
+            if (line.startsWith('data:')) {
+              if (dataStr) dataStr += '\n'  // SSE spec: multiple data lines joined with newline
+              dataStr += line.slice(5)  // Don't trim - preserve whitespace including newlines
+            }
           }
           if (eventName && dataStr) {
             try {

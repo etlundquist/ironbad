@@ -20,7 +20,7 @@ from app.models import Contract as DBContract, AgentChatThread as DBAgentChatThr
 
 from app.api.deps import get_db
 from app.features.contract_agent.agent import AgentContext, agent
-from app.features.contract_agent.schemas import AgentEvalInputDataset, AgentEvalJob, AgentEventStreamContext, AgentChatThread, AgentChatMessage, AgentRunRequest
+from app.features.contract_agent.schemas import AgentEvalInputDataset, AgentEvalJob, AgentEvalRunRequest, AgentEventStreamContext, AgentChatThread, AgentChatMessage, AgentRunRequest
 from app.features.contract_agent.events import handle_event_stream
 from app.features.contract_agent.services import process_request_attachments
 from app.features.contract_agent.tasks import run_agent_evaluation
@@ -119,23 +119,23 @@ async def create_agent_run(request: AgentRunRequest, db: AsyncSession = Depends(
 
 
 @router.post("/agent/evals", tags=["contract_agent"])
-async def create_agent_eval_run(eval_id: str, run_name: str, dataset: AgentEvalInputDataset) -> Response:
+async def create_agent_eval_run(request: AgentEvalRunRequest) -> Response:
     """evaluate the agent with respect to the input dataset of test cases and pre-configured eval graders"""
 
     try:
         openai = AsyncOpenAI()
-        eval = await openai.evals.retrieve(eval_id=eval_id)
+        eval = await openai.evals.retrieve(eval_id=request.eval_id)
         logger.info(f"loading saved evaluation: {eval.name}")
     except Exception:
-        logger.error(f"failed to retrieve eval_id={eval_id}", exc_info=True)
-        raise HTTPException(status_code=404, detail=f"eval_id={eval_id} not found!")
+        logger.error(f"failed to retrieve eval_id={request.eval_id}", exc_info=True)
+        raise HTTPException(status_code=404, detail=f"eval_id={request.eval_id} not found!")
 
     try:
-        job = AgentEvalJob(eval_id=eval_id, run_name=run_name, dataset=dataset, status=JobStatus.QUEUED)
+        job = AgentEvalJob(eval_id=request.eval_id, run_name=request.run_name, dataset=request.dataset, status=JobStatus.QUEUED)
         await run_agent_evaluation.kiq(job)
     except Exception:
-        logger.error(f"failed to create agent evaluation job for eval_id={eval_id}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"failed to create agent evaluation job for eval_id={eval_id}")
+        logger.error(f"failed to create agent evaluation job for eval_id={request.eval_id}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"failed to create agent evaluation job for eval_id={request.eval_id}")
 
     return Response(status_code=202)
 
