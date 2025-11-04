@@ -1,0 +1,5 @@
+# ignore jupyter notebooks in language detection
+*.ipynb linguist-generated
+
+# ignore jupyter notebook output cell metadata in diffs
+*.ipynb -diff
