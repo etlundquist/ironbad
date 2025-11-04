@@ -1,14 +1,14 @@
 from uuid import UUID
 from typing import Annotated, Literal, Optional, TypeAlias, Union
 from datetime import datetime
-
-from openai.types.responses import ResponseInputItem, ResponseItem
 from pydantic import Field
+
+from openai.types.responses import ResponseInputItem
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.schemas import ConfiguredBaseModel, ContractSectionCitation
 from app.features.contract_annotations.schemas import AnnotatedContract
-from app.enums import AnnotationType, ContractSectionType, ChatMessageStatus, ChatMessageRole
+from app.enums import AnnotationType, ContractSectionType, ChatMessageStatus, ChatMessageRole, JobStatus
 
 # agent tool request/response schemas
 # -----------------------------------
@@ -271,14 +271,19 @@ class AgentEvalTaskOutput(ConfiguredBaseModel):
     input_items: list[ResponseInputItem]
     output_items: list[ResponseInputItem]
 
-
 class AgentEvalOutputCase(AgentEvalInputCase, AgentEvalTaskOutput):
     pass
 
 class AgentEvalRunResponse(ConfiguredBaseModel):
     eval_id: str 
-    run_id: str 
+    eval_name: str 
     run_name: str
-    created_at: datetime
-    report_url: str 
-    status: str
+
+class AgentEvalJob(ConfiguredBaseModel):
+    eval_id: str
+    run_name: str
+    dataset: AgentEvalInputDataset
+    status: JobStatus
+    errors: Optional[list[dict]] = None
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)

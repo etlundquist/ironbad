@@ -1,32 +1,29 @@
-import asyncio
-from datetime import datetime
 import json
 import logging
 
 from uuid import UUID
 
 from agents.items import ResponseInputItemParam
-from fastapi import APIRouter, Depends, HTTPException
-from openai.types.responses import EasyInputMessageParam, ResponseInputItem, ResponseInputTextParam
+from fastapi import APIRouter, Depends, HTTPException, Response
+from openai.types.responses import EasyInputMessageParam, ResponseInputTextParam
 from sse_starlette import EventSourceResponse
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from openai import AsyncOpenAI
-from openai.types.responses import EasyInputMessage
 from agents import RunConfig, Runner
 
 from app.features.contract_annotations.schemas import AnnotatedContract
-from app.enums import ChatMessageRole, ChatMessageStatus
+from app.enums import ChatMessageRole, ChatMessageStatus, JobStatus
 from app.models import Contract as DBContract, AgentChatThread as DBAgentChatThread, AgentChatMessage as DBAgentChatMessage
 
 from app.api.deps import get_db
 from app.features.contract_agent.agent import AgentContext, agent
-from app.features.contract_agent.schemas import AgentEvalInputDataset, AgentEvalOutputCase, AgentEvalRunResponse, AgentEvalTaskInput, AgentEvalTaskOutput, AgentEventStreamContext, AgentChatThread, AgentChatMessage
+from app.features.contract_agent.schemas import AgentEvalInputDataset, AgentEvalJob, AgentEventStreamContext, AgentChatThread, AgentChatMessage, AgentRunRequest
 from app.features.contract_agent.events import handle_event_stream
-from app.features.contract_agent.schemas import AgentRunRequest
 from app.features.contract_agent.services import process_request_attachments
+from app.features.contract_agent.tasks import run_agent_evaluation
 
 
 router = APIRouter()
@@ -95,6 +92,7 @@ async def create_agent_run(request: AgentRunRequest, db: AsyncSession = Depends(
     # create the agent's runtime context and the event stream handler's context 
     agent_context = AgentContext(db=db, contract=contract, request=request)
     stream_context = AgentEventStreamContext(db=db, contract=contract, chat_thread_id=chat_thread.id, user_message_id=user_message.id, assistant_message_id=assistant_message.id)
+    run_config = RunConfig(workflow_name="Agent Run")
 
     # prepare the user input as either a single string or list of content blocks based on the presence/absence of attachments
     # NOTE: user message attachments are included as additional text content blocks following the main request content
@@ -111,6 +109,7 @@ async def create_agent_run(request: AgentRunRequest, db: AsyncSession = Depends(
         input=user_input, 
         context=agent_context,
         conversation_id=chat_thread.openai_conversation_id,
+        run_config=run_config,
         max_turns=25
     )
 
@@ -119,50 +118,26 @@ async def create_agent_run(request: AgentRunRequest, db: AsyncSession = Depends(
     return EventSourceResponse(handle_event_stream(event_stream=result.stream_events(), context=stream_context))
 
 
-@router.post("/agent/evals", tags=["contract_agent"], response_model=AgentEvalRunResponse)
-async def create_agent_eval_run(dataset: AgentEvalInputDataset, db: AsyncSession = Depends(get_db)) -> AgentEvalRunResponse:
+@router.post("/agent/evals", tags=["contract_agent"])
+async def create_agent_eval_run(eval_id: str, run_name: str, dataset: AgentEvalInputDataset) -> Response:
     """evaluate the agent with respect to the input dataset of test cases and pre-configured eval graders"""
 
     try:
-
-        # FIXME: convert this into a TaskIQ background task with a semaphore to limit the number of concurrent agent runs
-        task_inputs = [AgentEvalTaskInput(contract_filename=case.contract_filename, user_message=case.user_message, user_message_attachments=case.user_message_attachments) for case in dataset.cases]
-        agent_task_outputs = await asyncio.gather(*[run_agent_eval_task(db=db, task_input=task_input) for task_input in task_inputs])
-        output_cases = [AgentEvalOutputCase(**case_input.model_dump(), **task_output.model_dump()) for case_input, task_output in zip(dataset.cases, agent_task_outputs)]
-
         openai = AsyncOpenAI()
-        evals = await openai.evals.list()
-        agent_eval = next((eval for eval in evals.data if eval.name == "Agent Evaluation"), None)
-        if not agent_eval:
-            raise HTTPException(status_code=404, detail="Agent Evaluation OpenAI Eval Object not found")
+        eval = await openai.evals.retrieve(eval_id=eval_id)
+        logger.info(f"loading saved evaluation: {eval.name}")
+    except Exception:
+        logger.error(f"failed to retrieve eval_id={eval_id}", exc_info=True)
+        raise HTTPException(status_code=404, detail=f"eval_id={eval_id} not found!")
 
-        data_source_content = [{"item": output_case.model_dump(exclude_unset=True)} for output_case in output_cases]
-        eval_run = await openai.evals.runs.create(
-            eval_id=agent_eval.id,
-            name=dataset.name,
-            data_source={
-                "type": "jsonl",
-                "source": {
-                    "type": "file_content",
-                    "content": data_source_content
-                }
-            }
-        )
+    try:
+        job = AgentEvalJob(eval_id=eval_id, run_name=run_name, dataset=dataset, status=JobStatus.QUEUED)
+        await run_agent_evaluation.kiq(job)
+    except Exception:
+        logger.error(f"failed to create agent evaluation job for eval_id={eval_id}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"failed to create agent evaluation job for eval_id={eval_id}")
 
-        eval_run_response = AgentEvalRunResponse(
-            eval_id=agent_eval.id,
-            run_id=eval_run.id,
-            run_name=eval_run.name,
-            created_at=datetime.fromtimestamp(eval_run.created_at),
-            report_url=eval_run.report_url,
-            status=eval_run.status
-        )
-        return eval_run_response
-     
-    except Exception as e:
-
-        logger.error("Error running agent evaluation", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    return Response(status_code=202)
 
 
 @router.get("/agent/threads", tags=["contract_agent"])
@@ -229,59 +204,3 @@ async def get_agent_chat_message(thread_id: UUID, message_id: UUID, db: AsyncSes
     if not message:
         raise HTTPException(status_code=404, detail=f"agent_chat_message_id={message_id} not found")
     return AgentChatMessage.model_validate(message)
-
-
-async def run_agent_eval_task(db: AsyncSession, task_input: AgentEvalTaskInput) -> AgentEvalTaskOutput:
-    """create and execute a new agent task synchronously returning a RunResult object with the input and all output items"""
-
-    # fetch the relevant contract from the database and deserialize to pydantic
-    query = select(DBContract).where(DBContract.filename == task_input.contract_filename)
-    result = await db.execute(query)
-    dbcontract = result.scalar_one_or_none()
-    if not dbcontract:
-        raise ValueError(f"contract_filename={task_input.contract_filename} not found")
-    contract = AnnotatedContract.model_validate(dbcontract)
-
-    # prepare the agent context and user input (either a single string or list of content blocks based on the presence/absence of attachments) for the run
-    agent_run_request = AgentRunRequest(contract_id=contract.id, content=task_input.user_message, attachments=task_input.user_message_attachments)
-    agent_context = AgentContext(db=db, contract=contract, request=agent_run_request)
-    if task_input.user_message_attachments:
-        attachment_blocks = await process_request_attachments(db=db, contract=contract, request=agent_run_request)
-        user_input: list[ResponseInputItemParam] = [EasyInputMessageParam(role="user", content=[ResponseInputTextParam(type="input_text", text=task_input.user_message)] + attachment_blocks)]
-    else:
-        user_input: str = task_input.user_message
-
-    # add additional metadata to the run config to identify evaluation runs server-side
-    run_config = RunConfig(workflow_name="Agent Evaluation")
-
-    try:
-        # execute the agent run synchronously returning a RunResult object with all input/output items
-        result = await Runner.run(
-            starting_agent=agent, 
-            input=user_input, 
-            context=agent_context,
-            run_config=run_config,
-            max_turns=25
-        )
-        # convert the run input to a list of input items
-        if isinstance(result.input, str):
-            input_items: list[ResponseInputItem] = [EasyInputMessage(type="message", role="user", content=result.input)] 
-        else:
-            input_items: list[ResponseInputItem] = result.input
-        # convert the run output to a list of output items
-        output_items: ResponseInputItem = [item.to_input_item() for item in result.new_items]
-        return AgentEvalTaskOutput(
-            status="success", 
-            assistant_message=result.final_output,
-            input_items=input_items,
-            output_items=output_items
-        )
-    except Exception:
-        # log the error and return a failure response
-        logger.error("agent run failed!", exc_info=True)
-        return AgentEvalTaskOutput(
-            status="failure", 
-            assistant_message="The agent run failed.", 
-            input_items=[], 
-            output_items=[]
-        )
