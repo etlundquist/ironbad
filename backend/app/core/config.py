@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     # database settings
     database_url: PostgresDsn = Field(default="postgresql+asyncpg://postgres:password@database:5432/ironbad", description="database connection string using asyncpg driver")
     db_echo: bool = Field(default=False, description="echo SQL queries to console")
-    db_pool_size: int = Field(default=5, description="database connection pool size")
+    db_pool_size: int = Field(default=10, description="database connection pool size")
     db_max_overflow: int = Field(default=10, description="maximum number of database connections to create beyond pool size")
 
     # redis settings
