@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Contract, ContractSectionCitation } from '../../lib/types'
 import { useContractChat } from '../../hooks/useContractChat'
 import { Spinner } from '../common/Spinner'
@@ -27,7 +28,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ contract, contractId, isAnalyz
     sendMessage,
     handleNewChat
   } = useContractChat(contractId, contract, {
-    onError: (title, message) => showToast({ type: 'error', title, message })
+    onError: (title, message) => showToast({ type: 'error', title, message, contractFilename: contract.filename })
   })
 
   useEffect(() => {
@@ -115,7 +116,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ contract, contractId, isAnalyz
 
       return (
         <div ref={contentRef}>
-          <ReactMarkdown>{children}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>
         </div>
       )
     }

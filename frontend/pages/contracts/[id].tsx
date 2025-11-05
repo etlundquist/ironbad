@@ -105,13 +105,15 @@ const ContractDetailPage: NextPage = () => {
       showToast({
         type: 'success',
         title: 'Ingestion Started',
-        message: 'Contract ingestion started successfully!'
+        message: 'Contract ingestion started successfully!',
+        contractFilename: contract.filename
       })
     } catch (error) {
       showToast({
         type: 'error',
         title: 'Ingestion Failed',
-        message: error instanceof Error ? error.message : 'Unknown error'
+        message: error instanceof Error ? error.message : 'Unknown error',
+        contractFilename: contract.filename
       })
     } finally {
       setIsAnalyzing(false)
@@ -129,7 +131,8 @@ const ContractDetailPage: NextPage = () => {
       showToast({
         type: 'error',
         title: 'Analysis Failed',
-        message: error instanceof Error ? error.message : 'Unknown error'
+        message: error instanceof Error ? error.message : 'Unknown error',
+        contractFilename: contract.filename
       })
       setIsAnalyzing(false)
     }

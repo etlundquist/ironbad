@@ -53,6 +53,7 @@ const ContractsPage: NextPage = () => {
 
   const handleIngestContract = async (contractId: string) => {
     setIngestingContract(contractId)
+    const contract = contracts.find(c => c.id === contractId)
     try {
       await ingestContracts([contractId])
       await loadContracts()
@@ -60,7 +61,8 @@ const ContractsPage: NextPage = () => {
       showToast({
         type: 'error',
         title: 'Ingestion Failed',
-        message: error instanceof Error ? error.message : 'Unknown error'
+        message: error instanceof Error ? error.message : 'Unknown error',
+        contractFilename: contract?.filename
       })
       setIngestingContract(null)
     }
@@ -68,6 +70,7 @@ const ContractsPage: NextPage = () => {
 
   const handleAnalyzeContract = async (contractId: string) => {
     setAnalyzingContract(contractId)
+    const contract = contracts.find(c => c.id === contractId)
     try {
       await analyzeContracts([contractId])
       await loadContracts()
@@ -75,26 +78,30 @@ const ContractsPage: NextPage = () => {
       showToast({
         type: 'error',
         title: 'Analysis Failed',
-        message: error instanceof Error ? error.message : 'Unknown error'
+        message: error instanceof Error ? error.message : 'Unknown error',
+        contractFilename: contract?.filename
       })
       setAnalyzingContract(null)
     }
   }
 
   const handleDeleteContract = async (contractId: string) => {
+    const contract = contracts.find(c => c.id === contractId)
     try {
       await deleteContract(contractId)
       showToast({
         type: 'success',
         title: 'Contract Deleted',
-        message: 'Contract has been successfully deleted'
+        message: 'Contract has been successfully deleted',
+        contractFilename: contract?.filename
       })
       await loadContracts()
     } catch (error) {
       showToast({
         type: 'error',
         title: 'Deletion Failed',
-        message: error instanceof Error ? error.message : 'Unknown error'
+        message: error instanceof Error ? error.message : 'Unknown error',
+        contractFilename: contract?.filename
       })
     }
   }

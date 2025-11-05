@@ -7,7 +7,7 @@ standard_clause_rules:
         text: The liability cap must include exceptions that allow unlimited liability for breaches of confidentiality, intellectual property infringement, data privacy or security violations, and indemnification obligations.
       - severity: warning
         title: Supplier's Liability Limits Below Threshold
-        text: Supplier's liability limits must not be less than the greater of twelve (12) months of fees paid or $500,000.
+        text: Supplier's liability limits must not be less than twelve (12) months of fees paid
 
   - standard_clause_name: indemnification
     rules:
@@ -30,8 +30,8 @@ standard_clause_rules:
         title: Customer Cannot Terminate for Convenience
         text: Customer must have the right to terminate this Agreement for convenience upon no more than thirty (30) days' prior written notice.
       - severity: critical
-        title: No Refund on Termination for Convenience
-        text: Upon Customer's termination for convenience, Supplier must refund a pro-rata portion of any prepaid fees for the unused portion of the term within thirty (30) days of the effective date of termination.
+        title: No Refund on Termination
+        text: Upon termination, Supplier must refund a pro-rata portion of any prepaid fees for the unused portion of the term within thirty (30) days of the effective date of termination.
       - severity: critical
         title: No Data Return Upon Termination
         text: Upon termination, Supplier must return or destroy all Customer Data and provide Customer with a complete export of all data in a standard format at no additional charge.
@@ -85,28 +85,22 @@ standard_clause_rules:
     rules:
       - severity: critical
         title: License Scope Too Restrictive
-        text: Customer must be granted a non-exclusive, worldwide license to use the Software for Customer's internal business purposes.
+        text: Customer must be granted a non-exclusive license to use the Software for Customer's internal business purposes.
       - severity: warning
         title: Access by Affiliates or Contractors Prohibited
-        text: The license must permit access and use by Customer's employees, contractors, and affiliates for Customer's internal business purposes; prohibitions on affiliates or contractors are not acceptable.
+        text: The license must not prohibit access and use by Customer's employees, contractors, and affiliates for Customer's internal business purposes
       - severity: warning
         title: Unreasonable Geographic or Site Restrictions
         text: The license must not restrict usage to specific physical sites or geographies; seat- or usage-based pricing is acceptable.
-      - severity: warning
-        title: Backup and Integration Prohibited
-        text: Customer must have the right to make backup copies, customize interfaces, and integrate the Software with other systems without additional fees.
 
   - standard_clause_name: payment_terms
     rules:
-      - severity: warning
-        title: Payment Terms Less Than 30 Days
-        text: Customer must have at least thirty (30) days from the date of invoice to pay undisputed fees.
       - severity: critical
         title: No Invoice Dispute Rights
         text: Customer must have the right to dispute invoices in good faith, and Supplier must not suspend Services during the dispute resolution period.
       - severity: warning
-        title: Excessive Fee Increases
-        text: For renewal terms, Supplier's fee increases must not exceed five percent (5%) per year, with at least ninety (90) days' prior written notice.
+        title: Payment Terms Less Than 30 Days
+        text: Customer must have at least thirty (30) days from the date of invoice to pay undisputed fees.
       - severity: warning
         title: Fees May Increase During Initial Term
         text: Fees must be fixed during the Initial Term with no increases permitted before renewal.
@@ -115,13 +109,13 @@ standard_clause_rules:
     rules:
       - severity: critical
         title: No Fixed Initial Term
-        text: The agreement must specify an initial term that is not indefinite or open-ended.
+        text: The agreement must specify an initial term that is not indefinite or open-ended (the initial term may be defined by a fixed end date, initial duration, order forms, subscription terms, etc.)
       - severity: warning
         title: Auto-Renewal Cannot Be Opted Out
         text: If the Agreement includes automatic renewal, Customer must be able to opt out of auto-renewal without penalty or fee.
       - severity: warning
         title: Excessive Non-Renewal Notice Required
-        text: Customer must not be required to provide notice of non-renewal more than ninety (90) days prior to the expiration of the then-current term.
+        text: Customer must not be required to provide notice of non-renewal more than thirty (30) days prior to the expiration of the then-current term.
 
   - standard_clause_name: governing_law
     rules:

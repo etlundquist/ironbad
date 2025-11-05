@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { StandardClause, ContractClause, Contract } from '../../lib/types'
 import { fetchStandardClauses, fetchContractClauses } from '../../lib/api'
 import { Spinner } from '../common/Spinner'
@@ -142,7 +143,7 @@ export const ClausesTab: React.FC<ClausesTabProps> = ({ contract, isAnalyzing, o
                 {isFound && isExpanded && contractClause && (
                   <div className="clause-content">
                     <div className="clause-markdown">
-                      <ReactMarkdown>{contractClause.cleaned_markdown}</ReactMarkdown>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{contractClause.cleaned_markdown}</ReactMarkdown>
                     </div>
                   </div>
                 )}

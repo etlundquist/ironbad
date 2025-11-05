@@ -36,6 +36,7 @@ async def ingest_contract(job: ContractIngestionJob) -> None:
         result = await db.execute(query)
         contract = result.scalar_one()
         contract_id = contract.id
+        contract_name = contract.filename
 
         # get the up-to-date set of standard clauses to map/extract
         query = select(StandardClause)
@@ -46,7 +47,7 @@ async def ingest_contract(job: ContractIngestionJob) -> None:
         notifications_client = await get_notifications_client()
 
         # log the start time for contract ingestion
-        logger.info(f"*** ingesting contract: {contract.filename} ({contract.id}) ***")
+        logger.info(f"*** ingesting contract: {contract_name} ({contract_id}) ***")
         beg_time = datetime.now()
 
         try:
@@ -65,7 +66,7 @@ async def ingest_contract(job: ContractIngestionJob) -> None:
             # add the structured contract sections to the database
             contract_sections = [
                 ContractSection(
-                    contract_id=contract.id,
+                    contract_id=contract_id,
                     type=section.type,
                     level=section.level,
                     number=section.number,
@@ -88,28 +89,29 @@ async def ingest_contract(job: ContractIngestionJob) -> None:
             # if ingestion was successful then progress the contract to the next state and commit all changes to the database
             duration = datetime.now() - beg_time
             contract.status = ContractStatus.READY_FOR_REVIEW
-            logger.info(f"*** contract ingestion ({contract.id}: {contract.filename}) successful! ({duration}) ***")
+            logger.info(f"*** contract ingestion ({contract_id}: {contract_name}) successful! ({duration}) ***")
             await db.commit()
 
             # send a notification that the contract ingestion was successful
-            status_update = JobStatusUpdate(contract_id=contract_id, status=JobStatus.COMPLETED, timestamp=datetime.now())
+            status_update = JobStatusUpdate(contract_id=contract_id, contract_name=contract_name, status=JobStatus.COMPLETED, timestamp=datetime.now())
             await notifications_client.publish(channel=settings.redis_notifications_channel, event=NotificationEvent(event="ingestion", data=status_update))
 
         except Exception as e:
 
             # if ingestion failed then leave the contract in the current state and discard all extracted sections and clauses
-            logger.error(f"*** contract ingestion ({contract.id}: {contract.filename}) failed! discarding extracted sections and clauses ***", exc_info=True)
-            await db.execute(delete(ContractSection).where(ContractSection.contract_id == contract.id))
-            await db.execute(delete(ContractClause).where(ContractClause.contract_id == contract.id))
+            logger.error(f"*** contract ingestion ({contract_id}: {contract_name}) failed! discarding extracted sections and clauses ***", exc_info=True)
+            await db.execute(delete(ContractSection).where(ContractSection.contract_id == contract_id))
+            await db.execute(delete(ContractClause).where(ContractClause.contract_id == contract_id))
 
             # record the error and discard any extracted markdown, sections, and clauses
+            contract.status = ContractStatus.UPLOADED
             contract.errors = [{"step": "ingestion", "message": str(e)}]
             contract.markdown = None
             contract.meta = None
             await db.commit()
 
             # send a notification that the contract ingestion failed
-            status_update = JobStatusUpdate(contract_id=contract_id, status=JobStatus.FAILED, errors=[{"step": "ingestion", "message": str(e)}], timestamp=datetime.now())
+            status_update = JobStatusUpdate(contract_id=contract_id, contract_name=contract_name, status=JobStatus.FAILED, errors=[{"step": "ingestion", "message": str(e)}], timestamp=datetime.now())
             await notifications_client.publish(channel=settings.redis_notifications_channel, event=NotificationEvent(event="ingestion", data=status_update))
 
 
@@ -125,6 +127,7 @@ async def analyze_contract(job: ContractAnalysisJob) -> None:
         result = await db.execute(query)
         contract = result.scalar_one()
         contract_id = contract.id
+        contract_name = contract.filename
 
         # get the up-to-date set of standard clauses to evaluate
         query = select(StandardClause)
@@ -135,7 +138,7 @@ async def analyze_contract(job: ContractAnalysisJob) -> None:
         notifications_client = await get_notifications_client()
 
         # log the start time for issue identification
-        logger.info(f"*** analyzing contract: {contract.filename} ({contract.id}) ***")
+        logger.info(f"*** analyzing contract: {contract_name} ({contract_id}) ***")
         beg_time = datetime.now()
 
         try:
@@ -147,23 +150,24 @@ async def analyze_contract(job: ContractAnalysisJob) -> None:
             # if issue identification was successful then progress the contract to the next state and commit all changes to the database
             duration = datetime.now() - beg_time
             contract.status = ContractStatus.UNDER_REVIEW
-            logger.info(f"*** contract analysis ({contract.id}: {contract.filename}) successful! ({duration}) ***")
+            logger.info(f"*** contract analysis ({contract_id}: {contract_name}) successful! ({duration}) ***")
             await db.commit()
 
             # send a notification that the contract analysis was successful
-            status_update = JobStatusUpdate(contract_id=contract_id, status=JobStatus.COMPLETED, timestamp=datetime.now())
+            status_update = JobStatusUpdate(contract_id=contract_id, contract_name=contract_name, status=JobStatus.COMPLETED, timestamp=datetime.now())
             await notifications_client.publish(channel=settings.redis_notifications_channel, event=NotificationEvent(event="analysis", data=status_update))
 
         except Exception as e:
 
             # if issue identification failed then leave the contract in the current state and discard all extracted issues
-            logger.error(f"*** contract analysis ({contract.id}: {contract.filename}) failed! discarding extracted issues ***", exc_info=True)
-            await db.execute(delete(ContractIssue).where(ContractIssue.contract_id == contract.id))
+            logger.error(f"*** contract analysis ({contract_id}: {contract_name}) failed! discarding extracted issues ***", exc_info=True)
+            await db.execute(delete(ContractIssue).where(ContractIssue.contract_id == contract_id))
 
             # record the error and discard any extracted issues
+            contract.status = ContractStatus.READY_FOR_REVIEW
             contract.errors = [{"step": "analysis", "message": str(e)}]
             await db.commit()
 
             # send a notification that the contract analysis failed
-            status_update = JobStatusUpdate(contract_id=contract_id, status=JobStatus.FAILED, errors=[{"step": "analysis", "message": str(e)}], timestamp=datetime.now())
+            status_update = JobStatusUpdate(contract_id=contract_id, contract_name=contract_name, status=JobStatus.FAILED, errors=[{"step": "analysis", "message": str(e)}], timestamp=datetime.now())
             await notifications_client.publish(channel=settings.redis_notifications_channel, event=NotificationEvent(event="analysis", data=status_update))

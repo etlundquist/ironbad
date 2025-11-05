@@ -19,7 +19,8 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({ contract, onContract
     customer_name: "",
     supplier_name: "",
     effective_date: "",
-    initial_term: ""
+    initial_term: "",
+    summary: ""
   })
   const [originalMetadata, setOriginalMetadata] = useState<ContractMetadata | null>(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -36,7 +37,8 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({ contract, onContract
         customer_name: "",
         supplier_name: "",
         effective_date: "",
-        initial_term: ""
+        initial_term: "",
+        summary: ""
       }
       setMetadata(defaultMetadata)
       setOriginalMetadata(defaultMetadata)
@@ -63,13 +65,15 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({ contract, onContract
       showToast({
         type: 'success',
         title: 'Metadata Saved',
-        message: 'Metadata saved successfully!'
+        message: 'Metadata saved successfully!',
+        contractFilename: contract.filename
       })
     } catch (error) {
       showToast({
         type: 'error',
         title: 'Save Failed',
-        message: error instanceof Error ? error.message : 'Unknown error'
+        message: error instanceof Error ? error.message : 'Unknown error',
+        contractFilename: contract.filename
       })
     } finally {
       setIsSaving(false)
@@ -205,6 +209,23 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({ contract, onContract
               placeholder="e.g., 12 months, 2 years"
             />
           </div>
+        </div>
+
+        <div className="form-group" style={{ marginTop: '1.5rem' }}>
+          <label htmlFor="summary">Contract Summary</label>
+          <textarea
+            id="summary"
+            value={metadata.summary || ''}
+            onChange={(e) => handleMetadataChange('summary', e.target.value)}
+            className="form-input"
+            placeholder="Contract summary will appear here after ingestion..."
+            rows={10}
+            style={{
+              width: '100%',
+              minHeight: '200px',
+              resize: 'vertical'
+            }}
+          />
         </div>
       </div>
     </div>

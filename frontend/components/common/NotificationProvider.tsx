@@ -6,6 +6,7 @@ export interface SimpleToast {
   type: 'success' | 'error' | 'info' | 'warning'
   title: string
   message: string
+  contractFilename?: string
 }
 
 interface NotificationContextType {
@@ -27,6 +28,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       type: simpleToast.type === 'success' || simpleToast.type === 'info' ? 'success' : 'error',
       title: simpleToast.title,
       message: simpleToast.message,
+      contractFilename: simpleToast.contractFilename,
       jobType: 'ingestion' // Default jobType for styling
     })
   }, [addToast])

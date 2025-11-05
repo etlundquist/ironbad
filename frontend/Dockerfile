@@ -4,7 +4,7 @@ WORKDIR /app
 # copy package files first for better caching
 COPY package*.json ./
 
-# install all dependencies including types in one step
+# install all dependencies (including remark-gfm for markdown table support) and types in one step
 RUN npm install && npm install --save-dev @types/react @types/react-dom @types/node
 
 # copy source code

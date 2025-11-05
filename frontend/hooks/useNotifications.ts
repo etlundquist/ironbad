@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 export interface JobStatusUpdate {
   contract_id: string
+  contract_name: string
   status: 'queued' | 'in_progress' | 'completed' | 'failed'
   errors?: Array<{ step: string; message: string }>
   timestamp: string
@@ -93,7 +94,7 @@ export function useNotifications(): UseNotificationsReturn {
           message: isSuccess
             ? `Contract ingestion completed successfully`
             : `Contract ingestion failed: ${jobStatusUpdate.errors?.[0]?.message || 'Unknown error'}`,
-          contractFilename: jobStatusUpdate.contract_id, // We'll need to get the actual filename
+          contractFilename: jobStatusUpdate.contract_name,
           jobType: 'ingestion'
         })
 
@@ -125,7 +126,7 @@ export function useNotifications(): UseNotificationsReturn {
           message: isSuccess
             ? `Contract analysis completed successfully`
             : `Contract analysis failed: ${jobStatusUpdate.errors?.[0]?.message || 'Unknown error'}`,
-          contractFilename: jobStatusUpdate.contract_id, // We'll need to get the actual filename
+          contractFilename: jobStatusUpdate.contract_name,
           jobType: 'analysis'
         })
 

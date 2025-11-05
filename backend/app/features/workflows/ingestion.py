@@ -430,6 +430,8 @@ async def parse_contract(path: str) -> ParsedContract:
 
     logger.info("converting PDF/DOCX contract to markdown text...")
     contract_markdown = await parse_contract_markdown(path)
+    if not contract_markdown.strip():
+        raise ValueError("failed to convert raw contract document to markdown text")
 
     logger.info("parsing contract sections as structured objects...")
     section_list, section_tree = await parse_contract_sections(contract_markdown)

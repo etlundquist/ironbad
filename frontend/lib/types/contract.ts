@@ -5,6 +5,7 @@ export interface ContractMetadata {
   supplier_name?: string
   effective_date?: string
   initial_term?: string
+  summary?: string
 }
 
 export interface Contract {

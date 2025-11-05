@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Contract, ContractIssue } from '../../lib/types'
 import { fetchContractIssues, resolveIssue, unresolveIssue, generateAIRevision, saveUserRevision } from '../../lib/api'
 import { updateContractStatus, analyzeContracts } from '../../lib/api'
@@ -94,7 +95,8 @@ export const IssuesTab: React.FC<IssuesTabProps> = ({ contract, isAnalyzing, onA
       showToast({
         type: 'error',
         title: 'Failed to Resolve Issue',
-        message: error instanceof Error ? error.message : 'Unknown error'
+        message: error instanceof Error ? error.message : 'Unknown error',
+        contractFilename: contract.filename
       })
     }
   }
@@ -107,7 +109,8 @@ export const IssuesTab: React.FC<IssuesTabProps> = ({ contract, isAnalyzing, onA
       showToast({
         type: 'error',
         title: 'Failed to Unresolve Issue',
-        message: error instanceof Error ? error.message : 'Unknown error'
+        message: error instanceof Error ? error.message : 'Unknown error',
+        contractFilename: contract.filename
       })
     }
   }
@@ -122,7 +125,8 @@ export const IssuesTab: React.FC<IssuesTabProps> = ({ contract, isAnalyzing, onA
       showToast({
         type: 'error',
         title: 'Failed to Generate Revision',
-        message: error instanceof Error ? error.message : 'Unknown error'
+        message: error instanceof Error ? error.message : 'Unknown error',
+        contractFilename: contract.filename
       })
     } finally {
       setGeneratingIssueId(null)
@@ -138,7 +142,8 @@ export const IssuesTab: React.FC<IssuesTabProps> = ({ contract, isAnalyzing, onA
       showToast({
         type: 'error',
         title: 'Failed to Save Revision',
-        message: error instanceof Error ? error.message : 'Unknown error'
+        message: error instanceof Error ? error.message : 'Unknown error',
+        contractFilename: contract.filename
       })
     } finally {
       setSavingIssueId(null)
@@ -153,7 +158,8 @@ export const IssuesTab: React.FC<IssuesTabProps> = ({ contract, isAnalyzing, onA
       showToast({
         type: 'error',
         title: 'Failed to Complete Review',
-        message: error instanceof Error ? error.message : 'Unknown error'
+        message: error instanceof Error ? error.message : 'Unknown error',
+        contractFilename: contract.filename
       })
     }
   }
@@ -166,7 +172,8 @@ export const IssuesTab: React.FC<IssuesTabProps> = ({ contract, isAnalyzing, onA
       showToast({
         type: 'error',
         title: 'Failed to Reopen Review',
-        message: error instanceof Error ? error.message : 'Unknown error'
+        message: error instanceof Error ? error.message : 'Unknown error',
+        contractFilename: contract.filename
       })
     }
   }
@@ -346,11 +353,11 @@ export const IssuesTab: React.FC<IssuesTabProps> = ({ contract, isAnalyzing, onA
                             <div className="issue-actions">
                               <div className="issue-section">
                                 <div className="issue-section-title">Policy Rule</div>
-                                <div className="issue-section-body clause-markdown"><ReactMarkdown>{issue.standard_clause_rule?.text || ''}</ReactMarkdown></div>
+                                <div className="issue-section-body clause-markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{issue.standard_clause_rule?.text || ''}</ReactMarkdown></div>
                               </div>
                               <div className="issue-section">
                                 <div className="issue-section-title">Issue Explanation</div>
-                                <div className="issue-section-body clause-markdown"><ReactMarkdown>{issue.explanation || ''}</ReactMarkdown></div>
+                                <div className="issue-section-body clause-markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{issue.explanation || ''}</ReactMarkdown></div>
                               </div>
                               <div className="issue-section">
                                 <div className="issue-section-title">Relevant Contract Text</div>

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Contract, ContractSectionCitation } from '../../lib/types'
 import { ChatMessageAttachment } from '../../lib/types/agent'
 import { SavedPrompt } from '../../lib/types/saved-prompt'
@@ -54,7 +55,7 @@ export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId
     messageProgress,
     messageTodos
   } = useAgentChat(contractId, {
-    onError: (title, message) => showToast({ type: 'error', title, message }),
+    onError: (title, message) => showToast({ type: 'error', title, message, contractFilename: contract.filename }),
     onToolCall: (toolName, toolCallId, toolCallArgs) => {
       console.log('Agent tool call:', { toolName, toolCallId, toolCallArgs })
     },
@@ -334,7 +335,7 @@ export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId
 
       return (
         <div ref={contentRef}>
-          <ReactMarkdown>{children}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>
         </div>
       )
     }

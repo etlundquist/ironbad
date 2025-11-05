@@ -24,6 +24,7 @@ class ContractAnalysisJob(ConfiguredBaseModel):
 
 class JobStatusUpdate(ConfiguredBaseModel):
     contract_id: UUID
+    contract_name: str
     status: JobStatus
     errors: Optional[list[dict]] = None
     timestamp: datetime
