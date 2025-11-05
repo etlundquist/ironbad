@@ -116,7 +116,7 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
               </div>
             ))
           ) : (
-            <p style={{ color: '#6b7280', fontSize: '14px', fontStyle: 'italic' }}>No pending comments. Select text in the contract to add a comment.</p>
+            <p style={{ color: '#6b7280', fontSize: '14px', fontStyle: 'italic' }}>No pending comments. Select section text to add a comment.</p>
           )}
         </div>
       )}

@@ -40,31 +40,23 @@ const Header: React.FC = () => {
             <div style={{
               width: '40px',
               height: '40px',
-              background: '#1f2937',
               borderRadius: '8px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              position: 'relative'
+              position: 'relative',
+              overflow: 'hidden'
             }}>
-              {/* Cast iron skillet icon */}
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                style={{ color: '#ffffff' }}
-              >
-                {/* Skillet body */}
-                <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" fill="none"/>
-                {/* Handle */}
-                <path d="M20 12 L24 12 L24 10 L20 10 Z" fill="currentColor"/>
-                {/* Helper handle */}
-                <path d="M4 8 L6 8 L6 6 L4 6 Z" fill="currentColor"/>
-                {/* Stars */}
-                <path d="M12 4 L12.5 5.5 L14 5.5 L12.75 6.5 L13.25 8 L12 7 L10.75 8 L11.25 6.5 L10 5.5 L11.5 5.5 Z" fill="currentColor"/>
-                <path d="M12 16 L12.5 17.5 L14 17.5 L12.75 18.5 L13.25 20 L12 19 L10.75 20 L11.25 18.5 L10 17.5 L11.5 17.5 Z" fill="currentColor"/>
-              </svg>
+              <img
+                src="/cast-iron.png"
+                alt="Ironbad Logo"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  transform: 'scale(1.15)'
+                }}
+              />
             </div>
             <div>
               <div style={{
@@ -81,7 +73,7 @@ const Header: React.FC = () => {
                 fontWeight: '500',
                 letterSpacing: '0.05em'
               }}>
-                Automated Contract Review
+                AI-Powered Contract Review
               </div>
             </div>
           </div>

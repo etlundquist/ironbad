@@ -123,7 +123,7 @@ const UploadPage: NextPage = () => {
       <main className="main-content">
         <div className="upload-header">
           <h1>Upload Contracts</h1>
-          <p>Upload PDF or DOCX contracts to begin the analysis process</p>
+          <p>Upload one or more contract documents in PDF or DOCX format</p>
         </div>
 
         <DropZone

@@ -500,7 +500,7 @@ const ReviewPage: NextPage = () => {
                 <div className="comments-sidebar" style={{ width: '100%', backgroundColor: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div className="tab-header annotations-header">
                     <div className="annotations-header-title">
-                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
                         <polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="1.5" fill="none"/>
                         <path d="M9 13h6M9 17h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>

@@ -7,7 +7,7 @@ const Home: NextPage = () => {
       <main className="main-content">
         <div className="dashboard-header">
           <h1>Ironbad</h1>
-          <p>Automated Contract Review</p>
+          <p>AI-Powered Contract Review</p>
         </div>
         <div className="action-buttons">
           <Link href="/upload" className="primary-button">

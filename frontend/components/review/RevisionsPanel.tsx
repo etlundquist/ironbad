@@ -111,7 +111,7 @@ export const RevisionsPanel: React.FC<RevisionsPanelProps> = ({
               </div>
             ))
           ) : (
-            <p style={{ color: '#6b7280', fontSize: '14px', fontStyle: 'italic' }}>No pending revisions. Select text and choose Suggest Revision.</p>
+            <p style={{ color: '#6b7280', fontSize: '14px', fontStyle: 'italic' }}>No pending revisions. Select section text to suggest a revision.</p>
           )}
         </div>
       )}

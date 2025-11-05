@@ -375,9 +375,9 @@ export const AgentChatTab: React.FC<AgentChatTabProps> = ({ contract, contractId
   }
 
   const AIIcon = () => (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <rect x="3" y="3" width="18" height="18" rx="4" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-      <text x="12" y="15.5" fontSize="10" fontWeight="700" textAnchor="middle" fill="currentColor">AI</text>
+      <text x="12" y="16" fontSize="12" fontWeight="700" textAnchor="middle" fill="currentColor">AI</text>
       <path d="M19 4L19.5 5.5L21 6L19.5 6.5L19 8L18.5 6.5L17 6L18.5 5.5L19 4Z" fill="currentColor"/>
       <path d="M20 16L20.35 17L21.5 17.35L20.35 17.7L20 19L19.65 17.7L18.5 17.35L19.65 17L20 16Z" fill="currentColor"/>
     </svg>
