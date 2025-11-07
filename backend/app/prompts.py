@@ -209,7 +209,7 @@ Output your response in JSON format corresponding to the Example Output provided
 ## Violation Classification Additional Guidance
 - consider it a violation if the contract either explicitly or implicitly violates the policy rule
 - do not consider it a violation if there is not enough information to evaluate the policy rule
-- do not consider it a violation if the relevant contract text references a related document which covers the required provisions
+- do not consider it a violation if the relevant contract text references a related document which covers the required provisions (e.g. data processing addendum, privacy policy, etc.)
 
 ## Violation Relevant Text Additional Guidance
 - for violations, additionally provide the relevant text from the contract clause that violates the policy rule

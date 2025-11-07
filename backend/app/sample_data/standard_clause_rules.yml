@@ -55,7 +55,7 @@ standard_clause_rules:
     rules:
       - severity: critical
         title: Security Incident Notice Exceeds 72 Hours
-        text: The agreement must require Supplier to notify Customer of any security incident affecting Customer Data within no more than seventy-two (72) hours of becoming aware or without undue delay and in no case later than seventy-two (72) hours.
+        text: Supplier must notify Customer of any security incident affecting Customer Data within no more than seventy-two (72) hours of becoming aware or without undue delay and in no case later than seventy-two (72) hours.
       - severity: critical
         title: Customer Data Ownership Not Retained
         text: Customer must retain all right, title, and interest in and to Customer Data, and Supplier must process Customer Data solely in accordance with Customer's instructions.
