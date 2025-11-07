@@ -21,7 +21,7 @@ standard_clause_rules:
         title: Indemnification Subject to Liability Cap
         text: Supplier's indemnification obligations must not be subject to or limited by the general limitation of liability provisions.
       - severity: critical
-        title: No Duty to Defend in Indemnity
+        title: No Duty to Defend
         text: Indemnification must include Supplier's duty to defend and cover defense costs for third-party claims.
 
   - standard_clause_name: termination
@@ -109,7 +109,7 @@ standard_clause_rules:
         text: The agreement must specify an initial term that is not indefinite or open-ended (the initial term may be defined by a fixed end date, initial duration, order form, subscription term, etc.)
       - severity: warning
         title: Auto-Renewal Cannot Be Opted Out
-        text: If the Agreement includes automatic renewal, Customer must be able to opt out of auto-renewal without penalty or fee.
+        text: If the Agreement includes automatic renewal, Customer must be able to opt out of auto-renewal without paying an explicit penalty or fee.
       - severity: warning
         title: Excessive Non-Renewal Notice Required
         text: Customer must not be required to provide notice of non-renewal more than thirty (30) days prior to the expiration of the then-current term.
