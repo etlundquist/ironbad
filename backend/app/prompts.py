@@ -209,6 +209,7 @@ Output your response in JSON format corresponding to the Example Output provided
 ## Violation Classification Additional Guidance
 - consider it a violation if the contract either explicitly or implicitly violates the policy rule
 - do not consider it a violation if there is not enough information to evaluate the policy rule
+- do not consider it a violation if the relevant contract text references a related document which covers the required provisions
 
 ## Violation Relevant Text Additional Guidance
 - for violations, additionally provide the relevant text from the contract clause that violates the policy rule
@@ -320,8 +321,11 @@ Generate a suggested revision to the contract clause which will fix the issue wi
 - read the full set of policy rules and the standard approved language to understand how to suggest a revision which will fix the identified issue without violating any other policy rules
 - read the contract summary to understand the overall context of the agreement including: the high-level scope and purpose of the agreement, the named parties and their associated roles
 - generate a suggested revision which will fix the identified issue by modifying, adding, and/or removing relevant terms and conditions from the contract clause
+
+# Response Guidelines
 - your response must fully replace the relevant text from the contract clause with the suggested revision
-- your response must be consistent with the full set of policy rules but not add, modify, or remove any terms or conditions which are irrelevant to the identified issue
+- your response must not violate any other clause-specific policy rules
+- your response must not add, modify, or remove any terms or conditions which are not relevant to the identified issue
 - your response should be consistent with the overall scope and context of the agreement as provided in the contract summary
 - output your response without any additional formatting or markdown headers
 

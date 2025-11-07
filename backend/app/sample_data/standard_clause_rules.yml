@@ -7,7 +7,7 @@ standard_clause_rules:
         text: The liability cap must include exceptions that allow unlimited liability for breaches of confidentiality, intellectual property infringement, data privacy or security violations, and indemnification obligations.
       - severity: warning
         title: Supplier's Liability Limits Below Threshold
-        text: Supplier's liability limits must not be less than twelve (12) months of fees paid
+        text: Supplier's liability limits must not be less than either twelve (12) months of fees paid or the price of the provided goods/services (either specified limit is acceptable)
 
   - standard_clause_name: indemnification
     rules:
@@ -62,9 +62,6 @@ standard_clause_rules:
       - severity: critical
         title: No GDPR/CCPA Compliance Commitment
         text: Supplier must comply with all applicable data protection and privacy laws including GDPR, CCPA, and other regulations applicable to Customer's business.
-      - severity: warning
-        title: No Data Processing Addendum Commitment
-        text: Supplier must agree to execute a data processing addendum or equivalent upon Customer's request.
 
   - standard_clause_name: warranties
     rules:
@@ -88,7 +85,7 @@ standard_clause_rules:
         text: Customer must be granted a non-exclusive license to use the Software for Customer's internal business purposes.
       - severity: warning
         title: Access by Affiliates or Contractors Prohibited
-        text: The license must not prohibit access and use by Customer's employees, contractors, and affiliates for Customer's internal business purposes
+        text: The license must not prohibit access and use by Customer's employees, contractors, or affiliates for Customer's internal business purposes.
       - severity: warning
         title: Unreasonable Geographic or Site Restrictions
         text: The license must not restrict usage to specific physical sites or geographies; seat- or usage-based pricing is acceptable.
@@ -103,13 +100,13 @@ standard_clause_rules:
         text: Customer must have at least thirty (30) days from the date of invoice to pay undisputed fees.
       - severity: warning
         title: Fees May Increase During Initial Term
-        text: Fees must be fixed during the Initial Term with no increases permitted before renewal.
+        text: Fees must be fixed during the Initial Term with no increases permitted until a new renewal or subscription term begins (price changes are allowed for new renewal or subscription terms)
 
   - standard_clause_name: term
     rules:
       - severity: critical
         title: No Fixed Initial Term
-        text: The agreement must specify an initial term that is not indefinite or open-ended (the initial term may be defined by a fixed end date, initial duration, order forms, subscription terms, etc.)
+        text: The agreement must specify an initial term that is not indefinite or open-ended (the initial term may be defined by a fixed end date, initial duration, order form, subscription term, etc.)
       - severity: warning
         title: Auto-Renewal Cannot Be Opted Out
         text: If the Agreement includes automatic renewal, Customer must be able to opt out of auto-renewal without penalty or fee.

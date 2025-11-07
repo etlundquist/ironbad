@@ -57,8 +57,8 @@ class Contract(Base):
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
-    sections = relationship("ContractSection", back_populates="contract")
-    clauses = relationship("ContractClause", back_populates="contract")
+    sections = relationship("ContractSection", back_populates="contract", cascade="all, delete-orphan", passive_deletes=True)
+    clauses = relationship("ContractClause", back_populates="contract", cascade="all, delete-orphan", passive_deletes=True)
 
 
 class ContractSection(Base):
