@@ -38,8 +38,8 @@ standard_clauses:
       The service credit remedy shall be Customer's sole and exclusive remedy for Supplier's failure to meet the service levels set forth herein, except that repeated or prolonged failures to meet service levels may constitute a material breach entitling Customer to terminate this Agreement.
 
   - name: data_privacy
-    display_name: Data Protection and Security
-    description: Data ownership, processing instructions, privacy law compliance, security safeguards, and breach notification.
+    display_name: Data Protection, Privacy, Confidentiality, and Security
+    description: Data ownership, processing instructions, privacy law compliance, confidentiality obligations, security safeguards, and breach notification.
     standard_text: |
       As between the parties, Customer retains all right, title, and interest in and to all Customer Data. 
       Supplier shall process Customer Data solely for the purpose of providing the Services in accordance with this Agreement and Customer's documented instructions, and shall not use, disclose, or access Customer Data for any other purpose.

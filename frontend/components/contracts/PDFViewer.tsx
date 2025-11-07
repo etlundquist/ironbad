@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { Contract } from '../../lib/types'
 import { getContractContentUrl } from '../../lib/api'
@@ -35,7 +35,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ contract }) => {
     handleZoomChange,
     clearSearch,
     goToNextSearchResult,
-    goToPreviousSearchResult
+    goToPreviousSearchResult,
+    clearHighlights
   } = usePDFViewer()
 
   useEffect(() => {
@@ -55,10 +56,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ contract }) => {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      (window as any).pdfViewerFunctions = { navigateToPage, highlightText: (text: string, pageNumber?: number) => {
-        if (typeof pageNumber === 'number') navigateToPage(pageNumber)
-        console.log('Highlight requested for text:', text, 'on page:', pageNumber)
-      }, searchInPDF: searchInPDF }
+      ;(window as any).pdfViewerFunctions = {
+        navigateToPage,
+        highlightText: (text: string, pageNumber?: number) => {
+          if (typeof pageNumber === 'number') navigateToPage(pageNumber)
+          console.log('Highlight requested for text:', text, 'on page:', pageNumber)
+        },
+        searchInPDF: searchInPDF
+      }
     }
   }, [navigateToPage])
 
@@ -67,116 +72,174 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ contract }) => {
     setPdfLoading(false)
   }
 
-  const clearHighlights = () => {
-    const highlights = document.querySelectorAll('.pdf-search-highlight')
-    highlights.forEach(highlight => {
-      highlight.remove()
+  const waitForTextLayer = (pageElement: HTMLElement): Promise<HTMLElement | null> => {
+    return new Promise(resolve => {
+      const existingLayer = pageElement.querySelector<HTMLElement>('.react-pdf__Page__textContent')
+      if (existingLayer) {
+        resolve(existingLayer)
+        return
+      }
+
+      const observer = new MutationObserver(() => {
+        const layer = pageElement.querySelector<HTMLElement>('.react-pdf__Page__textContent')
+        if (layer) {
+          observer.disconnect()
+          resolve(layer)
+        }
+      })
+
+      observer.observe(pageElement, { childList: true, subtree: true })
+
+      // Fallback in case the text layer never renders
+      setTimeout(() => {
+        observer.disconnect()
+        resolve(pageElement.querySelector<HTMLElement>('.react-pdf__Page__textContent'))
+      }, 1500)
     })
   }
 
-  const highlightTextInPage = (pageElement: HTMLElement, searchText: string, currentIndex: number) => {
-    setTimeout(() => {
-      const textLayer = pageElement.querySelector('.react-pdf__Page__textContent')
-      if (!textLayer) return
+  const buildTextSegments = (root: HTMLElement) => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null)
+    let currentNode = walker.nextNode() as Text | null
+    let currentIndex = 0
+    const segments: Array<{ node: Text; start: number; end: number }> = []
+    let fullText = ''
 
-      const searchTerm = searchText.toLowerCase()
-      const fullText = textLayer.textContent || ''
+    while (currentNode) {
+      const textContent = currentNode.textContent || ''
+      const start = currentIndex
+      const end = start + textContent.length
+      segments.push({ node: currentNode, start, end })
+      fullText += textContent
+      currentIndex = end
+      currentNode = walker.nextNode() as Text | null
+    }
 
-      if (fullText.toLowerCase().includes(searchTerm)) {
-        const textSpans = Array.from(textLayer.querySelectorAll('span'))
-        const textNodes = textSpans.map(span => ({
-          element: span,
-          text: span.textContent || '',
-          startIndex: 0,
-          endIndex: 0
-        }))
-
-        let currentPos = 0
-        textNodes.forEach(node => {
-          node.startIndex = currentPos
-          node.endIndex = currentPos + node.text.length
-          currentPos += node.text.length
-        })
-
-        const regex = new RegExp(`(${searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
-        let match
-        let matchIndex = 0
-
-        while ((match = regex.exec(fullText)) !== null) {
-          const matchStart = match.index
-          const matchEnd = match.index + match[0].length
-
-          const affectedSpans = textNodes.filter(node =>
-            node.startIndex < matchEnd && node.endIndex > matchStart
-          )
-
-          if (affectedSpans.length > 0) {
-            if (affectedSpans.length === 1) {
-              const span = affectedSpans[0]
-              const relativeStart = Math.max(0, matchStart - span.startIndex)
-              const relativeEnd = Math.min(span.text.length, matchEnd - span.startIndex)
-              const beforeText = span.text.substring(0, relativeStart)
-              const matchText = span.text.substring(relativeStart, relativeEnd)
-              const afterText = span.text.substring(relativeEnd)
-
-              const isCurrent = currentIndex >= 0 && matchIndex === currentIndex
-              const className = isCurrent ? 'pdf-search-highlight current' : 'pdf-search-highlight'
-              const highlightedMatch = `<span class="${className}">${matchText}</span>`
-
-              span.element.innerHTML = beforeText + highlightedMatch + afterText
-            } else {
-              affectedSpans.forEach((span, spanIndex) => {
-                const spanStart = Math.max(0, matchStart - span.startIndex)
-                const spanEnd = Math.min(span.text.length, matchEnd - span.startIndex)
-
-                const isCurrent = currentIndex >= 0 && matchIndex === currentIndex
-                const className = isCurrent ? 'pdf-search-highlight current' : 'pdf-search-highlight'
-
-                if (spanIndex === 0) {
-                  const beforeText = span.text.substring(0, spanStart)
-                  const matchText = span.text.substring(spanStart)
-                  span.element.innerHTML = beforeText + `<span class="${className}">${matchText}</span>`
-                } else if (spanIndex === affectedSpans.length - 1) {
-                  const matchText = span.text.substring(0, spanEnd)
-                  const afterText = span.text.substring(spanEnd)
-                  span.element.innerHTML = `<span class="${className}">${matchText}</span>` + afterText
-                } else {
-                  span.element.innerHTML = `<span class="${className}">${span.text}</span>`
-                }
-              })
-            }
-
-            matchIndex++
-          }
-        }
-      }
-    }, 200)
+    return { segments, fullText }
   }
+
+  const findTextNodeAtPosition = (
+    segments: Array<{ node: Text; start: number; end: number }>,
+    position: number,
+    preferEnd = false
+  ) => {
+    for (const segment of segments) {
+      const { start, end } = segment
+      const withinStart = position >= start && position < end
+      const withinEnd = preferEnd ? position > start && position <= end : withinStart
+
+      if ((!preferEnd && withinStart) || (preferEnd && withinEnd)) {
+        const offset = Math.max(0, Math.min(position - start, (segment.node.textContent || '').length))
+        return { node: segment.node, offset }
+      }
+    }
+
+    if (preferEnd && segments.length > 0) {
+      const last = segments[segments.length - 1]
+      return { node: last.node, offset: (last.node.textContent || '').length }
+    }
+
+    return null
+  }
+
+  const highlightTextLayer = (textLayer: HTMLElement, searchTerm: string, startingIndex: number) => {
+    const { segments, fullText } = buildTextSegments(textLayer)
+
+    if (!fullText) return 0
+
+    const escaped = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const regex = new RegExp(escaped, 'gi')
+
+    let match: RegExpExecArray | null
+    let matchesOnLayer = 0
+
+    while ((match = regex.exec(fullText)) !== null) {
+      const matchStart = match.index
+      const matchEnd = match.index + match[0].length
+
+      const startNodeInfo = findTextNodeAtPosition(segments, matchStart)
+      const endNodeInfo = findTextNodeAtPosition(segments, matchEnd, true)
+
+      if (!startNodeInfo || !endNodeInfo) {
+        continue
+      }
+
+      const range = document.createRange()
+      range.setStart(startNodeInfo.node, startNodeInfo.offset)
+      range.setEnd(endNodeInfo.node, endNodeInfo.offset)
+
+      const highlightSpan = document.createElement('span')
+      highlightSpan.className = 'pdf-search-highlight'
+      highlightSpan.setAttribute('data-result-index', `${startingIndex + matchesOnLayer}`)
+
+      try {
+        range.surroundContents(highlightSpan)
+      } catch {
+        const contents = range.extractContents()
+        highlightSpan.appendChild(contents)
+        range.insertNode(highlightSpan)
+      }
+
+      matchesOnLayer++
+    }
+
+    return matchesOnLayer
+  }
+
+  const updateCurrentHighlightClass = useCallback(
+    (index: number) => {
+      const highlights = document.querySelectorAll<HTMLElement>('.pdf-search-highlight')
+      highlights.forEach(span => {
+        const highlightIndex = Number(span.dataset.resultIndex ?? -1)
+        if (highlightIndex === index && index >= 0) {
+          span.classList.add('current')
+        } else {
+          span.classList.remove('current')
+        }
+      })
+    },
+    []
+  )
 
   const performSearch = async (text: string) => {
     setIsSearching(true)
     try {
       clearHighlights()
 
-      const results = []
-      const searchTerm = text.toLowerCase()
+      const results: Array<{ page: number; text: string; index: number }> = []
+      const normalizedSearch = text.trim()
+
+      if (!normalizedSearch) {
+        setSearchResults([])
+        setCurrentSearchIndex(0)
+        return
+      }
+
+      let matchesSoFar = 0
 
       for (let i = 1; i <= (numPages || 0); i++) {
         const pageElement = document.getElementById(`pdf-page-${i}`)
-        if (pageElement) {
-          const textContent = pageElement.textContent?.toLowerCase() || ''
-          if (textContent.includes(searchTerm)) {
-            results.push({ page: i, text: text })
-            highlightTextInPage(pageElement, text, i === 1 ? 0 : -1)
+        if (!pageElement) continue
+
+        const textLayer = await waitForTextLayer(pageElement)
+        if (!textLayer) continue
+
+        const matchesOnPage = highlightTextLayer(textLayer, normalizedSearch, matchesSoFar)
+
+        if (matchesOnPage > 0) {
+          for (let j = 0; j < matchesOnPage; j++) {
+            results.push({ page: i, text: normalizedSearch, index: matchesSoFar + j })
           }
+          matchesSoFar += matchesOnPage
         }
       }
 
       setSearchResults(results)
-      setCurrentSearchIndex(0)
+      setCurrentSearchIndex(results.length > 0 ? 0 : 0)
 
       if (results.length > 0) {
         navigateToPage(results[0].page)
+        updateCurrentHighlightClass(0)
       }
     } catch (error) {
       console.error('Search error:', error)
@@ -192,8 +255,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ contract }) => {
     } else {
       setSearchResults([])
       setCurrentSearchIndex(0)
+      clearHighlights()
     }
   }
+
+  useEffect(() => {
+    if (searchResults.length === 0) return
+    updateCurrentHighlightClass(currentSearchIndex)
+  }, [currentSearchIndex, searchResults.length, updateCurrentHighlightClass])
 
   if (contract.filetype !== 'application/pdf' || !pdfUrl) {
     return (

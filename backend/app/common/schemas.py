@@ -20,6 +20,8 @@ class ContractStructuredMetadata(ConfiguredBaseModel):
     supplier_name: Optional[str] = None
     effective_date: Optional[str] = None
     initial_term: Optional[str] = None
+    renewal_type: Optional[Literal["Automatic", "Manual", "None"]] = None
+    governing_law: Optional[str] = None
 
 class ContractMetadata(ContractStructuredMetadata):
     summary: Optional[str] = None

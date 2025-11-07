@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
 export function usePDFViewer() {
   const [numPages, setNumPages] = useState<number | null>(null)
@@ -31,9 +31,11 @@ export function usePDFViewer() {
     const highlights = document.querySelectorAll('.pdf-search-highlight')
     highlights.forEach(highlight => {
       const parent = highlight.parentNode
-      if (parent) {
-        parent.replaceChild(document.createTextNode(highlight.textContent || ''), highlight)
+      if (!parent) return
+      while (highlight.firstChild) {
+        parent.insertBefore(highlight.firstChild, highlight)
       }
+      parent.removeChild(highlight)
     })
   }
 
@@ -79,7 +81,8 @@ export function usePDFViewer() {
     handleZoomChange,
     clearSearch,
     goToNextSearchResult,
-    goToPreviousSearchResult
+    goToPreviousSearchResult,
+    clearHighlights
   }
 }
 

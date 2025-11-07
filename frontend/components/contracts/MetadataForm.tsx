@@ -20,6 +20,8 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({ contract, onContract
     supplier_name: "",
     effective_date: "",
     initial_term: "",
+    renewal_type: "None",
+    governing_law: "",
     summary: ""
   })
   const [originalMetadata, setOriginalMetadata] = useState<ContractMetadata | null>(null)
@@ -38,6 +40,8 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({ contract, onContract
         supplier_name: "",
         effective_date: "",
         initial_term: "",
+        renewal_type: "None",
+        governing_law: "",
         summary: ""
       }
       setMetadata(defaultMetadata)
@@ -133,31 +137,33 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({ contract, onContract
       </div>
 
       <div className="metadata-form">
-        <div className="form-group">
-          <label htmlFor="document_type">Document Type</label>
-          <select
-            id="document_type"
-            value={metadata.document_type}
-            onChange={(e) => handleMetadataChange('document_type', e.target.value)}
-            className="form-select"
-          >
-            <option value="Master Agreement">Master Agreement</option>
-            <option value="Statement of Work">Statement of Work</option>
-            <option value="Purchase Order">Purchase Order</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="document_type">Document Type</label>
+            <select
+              id="document_type"
+              value={metadata.document_type}
+              onChange={(e) => handleMetadataChange('document_type', e.target.value)}
+              className="form-select"
+            >
+              <option value="Master Agreement">Master Agreement</option>
+              <option value="Statement of Work">Statement of Work</option>
+              <option value="Purchase Order">Purchase Order</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
 
-        <div className="form-group">
-          <label htmlFor="document_title">Document Title</label>
-          <input
-            type="text"
-            id="document_title"
-            value={metadata.document_title || ''}
-            onChange={(e) => handleMetadataChange('document_title', e.target.value)}
-            className="form-input"
-            placeholder="Enter document title"
-          />
+          <div className="form-group">
+            <label htmlFor="document_title">Document Title</label>
+            <input
+              type="text"
+              id="document_title"
+              value={metadata.document_title || ''}
+              onChange={(e) => handleMetadataChange('document_title', e.target.value)}
+              className="form-input"
+              placeholder="Enter document title"
+            />
+          </div>
         </div>
 
         <div className="form-row">
@@ -207,6 +213,34 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({ contract, onContract
               onChange={(e) => handleMetadataChange('initial_term', e.target.value)}
               className="form-input"
               placeholder="e.g., 12 months, 2 years"
+            />
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="renewal_type">Renewal Type</label>
+            <select
+              id="renewal_type"
+              value={metadata.renewal_type || 'None'}
+              onChange={(e) => handleMetadataChange('renewal_type', e.target.value)}
+              className="form-select"
+            >
+              <option value="Automatic">Automatic</option>
+              <option value="Manual">Manual</option>
+              <option value="None">None</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="governing_law">Governing Law</label>
+            <input
+              type="text"
+              id="governing_law"
+              value={metadata.governing_law || ''}
+              onChange={(e) => handleMetadataChange('governing_law', e.target.value)}
+              className="form-input"
+              placeholder="e.g., California, Delaware"
             />
           </div>
         </div>

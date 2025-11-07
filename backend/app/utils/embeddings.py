@@ -29,7 +29,7 @@ async def get_clause_embeddings(clauses: list[StandardClause]) -> list[list[floa
     """get vector embeddings for a list of standard clauses"""
 
     openai = AsyncOpenAI()
-    clause_texts = [string_truncate(f"{clause.display_name}\n{clause.standard_text}", max_tokens=settings.openai_embedding_max_tokens, tokenizer=encoding) for clause in clauses]
+    clause_texts = [string_truncate(f"{clause.display_name}\n{clause.description}\n{clause.standard_text}", max_tokens=settings.openai_embedding_max_tokens, tokenizer=encoding) for clause in clauses]
     clause_tasks = [with_semaphore(openai.embeddings.create(input=text, model=settings.openai_embedding_model), openai_semaphore) for text in clause_texts]
     clause_responses: list[CreateEmbeddingResponse|Exception] = await asyncio.gather(*clause_tasks, return_exceptions=True)
     clause_embeddings: list[list[float]] = [response.data[0].embedding if isinstance(response, CreateEmbeddingResponse) else None for response in clause_responses]

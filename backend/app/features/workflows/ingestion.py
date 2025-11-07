@@ -306,7 +306,7 @@ async def extract_contract_structured_metadata(contract_markdown: str) -> Contra
 
     openai = AsyncOpenAI()
     response: ParsedResponse = await openai.responses.parse(
-        model="gpt-4.1-mini",
+        model="gpt-4.1",
         instructions=PROMPT_METADATA_EXTRACTION,
         input=contract_markdown,
         text_format=ContractStructuredMetadata,
@@ -322,7 +322,7 @@ async def extract_contract_summary(contract_markdown: str) -> str:
 
     openai = AsyncOpenAI()
     response: Response = await openai.responses.create(
-        model="gpt-4.1-mini",
+        model="gpt-4.1",
         instructions=PROMPT_CONTRACT_SUMMARY,
         input=contract_markdown,
         temperature=0.0,

@@ -5,6 +5,8 @@ export interface ContractMetadata {
   supplier_name?: string
   effective_date?: string
   initial_term?: string
+  renewal_type?: "Automatic" | "Manual" | "None"
+  governing_law?: string
   summary?: string
 }
 

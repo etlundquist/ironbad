@@ -91,10 +91,12 @@ Extract the following metadata attributes from the contract text provided below 
 - supplier_name: the company name of the "Supplier" party in the contract (i.e. the supplier, vendor, or service provider company named in the contract)
 - effective_date: the effective date or execution date of the contract in YYYY-MM-DD format if available
 - initial_term: the term, end date, or duration of the contract's initial period if available in a single sentence
+- renewal_type: the contract's renewal process, one of: ["Automatic", "Manual", "None"]
+- governing_law: the governing law of the contract, e.g. "State of New York"
 
 # Extraction Guidelines
 - valid `document_type` values are as follow:
-    - "Master Agreement": an overall services or licensing contract that sets the high-level terms and conditions governing the relationship between the two parties
+    - "Master Agreement": a primary contract that governs the overall legal relationship between the two parties and sets the high-level terms and conditions; often titled "Terms of Service", "Customer Agreement", "License Agreement", etc.
     - "Statement of Work": a detailed contract that defines the scope, deliverables, timelines, and pricing for a specific project under a master agreement
     - "Purchase Order": a short-form contract authorizing a specific purchase or license of goods or services, usually referencing a master agreement
     - "Other": additional addendums (e.g. confidentiality, non-disclosure, etc.) or non-contract documents (no legal terms or conditions)
@@ -102,6 +104,8 @@ Extract the following metadata attributes from the contract text provided below 
 - the `customer_name` and `supplier_name` are usually identified in the contract preamble - do not include legal entity suffixes such as "Inc.", "LLC", "Corp", etc.
 - the `effective_date` is usually either mentioned explicitly at the beginning of the contract or on the signature page
 - the `initial_term` can be specified as fixed end date or an initial duration in months or years - concisely extract the initial term if present in a single sentence
+- the `renewal_type` is the contract's renewal process, one of: ["Automatic", "Manual", "None"]
+- the `governing_law` is the governing law of the contract, e.g. "State of New York"
 - if you cannot determine the correct value for an attribute then omit it from your response - do not make up information or respond that the information is not available
 - format your response as a valid JSON object conforming to the Example Response provided below
 
@@ -112,7 +116,9 @@ Extract the following metadata attributes from the contract text provided below 
   "customer_name": "PepsiCo",
   "supplier_name": “Okta”,
   "effective_date": "2023-12-01",
-  "initial_term": "the agreement shall begin on the Effective Date and continue for two years"
+  "initial_term": "the agreement shall begin on the Effective Date and continue for two years",
+  "renewal_type": "Automatic",
+  "governing_law": "State of New York"
 }
 """.strip()
 
@@ -125,8 +131,11 @@ Produce a concise summary of at most 200 words that gives a clear, high-level un
 Include the following information in your summary when available:
 - the contract type (e.g. software license, master service agreement, purchase order, etc.) and the high-level purpose or scope of the agreement
 - the parties' full names (if available) and roles (e.g. customer, supplier, licensee, licensor, etc.) that describe how each party is referenced in the contract
+- a list of clause names and/or high-level provisions that are covered by the contract
 - any references to related documents, attachments, or schedules that are referenced in the agreement but not provided in the contract text
+- the contract's governing law
 
+Do not include specific terms and conditions (e.g. liability limits, indemnification obligations, termination provisions, etc.).
 Write your summary in a single paragraph of plain, compact prose.
 Avoid restating boilerplate language or quoting large blocks of text verbatim.
 """.strip()
@@ -142,10 +151,9 @@ Determine whether the contract section is relevant to the standard clause.
 - read the contract summary for context about the overall nature and scope of the agreement, but do not rely on it to determine whether the section is relevant
 - read the contract section carefully to understand whether it is relevant to the standard clause based on the section's title and/or text
 - consider the section relevant if it's title is semantically similar to the standard clause's title
-- consider the section relevant if it's text covers the same generalcategories of terms and conditions as the standard clause
+- consider the section relevant if it's text covers the same general categories of terms and conditions as the standard clause
 - consider the section relevant if it contains a subset of the standard clause's terms and conditions
-- consider the section relevant if it contains any relevant numbered or bulleted sub-sections
-- do not consider the section relevant if it's title and/or text are unrelated or not relevant to the standard clause
+- consider the section relevant if it contains any numbered or bulleted sub-sections that are relevant to the standard clause
 - output an overall relevant/not-relevant determination and a confidence score between 0 and 99 indicating how confident you are in your determination
 - output the results in JSON format corresponding to the following schema: {{"relevant": boolean, "confidence": integer}}
 
