@@ -2707,6 +2707,12 @@ main {
     max-width: 100%;
   }
 
+  .agent-chat-panel .chat-message.user,
+  .agent-chat-panel .chat-message.assistant {
+    width: 100%;
+    max-width: 100%;
+  }
+
   .chat-input-container {
     flex-direction: column;
     align-items: stretch;
@@ -3609,6 +3615,16 @@ main {
   overflow-y: auto;
   padding-right: 8px;
   margin-bottom: 16px;
+}
+
+.agent-chat-panel .chat-message.assistant,
+.agent-chat-panel .chat-message.user {
+  width: 85%;
+  max-width: 85%;
+}
+
+.agent-chat-panel .chat-message-meta {
+  width: 100%;
 }
 
 .agent-chat-panel .chat-input-container {

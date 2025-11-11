@@ -417,6 +417,8 @@ async def make_revision(
     Make a new suggested revision anchored to a specific contract section and consecutive text span.
     The old text must be an exact, case-sensitive substring of the retrieved contract section text.
     Use this tool to edit specific contract text spans to add/remove/modify terms and conditions based on the user's request.
+    Make your revisions as small as possible (edit smallest possible original text) to make the required changes.
+    Do not replace long runs of existing text with identical new text as it makes the document harder to read and understand.
 
     :param section_number: the section number to which the revision applies
     :param old_text: the old text to be replaced (exact, case-sensitive substring of the retrieved section text)
@@ -616,9 +618,8 @@ async def todo_write(
     When to use:
     - complex multi-step tasks (3+ distinct steps)
     - non-trivial tasks requiring careful planning
-    - after receiving new instructions (use merge=False to create new todos)
-    - after completing tasks (use merge=True to mark complete and add follow-ups)
-    - when starting new tasks (mark as in_progress, ideally only one at a time)
+    - after completing task steps (use merge=True to mark complete and add follow-ups)
+    - when starting new task steps (mark as in_progress, ideally only one at a time)
     
     When NOT to use:
     - single, straightforward tasks
@@ -626,10 +627,11 @@ async def todo_write(
     - purely informational requests
     
     Task Management Guidelines:
+    - don't add steps for creating/updating the todo list itself or for generating your final response
     - update status in real-time as you work
     - mark complete IMMEDIATELY after finishing
     - only ONE task in_progress at a time
-    - complete current tasks before starting new ones
+    - complete current steps before starting new ones
     
     :param merge: if True, merge/update existing todos by id; if False, replace all todos with the new list
     :param todos: array of todo items with id, content, and status fields

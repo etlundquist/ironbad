@@ -70,6 +70,7 @@ async def resolve_agent_instructions(wrapper: RunContextWrapper[AgentContext], a
 
 model_settings = ModelSettings(reasoning=Reasoning(effort="medium", summary="detailed"), verbosity="medium", store=True)
 # TODO: switch to 'concise' reasoning summary once the SDK bug is fixed (https://github.com/openai/codex/issues/2376)
+# TODO: the current reasoning summaries are way too verbose and need to be simplified for better UI/UX in the progress log
 
 agent = Agent[AgentContext](
     name="Contract Redline Agent",
