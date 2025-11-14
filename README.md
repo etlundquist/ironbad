@@ -3,25 +3,26 @@
 > 🚧 **Under Construction** 🚧  
 > This project is a work in progress. Features, documentation, and APIs are subject to change.
 
-An AI-enabled Contract Lifecycle Management (CLM) platform built with FastAPI and Next.js. This project takes inspiration from [Ironclad](https://ironcladapp.com/) and serves as a sample implementation exploring various LLM/GenAI tools and methodologies for contract analysis, Q&A, and intelligent document redlining.
+An AI-Powered Contract Lifecycle Management (CLM) platform built with FastAPI and Next.js. This project takes inspiration from [Ironclad](https://ironcladapp.com/) and serves as a sample project to explore various LLM/GenAI tools and methodologies for document processing, Q&A, structured workflows, and agents.
 
 ## Overview
 
-Ironbad provides an end-to-end solution for contract review, leveraging AI to automate ingestion, analysis, and review workflows. The platform parses contracts into structured sections, matches input sections to standard clauses, identifies and resolves compliance issues, and offers both a simple RAG-based Q&A chat and an AI agent capable of making contract annotations and revisions as well as answering questions with rich inline citations. Users may view/edit contract sections and make/edit/resolve annotations including comments, revisions, section adds, and section removes themselves or collaboratively with an AI agent.
+Ironbad provides an end-to-end solution for contract review, leveraging AI to automate ingestion, analysis, and redlining workflows. The platform parses contracts into a tree of structured sections, maps sections to standard clauses, identifies compliance issues, and offers both a RAG-based Q&A chat and an AI agent capable of making contract annotations and revisions as well as answering questions with citations to relevant contract sections. Users may view/edit contract sections and manage annotations (comments, revisions, section adds/removes) either manually or collaboratively with the AI agent in the interactive redlining UI. The agent chat supports pinning attachments including precedent documents, specific contract sections, or highlighted text spans for additional context.
 
 ## Tech Stack
 
 ### Backend
-- **Framework:** FastAPI 0.x (async)
-- **Language:** Python 3.11+
+- **Language:** Python 3.11
+- **Framework:** FastAPI
 - **Database:** PostgreSQL 15+ with pgvector extension
 - **ORM:** SQLAlchemy 2.0 (async)
 - **Cache/Queue:** Redis 7+
-- **Task Queue:** Taskiq with Redis broker
-- **LLM:** OpenAI API (GPT-4o, GPT-5-preview, text-embedding-3-small)
-- **PDF/DOCX Parsing:** Docling
-- **Observability:** Pydantic Logfire (optional)
+- **Async Tasks:** Taskiq with Redis broker
+- **LLM:** OpenAI GPT-4.1 (workflows), GPT-5 (agents), TEXT-EMBEDDING-SMALL (embeddings)
+- **PDF/DOCX Parsing:** IBM Docling
 - **Agent Framework:** OpenAI Agents SDK
+- **Tracing/Observability:** Pydantic Logfire, OpenAI Tracing
+- **Real-Time Communication:** Server-Sent Events (SSE)
 
 ### Frontend
 - **Framework:** Next.js 14 (Pages Router)
@@ -29,12 +30,6 @@ Ironbad provides an end-to-end solution for contract review, leveraging AI to au
 - **UI Library:** React 18
 - **PDF Rendering:** react-pdf + pdfjs-dist
 - **Markdown Rendering:** react-markdown
-- **Real-time Communication:** Server-Sent Events (SSE)
-
-### Infrastructure
-- **Containerization:** Docker & Docker Compose
-- **Database Migrations:** SQLAlchemy table creation (development), Alembic-ready
-- **Environment Management:** python-dotenv, uv for Python dependencies
 
 ## Core Features
 
@@ -46,10 +41,10 @@ Ironbad provides an end-to-end solution for contract review, leveraging AI to au
 
 ### 2. Intelligent Contract Analysis
 - Automatic clause extraction and categorization
-- Policy template matching using semantic similarity (pgvector)
-- Rule-based compliance evaluation
-- AI-powered issue detection with severity levels
-- Generates actionable insights and recommendations
+- Standard clause template matching using semantic similarity (pgvector)
+- Rule-based compliance evaluation against policy requirements
+- AI-powered issue detection with severity levels (critical/warning)
+- Generates actionable revision suggestions based on standard clause language
 
 ### 3. Contract Q&A Chat (RAG)
 - Conversational interface for querying contract content
@@ -60,15 +55,16 @@ Ironbad provides an end-to-end solution for contract review, leveraging AI to au
 
 ### 4. AI Contract Agent
 - OpenAI native agent with custom tool-calling capabilities
-- Actions: add comments, propose revisions, suggest section adds/removes
-- Real-time progress tracking with tool call visualization
-- Streaming responses showing reasoning and actions
-- Integration with contract review workflow
+- Attachments: pin precedent documents to guide revisions, pin specific contract sections and/or text spans for context
+- Actions: answer questions with citations, analyze compliance against policy rules, add comments, propose revisions, suggest section adds/removes
+- Real-time progress tracking with task list and full agent trace (reasoning, tool calls, outputs)
+- Streaming responses with live updates
+- Integrated with contract review workflow
 
 ### 5. Contract Review Workspace
-- Interactive section tree with inline annotations
+- Interactive collapsible section tree with inline annotations
 - Comment management with resolution tracking
-- Revision proposals with AI and manual workflows
+- Revision proposals with AI-assisted and manual workflows
 - Section operation suggestions (add/remove)
 - Unified changelog showing all modifications
 - Side-by-side agent chat for guided redlining
@@ -79,19 +75,22 @@ Ironbad provides an end-to-end solution for contract review, leveraging AI to au
 - YAML-based sample data for seeding
 - CRUD operations via REST API
 
-### 7. Real-time Notifications
-- Long-lived SSE connection for status updates
+### 7. Prompt Library
+- Save prompts to use later during contract review with the AI agent
+- Prompts may include template variables that are resolved at execution time
+
+### 8. Real-time Notifications
+- Long-lived SSE connection for push-based status updates from the backend
 - Redis pub/sub for multi-client broadcasting
 - Toast notifications in UI for user feedback
 - Event types: ingestion progress, analysis completion, errors
 
 ## Future Enhancements
 
-- Saved Prompts with template variables and Precedent Documents for agent chat
-- Multi-user support including authentication and authorization
-- Document version control and version history
-- Document import/export directly to/from DOCX
-- Fine-tuned models for domain-specific extraction
+- Document version control and diff visualization
+- DOCX import/export for annotated contracts
+- Live collaborative contract editing (OnlyOffice, Collabora, etc.)
+- Fine-tuned models for improved compliance classification
 
 ## Project Structure
 
@@ -109,10 +108,11 @@ ironbad/
 │   │   │   ├── contract_clauses/       # Clause retrieval
 │   │   │   ├── contract_issues/        # Issue management
 │   │   │   ├── contract_sections/      # Section retrieval
-│   │   │   ├── notifications/          # SSE stream
-│   │   │   ├── standard_clauses/       # Policy templates
+│   │   │   ├── notifications/          # SSE notifications
+│   │   │   ├── saved_prompts/          # Prompt templates
+│   │   │   ├── standard_clauses/       # Policy clause templates
 │   │   │   ├── standard_clause_rules/  # Compliance rules
-│   │   │   └── workflows/              # Background tasks
+│   │   │   └── workflows/              # Background ingestion tasks
 │   │   ├── models.py                   # SQLAlchemy ORM models
 │   │   ├── enums.py                    # Shared enumerations
 │   │   ├── prompts.py                  # LLM prompt templates
@@ -135,38 +135,6 @@ ironbad/
 ├── sample_output/              # Sample processed contract outputs
 └── docker-compose.yml          # Service orchestration
 ```
-
-## Usage Workflow
-
-1. **Upload Contract:** Navigate to `/upload` and drag-and-drop a PDF or DOCX file
-2. **Ingest:** Click "Ingest" on the contract list to trigger parsing and embedding generation
-3. **Analyze:** Click "Analyze" to run clause matching and issue detection
-4. **Review:** View extracted clauses and identified issues on the contract detail page
-5. **Chat:** Ask questions about the contract content using the RAG-based chat interface
-6. **Redline:** Use the review workspace with the AI agent to make annotations and revisions
-
-## Key Technologies & Patterns
-
-### Backend Patterns
-- **Async-first:** All I/O operations use `async`/`await`
-- **Feature-based organization:** Vertical slices with minimal cross-dependencies
-- **Dependency injection:** FastAPI dependencies for sessions and configuration
-- **Type safety:** Pydantic schemas for validation, SQLAlchemy models for persistence
-- **Background processing:** Taskiq for long-running ingestion and analysis tasks
-
-### Frontend Patterns
-- **Type safety:** Full TypeScript with strict mode
-- **Separation of concerns:** Pages, components, hooks, API clients, and types
-- **Error handling:** Toast notifications for all user feedback
-- **Real-time updates:** SSE for contract status changes and agent progress
-- **Custom hooks:** Encapsulated business logic (useContract, useAgentChat, etc.)
-
-### AI/LLM Integration
-- **Vector search:** pgvector for semantic clause matching
-- **RAG pattern:** Context injection from vector-retrieved sections
-- **Agent framework:** OpenAI Agents SDK with custom tools for contract operations
-- **Streaming:** Token-by-token responses via SSE for better UX
-- **Embeddings:** OpenAI text-embedding-3-small (1536 dimensions)
 
 ## Architecture Documentation
 
