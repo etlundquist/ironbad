@@ -104,14 +104,12 @@
     {
         "id": 10,
         "contract_filename": "thomson-reuters-eula.pdf",
-        "task_category": "compliance_analysis",
+        "task_category": "question_answering",
         "task_criteria": [
-            "Answer must provide an overall answer of no, the contract does not explicitly meet our required minimum threshold amount",
-            "Answer must state that the contract satisfies the part of the rule requiring the liability cap to be at least twelve (12) months of fees paid",
-            "Answer must state that the contract does not specify a minimum dollar amount (e.g., $500,000) as a floor for the liability cap",
-            "Answer must state that if the fees paid in 12 months are less than $500,000, the supplier's liability limit could be less than $500,000, which does not meet the stated rule"
+            "Answer must provide an overall answer of no, the contract does not warrant that the Software is non-infringing and complies with all applicable laws",
+            "Answer must include citations to the relevant contract sections that support the answer correctly formatted in square brackets"
         ],
-        "user_message": "Do the supplier's liability limits meet our minimum threshold requirements?"
+        "user_message": "Does the supplier warrant that the Software is non-infringing and complies with applicable laws?"
     },
     {
         "id": 11,
@@ -131,7 +129,7 @@
             "Answer must provide an overall answer of yes, the contract conforms with our required term and renewal policy",
             "Answer must state that the initial term is defined in the Ordering Document, and the contract allows either party to prevent auto-renewal by giving at least 30 days' written notice before the end of the then-current term"
         ],
-        "user_message": "Does the contract conform with our required term and renewal policy?"
+        "user_message": "Does the contract comply with our required renewal policies?"
     },
 
     {
@@ -173,11 +171,11 @@
         "contract_filename": "thomson-reuters-eula.pdf",
         "task_category": "contract_annotations",
         "task_criteria": [
-            "Agent must add a revision that modifies Section 8 (Liability) to ensure the threshold amount is always at least $500,000 in accordance with our policy requirements",
-            "Revision should not modify existing carve-outs or exceptions to the liability cap",
-            "Revision should still allow for the threshold to be set based on the amount payable in the previous 12 months"
+            "Agent must add a revision that adds the IP non-infringement warranty to explicitly warrant that the Software does not and will not infringe any third-party intellectual property rights",
+            "Agent must add a revision that adds the legal compliance warranty stating that the Software and Services comply with all applicable laws and regulations",
+            "The revision(s) must be added to the 'warranties and disclaimers' section of the contract"
         ],
-        "user_message": "Revise the liability limits to ensure the threshold amount is always at least $500,000 in accordance with our policy requirements."
+        "user_message": "Revise the warranties section to add explicit IP non-infringement and legal compliance warranties."
     },
     {
         "id": 17,
@@ -198,7 +196,7 @@
             "Agent must add a revision that modifies the governing law clause to specify Delaware law for U.S. customers and Irish law for EU customers",
             "Revision should only modify the governing law clause and not any other clauses"
         ],
-        "user_message": "Revise the governing law clause to comply with our governing law policy requirements."
+        "user_message": "Revise the governing law clause to comply with our governing law policy requirements for both U.S. and EU customers."
     },
     {
         "id": 19,
